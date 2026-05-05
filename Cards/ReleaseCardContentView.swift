@@ -1,0 +1,76 @@
+//
+//  ReleaseCardContentView.swift
+//  MusiCards
+//
+//  Created by Hild György on 2026. 04. 07..
+//
+
+import SwiftUI
+
+struct ReleaseCardContentView: View {
+    let release: MBRelease?
+    let onShowVersions: () -> Void
+
+    var body: some View {
+        if let release {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 6) {
+                    metaRow("Date", MBDateTextFormatter.displayDate(from: release.date))
+                    metaRow("Country", release.country ?? "")
+                    metaRow("Label", labelText(from: release))
+                    metaRow("Cat. no.", catalogNumberText(from: release))
+                    metaRow("Barcode", release.barcode ?? "")
+                    metaRow("Notes", noteText(from: release))
+                    Button(action: {
+                        onShowVersions()
+                    }) {
+                        Text("Other versions →")
+                            .font(.callout)
+                            .foregroundStyle(.tint)
+                    }
+                    .padding(.top, 8)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.bottom, 24)
+            }
+        } else {
+            EmptyStateView.release
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.top, 0)
+        }
+    }
+
+    @ViewBuilder
+    private func metaRow(_ title: String, _ value: String) -> some View {
+        if !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            HStack(alignment: .top, spacing: 12) {
+                Text("\(title):")
+                    .foregroundStyle(.secondary)
+                    .font(.subheadline.weight(.bold))
+                    .frame(width: 80, alignment: .leading)
+
+                Text(value)
+                    .foregroundStyle(.primary)
+                    .font(.subheadline)
+
+                Spacer()
+            }
+        }
+    }
+
+    private func labelText(from release: MBRelease) -> String {
+        release.labelInfo?
+            .compactMap { $0.label?.name }
+            .joined(separator: ", ") ?? ""
+    }
+
+    private func catalogNumberText(from release: MBRelease) -> String {
+        release.labelInfo?
+            .compactMap { $0.catalogNumber }
+            .joined(separator: ", ") ?? ""
+    }
+
+    private func noteText(from release: MBRelease) -> String {
+        release.disambiguation ?? ""
+    }
+}

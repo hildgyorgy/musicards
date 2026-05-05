@@ -1,0 +1,572 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 100;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		F50A4F7E2F8EF16E006FD7A7 /* ClassicalMetadataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50A4F7C2F8EF16E006FD7A7 /* ClassicalMetadataStore.swift */; };
+		F50A4F7F2F8EF16E006FD7A7 /* ClassicalTrackFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50A4F7D2F8EF16E006FD7A7 /* ClassicalTrackFormatter.swift */; };
+		F50AC8762F8E5EE200776C7E /* DeckBackgroundView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50AC8752F8E5EE100776C7E /* DeckBackgroundView.swift */; };
+		F51CEDE02F899A4300E70ACD /* TrackDetailStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51CEDDF2F899A3D00E70ACD /* TrackDetailStore.swift */; };
+		F51CEDE22F89A0EC00E70ACD /* TrackDetailModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51CEDE12F89A0EA00E70ACD /* TrackDetailModels.swift */; };
+		F51CEDE42F89A18900E70ACD /* TrackDetailPagerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51CEDE32F89A18800E70ACD /* TrackDetailPagerView.swift */; };
+		F51CEEB22F8ACE2D00E70ACD /* CoverArtCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51CEEB12F8ACE2800E70ACD /* CoverArtCache.swift */; };
+		F51CEEB42F8ACE8800E70ACD /* ReleaseThumbnailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51CEEB32F8ACE8500E70ACD /* ReleaseThumbnailView.swift */; };
+		F520FA8B2F8D75A50020D8E2 /* ArtistCardHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F520FA8A2F8D75A30020D8E2 /* ArtistCardHeaderView.swift */; };
+		F53022652F862DA40002C907 /* ArtistCardContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F53022642F862D9D0002C907 /* ArtistCardContentView.swift */; };
+		F53022672F8639500002C907 /* SearchMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = F53022662F86394E0002C907 /* SearchMode.swift */; };
+		F530226B2F8647DF0002C907 /* ArtistCreditLinksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F530226A2F8647DD0002C907 /* ArtistCreditLinksView.swift */; };
+		F530226D2F86481E0002C907 /* TracksCardHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F530226C2F86481C0002C907 /* TracksCardHeaderView.swift */; };
+		F530226F2F865D440002C907 /* SafariView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F530226E2F865D420002C907 /* SafariView.swift */; };
+		F53022712F8691230002C907 /* DiscographyGrouping.swift in Sources */ = {isa = PBXBuildFile; fileRef = F53022702F8691210002C907 /* DiscographyGrouping.swift */; };
+		F53A320B2F840607005A436B /* CardsApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F53A32042F840607005A436B /* CardsApp.swift */; };
+		F53A320C2F840607005A436B /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F53A32052F840607005A436B /* ContentView.swift */; };
+		F53A320D2F840607005A436B /* DeckCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = F53A32062F840607005A436B /* DeckCard.swift */; };
+		F53A320E2F840607005A436B /* DeckCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F53A32072F840607005A436B /* DeckCardView.swift */; };
+		F53A320F2F840607005A436B /* DeckLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = F53A32082F840607005A436B /* DeckLayout.swift */; };
+		F53A32102F840607005A436B /* DeckStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = F53A32092F840607005A436B /* DeckStyle.swift */; };
+		F53A32112F840607005A436B /* DeckView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F53A320A2F840607005A436B /* DeckView.swift */; };
+		F53A32122F840607005A436B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F53A32032F840607005A436B /* Assets.xcassets */; };
+		F54FE62F2F9C08ED00646913 /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F54FE62E2F9C08EC00646913 /* AboutView.swift */; };
+		F54FE6332F9C106300646913 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = F54FE6322F9C104D00646913 /* PrivacyInfo.xcprivacy */; };
+		F57FC69D2F8FFBBC00422295 /* PanHandleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F57FC69C2F8FFBBA00422295 /* PanHandleView.swift */; };
+		F57FC69F2F8FFBDB00422295 /* DeckPhysics.swift in Sources */ = {isa = PBXBuildFile; fileRef = F57FC69E2F8FFBD900422295 /* DeckPhysics.swift */; };
+		F5918A072F845AFF00E625DD /* SearchCardContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5918A062F845AFE00E625DD /* SearchCardContentView.swift */; };
+		F5918A092F845C4900E625DD /* SearchContentState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5918A082F845C4900E625DD /* SearchContentState.swift */; };
+		F59B71472F84DBE10086AB37 /* SearchViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F59B71462F84DBDF0086AB37 /* SearchViewModel.swift */; };
+		F59B71492F8536780086AB37 /* SearchReleaseRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = F59B71482F8536750086AB37 /* SearchReleaseRow.swift */; };
+		F59B714B2F8539C60086AB37 /* MusicBrainzService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F59B714A2F8539C60086AB37 /* MusicBrainzService.swift */; };
+		F59B714D2F853B7C0086AB37 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = F59B714C2F853B7C0086AB37 /* Models.swift */; };
+		F59B714F2F8540170086AB37 /* MusiCardsAppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F59B714E2F8540150086AB37 /* MusiCardsAppModel.swift */; };
+		F59F29102F90DBF900A50F8C /* MBDateTextFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F59F290F2F90DBF700A50F8C /* MBDateTextFormatter.swift */; };
+		F59F29122F923B1E00A50F8C /* MusiCards.icon in Resources */ = {isa = PBXBuildFile; fileRef = F59F29112F923B1E00A50F8C /* MusiCards.icon */; };
+		F5BB4C212F982A62001CA927 /* BarcodeScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5BB4C202F982A60001CA927 /* BarcodeScannerView.swift */; };
+		F5D185AA2F93E4A200CDDB1C /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5D185A92F93E4A100CDDB1C /* EmptyStateView.swift */; };
+		F5D185AC2F93F71B00CDDB1C /* ErrorStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5D185AB2F93F71A00CDDB1C /* ErrorStateView.swift */; };
+		F5E62CD42F86ABA800E4B5AF /* ReleaseHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5E62CD32F86ABA600E4B5AF /* ReleaseHeaderView.swift */; };
+		F5ECDD4A2F85780C006161E3 /* TracksCardContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5ECDD492F857809006161E3 /* TracksCardContentView.swift */; };
+		F5ECDD4C2F8583D3006161E3 /* ReleaseCardContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5ECDD4B2F8583D2006161E3 /* ReleaseCardContentView.swift */; };
+		F5ECDD4E2F85A98B006161E3 /* SearchCardHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5ECDD4D2F85A989006161E3 /* SearchCardHeaderView.swift */; };
+		F5ECDD502F85C6FB006161E3 /* SearchArtistRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5ECDD4F2F85C6FA006161E3 /* SearchArtistRow.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		F50A4F7C2F8EF16E006FD7A7 /* ClassicalMetadataStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClassicalMetadataStore.swift; sourceTree = "<group>"; };
+		F50A4F7D2F8EF16E006FD7A7 /* ClassicalTrackFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClassicalTrackFormatter.swift; sourceTree = "<group>"; };
+		F50AC8752F8E5EE100776C7E /* DeckBackgroundView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckBackgroundView.swift; sourceTree = "<group>"; };
+		F51CEDDF2F899A3D00E70ACD /* TrackDetailStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackDetailStore.swift; sourceTree = "<group>"; };
+		F51CEDE12F89A0EA00E70ACD /* TrackDetailModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackDetailModels.swift; sourceTree = "<group>"; };
+		F51CEDE32F89A18800E70ACD /* TrackDetailPagerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackDetailPagerView.swift; sourceTree = "<group>"; };
+		F51CEEB12F8ACE2800E70ACD /* CoverArtCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverArtCache.swift; sourceTree = "<group>"; };
+		F51CEEB32F8ACE8500E70ACD /* ReleaseThumbnailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseThumbnailView.swift; sourceTree = "<group>"; };
+		F520FA8A2F8D75A30020D8E2 /* ArtistCardHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtistCardHeaderView.swift; sourceTree = "<group>"; };
+		F53022642F862D9D0002C907 /* ArtistCardContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtistCardContentView.swift; sourceTree = "<group>"; };
+		F53022662F86394E0002C907 /* SearchMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchMode.swift; sourceTree = "<group>"; };
+		F530226A2F8647DD0002C907 /* ArtistCreditLinksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtistCreditLinksView.swift; sourceTree = "<group>"; };
+		F530226C2F86481C0002C907 /* TracksCardHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TracksCardHeaderView.swift; sourceTree = "<group>"; };
+		F530226E2F865D420002C907 /* SafariView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafariView.swift; sourceTree = "<group>"; };
+		F53022702F8691210002C907 /* DiscographyGrouping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscographyGrouping.swift; sourceTree = "<group>"; };
+		F53A32032F840607005A436B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		F53A32042F840607005A436B /* CardsApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardsApp.swift; sourceTree = "<group>"; };
+		F53A32052F840607005A436B /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		F53A32062F840607005A436B /* DeckCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckCard.swift; sourceTree = "<group>"; };
+		F53A32072F840607005A436B /* DeckCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckCardView.swift; sourceTree = "<group>"; };
+		F53A32082F840607005A436B /* DeckLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckLayout.swift; sourceTree = "<group>"; };
+		F53A32092F840607005A436B /* DeckStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckStyle.swift; sourceTree = "<group>"; };
+		F53A320A2F840607005A436B /* DeckView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckView.swift; sourceTree = "<group>"; };
+		F54FE62E2F9C08EC00646913 /* AboutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutView.swift; sourceTree = "<group>"; };
+		F54FE6322F9C104D00646913 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		F57FC69C2F8FFBBA00422295 /* PanHandleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanHandleView.swift; sourceTree = "<group>"; };
+		F57FC69E2F8FFBD900422295 /* DeckPhysics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckPhysics.swift; sourceTree = "<group>"; };
+		F5918A062F845AFE00E625DD /* SearchCardContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchCardContentView.swift; sourceTree = "<group>"; };
+		F5918A082F845C4900E625DD /* SearchContentState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchContentState.swift; sourceTree = "<group>"; };
+		F59B71462F84DBDF0086AB37 /* SearchViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchViewModel.swift; sourceTree = "<group>"; };
+		F59B71482F8536750086AB37 /* SearchReleaseRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchReleaseRow.swift; sourceTree = "<group>"; };
+		F59B714A2F8539C60086AB37 /* MusicBrainzService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicBrainzService.swift; sourceTree = "<group>"; };
+		F59B714C2F853B7C0086AB37 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		F59B714E2F8540150086AB37 /* MusiCardsAppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusiCardsAppModel.swift; sourceTree = "<group>"; };
+		F59F290F2F90DBF700A50F8C /* MBDateTextFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MBDateTextFormatter.swift; sourceTree = "<group>"; };
+		F59F29112F923B1E00A50F8C /* MusiCards.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = MusiCards.icon; sourceTree = "<group>"; };
+		F5BB4C202F982A60001CA927 /* BarcodeScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BarcodeScannerView.swift; sourceTree = "<group>"; };
+		F5D185A92F93E4A100CDDB1C /* EmptyStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
+		F5D185AB2F93F71A00CDDB1C /* ErrorStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorStateView.swift; sourceTree = "<group>"; };
+		F5E5213F2F8292AD00D2CEAE /* MusiCards Release Viewer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "MusiCards Release Viewer.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		F5E62CD32F86ABA600E4B5AF /* ReleaseHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseHeaderView.swift; sourceTree = "<group>"; };
+		F5E81AE92F982C6B008F35BB /* MusiCards Release Viewer-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "MusiCards Release Viewer-Info.plist"; sourceTree = "<group>"; };
+		F5ECDD492F857809006161E3 /* TracksCardContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TracksCardContentView.swift; sourceTree = "<group>"; };
+		F5ECDD4B2F8583D2006161E3 /* ReleaseCardContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseCardContentView.swift; sourceTree = "<group>"; };
+		F5ECDD4D2F85A989006161E3 /* SearchCardHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchCardHeaderView.swift; sourceTree = "<group>"; };
+		F5ECDD4F2F85C6FA006161E3 /* SearchArtistRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchArtistRow.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		F5E5213C2F8292AD00D2CEAE /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		F5E521362F8292AD00D2CEAE = {
+			isa = PBXGroup;
+			children = (
+				F54FE6322F9C104D00646913 /* PrivacyInfo.xcprivacy */,
+				F5E81AE92F982C6B008F35BB /* MusiCards Release Viewer-Info.plist */,
+				F5E521402F8292AD00D2CEAE /* Products */,
+				F5ECDD572F85CF3D006161E3 /* Resources */,
+				F5ECDD512F85CE95006161E3 /* App */,
+				F5ECDD562F85CF27006161E3 /* Cards */,
+				F5ECDD542F85CEE7006161E3 /* ViewModels */,
+				F5ECDD522F85CEBE006161E3 /* Models */,
+				F5ECDD532F85CED1006161E3 /* Services */,
+				F5ECDD552F85CF0C006161E3 /* Deck */,
+				F59F29112F923B1E00A50F8C /* MusiCards.icon */,
+			);
+			sourceTree = "<group>";
+		};
+		F5E521402F8292AD00D2CEAE /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				F5E5213F2F8292AD00D2CEAE /* MusiCards Release Viewer.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		F5ECDD512F85CE95006161E3 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				F53A32042F840607005A436B /* CardsApp.swift */,
+				F53A32052F840607005A436B /* ContentView.swift */,
+				F59B714E2F8540150086AB37 /* MusiCardsAppModel.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		F5ECDD522F85CEBE006161E3 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				F51CEDE12F89A0EA00E70ACD /* TrackDetailModels.swift */,
+				F53022702F8691210002C907 /* DiscographyGrouping.swift */,
+				F53022662F86394E0002C907 /* SearchMode.swift */,
+				F5918A082F845C4900E625DD /* SearchContentState.swift */,
+				F59B71482F8536750086AB37 /* SearchReleaseRow.swift */,
+				F5ECDD4F2F85C6FA006161E3 /* SearchArtistRow.swift */,
+				F59B714C2F853B7C0086AB37 /* Models.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		F5ECDD532F85CED1006161E3 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				F59F290F2F90DBF700A50F8C /* MBDateTextFormatter.swift */,
+				F51CEEB12F8ACE2800E70ACD /* CoverArtCache.swift */,
+				F51CEDDF2F899A3D00E70ACD /* TrackDetailStore.swift */,
+				F59B714A2F8539C60086AB37 /* MusicBrainzService.swift */,
+				F50A4F7C2F8EF16E006FD7A7 /* ClassicalMetadataStore.swift */,
+				F50A4F7D2F8EF16E006FD7A7 /* ClassicalTrackFormatter.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		F5ECDD542F85CEE7006161E3 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				F59B71462F84DBDF0086AB37 /* SearchViewModel.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		F5ECDD552F85CF0C006161E3 /* Deck */ = {
+			isa = PBXGroup;
+			children = (
+				F5D185AB2F93F71A00CDDB1C /* ErrorStateView.swift */,
+				F5D185A92F93E4A100CDDB1C /* EmptyStateView.swift */,
+				F57FC69E2F8FFBD900422295 /* DeckPhysics.swift */,
+				F57FC69C2F8FFBBA00422295 /* PanHandleView.swift */,
+				F53A32062F840607005A436B /* DeckCard.swift */,
+				F53A32072F840607005A436B /* DeckCardView.swift */,
+				F53A32082F840607005A436B /* DeckLayout.swift */,
+				F53A32092F840607005A436B /* DeckStyle.swift */,
+				F53A320A2F840607005A436B /* DeckView.swift */,
+			);
+			path = Deck;
+			sourceTree = "<group>";
+		};
+		F5ECDD562F85CF27006161E3 /* Cards */ = {
+			isa = PBXGroup;
+			children = (
+				F54FE62E2F9C08EC00646913 /* AboutView.swift */,
+				F5BB4C202F982A60001CA927 /* BarcodeScannerView.swift */,
+				F50AC8752F8E5EE100776C7E /* DeckBackgroundView.swift */,
+				F520FA8A2F8D75A30020D8E2 /* ArtistCardHeaderView.swift */,
+				F530226A2F8647DD0002C907 /* ArtistCreditLinksView.swift */,
+				F53022642F862D9D0002C907 /* ArtistCardContentView.swift */,
+				F51CEDE32F89A18800E70ACD /* TrackDetailPagerView.swift */,
+				F5ECDD492F857809006161E3 /* TracksCardContentView.swift */,
+				F530226C2F86481C0002C907 /* TracksCardHeaderView.swift */,
+				F51CEEB32F8ACE8500E70ACD /* ReleaseThumbnailView.swift */,
+				F5ECDD4B2F8583D2006161E3 /* ReleaseCardContentView.swift */,
+				F5E62CD32F86ABA600E4B5AF /* ReleaseHeaderView.swift */,
+				F5918A062F845AFE00E625DD /* SearchCardContentView.swift */,
+				F5ECDD4D2F85A989006161E3 /* SearchCardHeaderView.swift */,
+				F530226E2F865D420002C907 /* SafariView.swift */,
+			);
+			path = Cards;
+			sourceTree = "<group>";
+		};
+		F5ECDD572F85CF3D006161E3 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				F53A32032F840607005A436B /* Assets.xcassets */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		F5E5213E2F8292AD00D2CEAE /* MusiCards Release Viewer */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F5E5214A2F8292AE00D2CEAE /* Build configuration list for PBXNativeTarget "MusiCards Release Viewer" */;
+			buildPhases = (
+				F5E5213B2F8292AD00D2CEAE /* Sources */,
+				F5E5213C2F8292AD00D2CEAE /* Frameworks */,
+				F5E5213D2F8292AD00D2CEAE /* Resources */,
+			);
+			buildRules = (
+			);
+			name = "MusiCards Release Viewer";
+			productName = Cards;
+			productReference = F5E5213F2F8292AD00D2CEAE /* MusiCards Release Viewer.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		F5E521372F8292AD00D2CEAE /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2640;
+				LastUpgradeCheck = 2640;
+				TargetAttributes = {
+					F5E5213E2F8292AD00D2CEAE = {
+						CreatedOnToolsVersion = 26.4;
+					};
+				};
+			};
+			buildConfigurationList = F5E5213A2F8292AD00D2CEAE /* Build configuration list for PBXProject "MusiCards Release Viewer" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = F5E521362F8292AD00D2CEAE;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 100;
+			productRefGroup = F5E521402F8292AD00D2CEAE /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				F5E5213E2F8292AD00D2CEAE /* MusiCards Release Viewer */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		F5E5213D2F8292AD00D2CEAE /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+				F54FE6332F9C106300646913 /* PrivacyInfo.xcprivacy in Resources */,
+				F59F29122F923B1E00A50F8C /* MusiCards.icon in Resources */,
+				F53A32122F840607005A436B /* Assets.xcassets in Resources */,
+			);
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		F5E5213B2F8292AD00D2CEAE /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+				F5BB4C212F982A62001CA927 /* BarcodeScannerView.swift in Sources */,
+				F530226B2F8647DF0002C907 /* ArtistCreditLinksView.swift in Sources */,
+				F53A320B2F840607005A436B /* CardsApp.swift in Sources */,
+				F5D185AA2F93E4A200CDDB1C /* EmptyStateView.swift in Sources */,
+				F59B714D2F853B7C0086AB37 /* Models.swift in Sources */,
+				F520FA8B2F8D75A50020D8E2 /* ArtistCardHeaderView.swift in Sources */,
+				F53022672F8639500002C907 /* SearchMode.swift in Sources */,
+				F5D185AC2F93F71B00CDDB1C /* ErrorStateView.swift in Sources */,
+				F53A320C2F840607005A436B /* ContentView.swift in Sources */,
+				F59B714F2F8540170086AB37 /* MusiCardsAppModel.swift in Sources */,
+				F53A320D2F840607005A436B /* DeckCard.swift in Sources */,
+				F5ECDD4A2F85780C006161E3 /* TracksCardContentView.swift in Sources */,
+				F51CEEB22F8ACE2D00E70ACD /* CoverArtCache.swift in Sources */,
+				F51CEDE22F89A0EC00E70ACD /* TrackDetailModels.swift in Sources */,
+				F51CEDE42F89A18900E70ACD /* TrackDetailPagerView.swift in Sources */,
+				F59B714B2F8539C60086AB37 /* MusicBrainzService.swift in Sources */,
+				F5ECDD4E2F85A98B006161E3 /* SearchCardHeaderView.swift in Sources */,
+				F53A320E2F840607005A436B /* DeckCardView.swift in Sources */,
+				F5ECDD4C2F8583D3006161E3 /* ReleaseCardContentView.swift in Sources */,
+				F5E62CD42F86ABA800E4B5AF /* ReleaseHeaderView.swift in Sources */,
+				F54FE62F2F9C08ED00646913 /* AboutView.swift in Sources */,
+				F57FC69F2F8FFBDB00422295 /* DeckPhysics.swift in Sources */,
+				F53A320F2F840607005A436B /* DeckLayout.swift in Sources */,
+				F530226F2F865D440002C907 /* SafariView.swift in Sources */,
+				F59B71492F8536780086AB37 /* SearchReleaseRow.swift in Sources */,
+				F50AC8762F8E5EE200776C7E /* DeckBackgroundView.swift in Sources */,
+				F53A32102F840607005A436B /* DeckStyle.swift in Sources */,
+				F59B71472F84DBE10086AB37 /* SearchViewModel.swift in Sources */,
+				F50A4F7E2F8EF16E006FD7A7 /* ClassicalMetadataStore.swift in Sources */,
+				F50A4F7F2F8EF16E006FD7A7 /* ClassicalTrackFormatter.swift in Sources */,
+				F51CEEB42F8ACE8800E70ACD /* ReleaseThumbnailView.swift in Sources */,
+				F5918A092F845C4900E625DD /* SearchContentState.swift in Sources */,
+				F57FC69D2F8FFBBC00422295 /* PanHandleView.swift in Sources */,
+				F5918A072F845AFF00E625DD /* SearchCardContentView.swift in Sources */,
+				F530226D2F86481E0002C907 /* TracksCardHeaderView.swift in Sources */,
+				F53022652F862DA40002C907 /* ArtistCardContentView.swift in Sources */,
+				F53022712F8691230002C907 /* DiscographyGrouping.swift in Sources */,
+				F51CEDE02F899A4300E70ACD /* TrackDetailStore.swift in Sources */,
+				F59F29102F90DBF900A50F8C /* MBDateTextFormatter.swift in Sources */,
+				F53A32112F840607005A436B /* DeckView.swift in Sources */,
+				F5ECDD502F85C6FB006161E3 /* SearchArtistRow.swift in Sources */,
+			);
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		F5E521482F8292AE00D2CEAE /* Debug configuration for PBXProject "MusiCards Release Viewer" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 963B9MS98N;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		F5E521492F8292AE00D2CEAE /* Release configuration for PBXProject "MusiCards Release Viewer" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 963B9MS98N;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		F5E5214B2F8292AE00D2CEAE /* Debug configuration for PBXNativeTarget "MusiCards Release Viewer" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 963B9MS98N;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "MusiCards Release Viewer-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = MusiCards;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
+				INFOPLIST_KEY_NSAppleMusicUsageDescription = "MusiCards uses Apple Music to detect the currently playing track and find the matching release.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "MusiCards uses the camera to scan music release barcodes";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = "-hu.hildgyorgy.musicards";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		F5E5214C2F8292AE00D2CEAE /* Release configuration for PBXNativeTarget "MusiCards Release Viewer" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 963B9MS98N;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "MusiCards Release Viewer-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = MusiCards;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
+				INFOPLIST_KEY_NSAppleMusicUsageDescription = "MusiCards uses Apple Music to detect the currently playing track and find the matching release.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "MusiCards uses the camera to scan music release barcodes";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = hu.hildgyorgy.musicards;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		F5E5213A2F8292AD00D2CEAE /* Build configuration list for PBXProject "MusiCards Release Viewer" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F5E521482F8292AE00D2CEAE /* Debug configuration for PBXProject "MusiCards Release Viewer" */,
+				F5E521492F8292AE00D2CEAE /* Release configuration for PBXProject "MusiCards Release Viewer" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		F5E5214A2F8292AE00D2CEAE /* Build configuration list for PBXNativeTarget "MusiCards Release Viewer" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F5E5214B2F8292AE00D2CEAE /* Debug configuration for PBXNativeTarget "MusiCards Release Viewer" */,
+				F5E5214C2F8292AE00D2CEAE /* Release configuration for PBXNativeTarget "MusiCards Release Viewer" */,
+			);
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = F5E521372F8292AD00D2CEAE /* Project object */;
+}

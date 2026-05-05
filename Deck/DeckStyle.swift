@@ -1,0 +1,79 @@
+//
+//  DeckStyle.swift
+//  Cards
+//
+//  Created by Hild György on 2026. 04. 05..
+//
+
+import SwiftUI
+
+enum DeckStyle {
+    
+    // MARK: - Geometry
+
+    static let horizontalInset: CGFloat = 8
+
+    static let expandedTop: CGFloat = -30
+    static let expandedBottomPadding: CGFloat = 90
+
+    static let peek: CGFloat = 40
+
+    static let collapsedBottomPadding: CGFloat = 4
+    static let collapsedExtraPeekCount: CGFloat = 2.8
+    
+    
+
+    // MARK: - Card shape
+
+    static let cornerRadius: CGFloat = 35
+
+    // MARK: - Card border
+
+    static let strokeLight = Color.black.opacity(0.2)
+    static let strokeDark: Color = Color(uiColor: .opaqueSeparator)
+    static let strokeWidth: CGFloat = 1
+
+    // MARK: - Card shadow
+
+    static let shadowColor: Color = .black.opacity(0.25)
+    static let shadowRadius: CGFloat = 8
+    static let shadowYOffset: CGFloat = 2
+
+    // MARK: - Card label
+
+    static let cardLabelFont: Font = .caption.weight(.medium)
+    static let cardLabelTracking: CGFloat = 4
+    static let cardLabelTopPadding: CGFloat = 12
+    static let cardLabelColor: Color = .secondary
+    static let cardLabelHitHeight: CGFloat = 56
+    
+    // MARK: - Header
+
+    static let headerSpacing: CGFloat = 6
+    static let headerTopSpacing: CGFloat = 20
+    static let contentTopSpacing: CGFloat = 24
+    static let contentHorizontalPadding: CGFloat = 32
+
+    // MARK: - Interaction
+
+    static let dragThreshold: CGFloat = 80
+
+    // MARK: - Animation
+
+    static let animation = Animation.spring(response: 0.32, dampingFraction: 0.82)
+
+    // MARK: - Container (box / base)
+
+    static let boxBackgroundLight: Color = Color(uiColor: .secondarySystemBackground)
+    static let boxBackgroundDark: Color = Color(uiColor: .systemBackground)
+
+    // MARK: - Card background
+
+    static let lightCardBackgroundColor: Color = Color(uiColor: .systemBackground)
+    static let darkCardBackgroundColor: Color = Color(uiColor: .secondarySystemBackground)
+
+    // MARK: - Content area
+
+    static let contentBackgroundLight: Color = Color(uiColor: .secondarySystemFill)
+    static let contentBackgroundDark: Color = Color(uiColor: .secondarySystemFill)
+}
