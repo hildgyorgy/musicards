@@ -1,12 +1,12 @@
 {
   "fill" : {
-    "automatic-gradient" : "extended-srgb:0.00000,0.53333,1.00000,1.00000"
+    "solid" : "extended-srgb:0.00000,0.53333,1.00000,1.00000"
   },
   "groups" : [
     {
       "layers" : [
         {
-          "blend-mode" : "lighten",
+          "blend-mode" : "normal",
           "fill-specializations" : [
             {
               "value" : "automatic"
@@ -20,17 +20,7 @@
             {
               "appearance" : "tinted",
               "value" : {
-                "automatic-gradient" : "extended-srgb:0.00000,0.53333,1.00000,1.00000",
-                "orientation" : {
-                  "start" : {
-                    "x" : 0.5,
-                    "y" : 0
-                  },
-                  "stop" : {
-                    "x" : 0.5,
-                    "y" : 0.7
-                  }
-                }
+                "solid" : "extended-srgb:0.00000,0.53333,1.00000,1.00000"
               }
             }
           ],
@@ -44,12 +34,13 @@
             },
             {
               "appearance" : "tinted",
-              "value" : true
+              "value" : false
             }
           ],
           "hidden" : false,
           "image-name" : "musicbrainz_logo_icon_248411.svg",
           "name" : "musicbrainz_logo_icon_248411",
+          "opacity" : 1,
           "position" : {
             "scale" : 33,
             "translation-in-points" : [

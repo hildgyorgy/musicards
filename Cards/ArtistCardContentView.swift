@@ -120,7 +120,7 @@ struct ArtistCardContentView: View {
             if let wikipedia,
                let url = wikipediaURL(for: wikipedia.title) {
                 SafariView(url: url)
-                    .presentationDetents([.fraction(0.885)])
+                    .presentationDetents([.fraction(0.83)])
             }
         }
     }

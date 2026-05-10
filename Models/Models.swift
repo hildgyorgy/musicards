@@ -18,6 +18,8 @@ struct MBRelease: Decodable {
     let labelInfo: [MBLabelInfo]?
     let media: [MBMedium]?
     let releaseGroup: MBReleaseGroupRef?
+    let relations: [MBRelation]?
+    let annotation: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -30,6 +32,8 @@ struct MBRelease: Decodable {
         case labelInfo = "label-info"
         case media
         case releaseGroup = "release-group"
+        case relations
+        case annotation
     }
 }
 
@@ -174,6 +178,7 @@ struct MBPlace: Decodable {
 struct MBRelation: Decodable {
     let type: String?
     let artist: MBArtist?
+    let label: MBLabel?
     let attributes: [String]?
     let work: MBWorkReference?
     let begin: String?
@@ -184,6 +189,7 @@ struct MBRelation: Decodable {
     init(
         type: String? = nil,
         artist: MBArtist? = nil,
+        label: MBLabel? = nil,
         attributes: [String]? = nil,
         work: MBWorkReference? = nil,
         begin: String? = nil,
@@ -193,6 +199,7 @@ struct MBRelation: Decodable {
     ) {
         self.type = type
         self.artist = artist
+        self.label = label
         self.attributes = attributes
         self.work = work
         self.begin = begin

@@ -62,6 +62,7 @@ struct TracksCardContentView: View {
                     } else {
                         flatSections(for: release)
                     }
+                    releaseLinerNotes(for: release)
                 }
             }
             .task(id: release.id) {
@@ -245,6 +246,145 @@ struct TracksCardContentView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
+    
+    // MARK: - Release-level liner notes
+
+    @ViewBuilder
+    private func releaseLinerNotes(for release: MBRelease) -> some View {
+        let credits = releaseLevelCreditRows(from: release)
+        let annotation = cleanedAnnotation(release.annotation)
+
+        if !credits.isEmpty || annotation != nil {
+            VStack(alignment: .leading, spacing: 12) {
+                if !credits.isEmpty {
+                    releaseCreditsSection(credits)
+                }
+
+                if let annotation {
+                    releaseAnnotationSection(annotation)
+                }
+            }
+            .padding(.horizontal, 0)
+            .padding(.top, 4)
+            .padding(.bottom, 36)
+        }
+    }
+
+    private func releaseCreditsSection(_ rows: [ReleaseCreditRow]) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            mediumHeader("RELEASE-LEVEL CREDITS")
+
+            VStack(alignment: .leading, spacing: 5) {
+                ForEach(rows) { row in
+                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                        Text(row.role)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .frame(width: 120, alignment: .leading)
+
+                        Text(row.name)
+                            .font(.footnote)
+                            .foregroundStyle(.primary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            }
+            .padding(.leading, 12)
+            .padding(.trailing, 12)
+        }
+    }
+
+    private func releaseAnnotationSection(_ annotation: String) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            mediumHeader("ANNOTATION")
+
+            Text(annotation)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.leading, 12)
+                .padding(.trailing, 12)
+        }
+    }
+    
+    private func releaseLevelCreditRows(from release: MBRelease) -> [ReleaseCreditRow] {
+        let ignoredURLTypes: Set<String> = [
+            "discogs",
+            "allmusic",
+            "amazon asin",
+            "purchase for download",
+            "purchase for mail-order",
+            "streaming",
+            "free streaming",
+            "download for free",
+            "license"
+        ]
+
+        return (release.relations ?? [])
+            .compactMap { relation -> ReleaseCreditRow? in
+                // We only want true release-level relationships here,
+                // not generic external URL relationships.
+                if relation.url != nil { return nil }
+
+                guard let rawType = relation.type?.trimmingCharacters(in: .whitespacesAndNewlines),
+                      !rawType.isEmpty
+                else {
+                    return nil
+                }
+
+                let loweredType = rawType.lowercased()
+                if ignoredURLTypes.contains(loweredType) {
+                    return nil
+                }
+
+                let name =
+                    relation.artist?.name ??
+                    relation.label?.name ??
+                    relation.place?.name ??
+                    relation.work?.title
+
+                guard let name,
+                      !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                else {
+                    return nil
+                }
+
+                let role = formattedReleaseRelationRole(rawType, attributes: relation.attributes)
+
+                return ReleaseCreditRow(
+                    role: role,
+                    name: name
+                )
+            }
+    }
+
+    private func formattedReleaseRelationRole(_ type: String, attributes: [String]?) -> String {
+        let role = type
+            .replacingOccurrences(of: "_", with: " ")
+            .capitalized
+
+        let cleanAttributes =
+            (attributes ?? [])
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+
+        if cleanAttributes.isEmpty {
+            return role
+        } else {
+            return "\(role) (\(cleanAttributes.joined(separator: ", ")))"
+        }
+    }
+
+    private func cleanedAnnotation(_ annotation: String?) -> String? {
+        guard let annotation else { return nil }
+
+        let cleaned = annotation
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        return cleaned.isEmpty ? nil : cleaned
+    }
 
     // MARK: - Medium header
 
@@ -380,4 +520,10 @@ private struct TrackSection: Identifiable {
     let id: String
     let title: String
     let rows: [TrackRow]
+}
+
+private struct ReleaseCreditRow: Identifiable {
+    let id = UUID()
+    let role: String
+    let name: String
 }
