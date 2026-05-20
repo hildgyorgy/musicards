@@ -53,9 +53,11 @@ struct SearchCardHeaderView: View {
                         .foregroundStyle(.primary)
                         .textFieldStyle(.plain)
                         .autocorrectionDisabled(true)
+#if os(iOS)
                         .keyboardType(.default)
                         .textInputAutocapitalization(.never)
                         .submitLabel(.search)
+#endif
                         .focused($isSearchFocused)
 
                     if !viewModel.searchQuery.isEmpty {
@@ -69,7 +71,7 @@ struct SearchCardHeaderView: View {
                         .transition(.opacity)
                     }
                 }
-
+#if os(iOS)
                 Button {
                     isShowingBarcodeScanner = true
                 } label: {
@@ -78,6 +80,7 @@ struct SearchCardHeaderView: View {
                         .font(.callout)
                 }
                 .buttonStyle(.plain)
+#endif
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
@@ -123,6 +126,7 @@ struct SearchCardHeaderView: View {
         .onChange(of: viewModel.searchQuery) { _, _ in
             viewModel.queryDidChange()
         }
+#if os(iOS)
         .sheet(isPresented: $isShowingBarcodeScanner) {
             if DataScannerViewController.isSupported && DataScannerViewController.isAvailable {
                 BarcodeScannerView { code in
@@ -141,5 +145,6 @@ struct SearchCardHeaderView: View {
                 .padding()
             }
         }
+#endif
     }
 }

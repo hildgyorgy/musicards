@@ -38,18 +38,19 @@ struct DeckView<HeaderContent: View, CardContent: View>: View {
                 ForEach(Array(cards.enumerated()), id: \.element.id) { _, card in
                     let index = card.id
 
-                    let cardHeight =
-                        proxy.size.height
-                        - DeckStyle.expandedTop
-                        - DeckStyle.expandedBottomPadding
-                        - CGFloat(cards.count - 1) * DeckStyle.peek
+                    let cardHeight = DeckLayout.cardHeight(
+                        totalCards: cards.count,
+                        containerHeight: proxy.size.height,
+                        safeAreaTop: proxy.safeAreaInsets.top
+                    )
 
                     let y = DeckLayout.yPosition(
                         index: index,
                         activeIndex: activeIndex,
                         totalCards: cards.count,
                         containerHeight: proxy.size.height,
-                        cardHeight: cardHeight
+                        safeAreaTop: proxy.safeAreaInsets.top,
+                        safeAreaBottom: proxy.safeAreaInsets.bottom
                     )
 
                     DeckCardView(

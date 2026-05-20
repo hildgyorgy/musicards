@@ -8,15 +8,23 @@
 import Foundation
 import SwiftUI
 import Combine
+#if canImport(UIKit)
 import UIKit
+#endif
+#if os(iOS)
 import MediaPlayer
+#endif
 
 @MainActor
 final class MusiCardsAppModel: ObservableObject {
+    #if os(macOS)
     @Published var activeIndex: Int = 0
+    #else
+    @Published var activeIndex: Int = 1
+    #endif
     @Published var selectedReleaseID: String?
     @Published var selectedRelease: MBRelease?
-    @Published var selectedReleaseCover: UIImage?
+    @Published var selectedReleaseCover: PlatformImage?
     @Published var isLoadingRelease: Bool = false
     @Published var selectedArtistID: String?
     @Published var selectedArtist: MBArtistDetail?
@@ -43,10 +51,12 @@ final class MusiCardsAppModel: ObservableObject {
     private let recentArtistsKey = "recentArtists"
     private let recentReleasesKey = "recentReleases"
 
+#if os(iOS)
     private var nowPlayingReleaseGroupID: String?
     private var nowPlayingReleaseGroupTitle: String?
     private var nowPlayingArtistName: String?
     private var nowPlayingObserver: NSObjectProtocol?
+    #endif
 
     // Pagination state
     private let releaseGroupsPageSize: Int = 25
@@ -61,7 +71,9 @@ final class MusiCardsAppModel: ObservableObject {
         self.classicalMetadataStore = ClassicalMetadataStore(service: service)
 
         loadRecents()
+#if os(iOS)
         startNowPlayingUpdates()
+        #endif
     }
 
     var isBlockingNavigationLoad: Bool {
@@ -296,6 +308,7 @@ final class MusiCardsAppModel: ObservableObject {
 
     // MARK: - Now Playing
 
+#if os(iOS)
     func openNowPlayingVersions() {
         guard
             let groupID = nowPlayingReleaseGroupID,
@@ -435,4 +448,5 @@ final class MusiCardsAppModel: ObservableObject {
 
         return parts.joined(separator: " • ")
     }
+#endif
 }

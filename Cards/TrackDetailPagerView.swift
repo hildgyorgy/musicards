@@ -32,7 +32,11 @@ struct TrackDetailPagerView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .tag(2)
             }
-            .tabViewStyle(.page(indexDisplayMode: .never))
+            #if os(iOS)
+            .tabViewStyle(.page(indexDisplayMode: .always))
+            #else
+            .tabViewStyle(.automatic)
+            #endif
             .frame(height: maxPageHeight)
 
             HStack(spacing: 6) {
@@ -68,7 +72,7 @@ struct TrackDetailPagerView: View {
                 onSelectArtist: onSelectArtist
             )
         } else if detailStore.isLoading(recordingID) {
-            ProgressView()
+            MusiCardsSpinner()
                 .frame(maxWidth: .infinity, alignment: .center)
                 .padding(.vertical, 20)
         } else {
@@ -84,7 +88,7 @@ struct TrackDetailPagerView: View {
                 onSelectArtist: onSelectArtist
             )
         } else if detailStore.isLoading(recordingID) {
-            ProgressView()
+            MusiCardsSpinner()
                 .frame(maxWidth: .infinity, alignment: .center)
                 .padding(.vertical, 20)
         } else {
@@ -97,7 +101,7 @@ struct TrackDetailPagerView: View {
         if let detailData {
             TrackTechnicalDetailPage(detailData: detailData)
         } else if detailStore.isLoading(recordingID) {
-            ProgressView()
+            MusiCardsSpinner()
                 .frame(maxWidth: .infinity, alignment: .center)
                 .padding(.vertical, 20)
         } else {

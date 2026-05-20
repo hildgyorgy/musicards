@@ -8,6 +8,7 @@
 import SwiftUI
 
 enum DeckCardID: Int, CaseIterable, Identifiable {
+    case home = 0
     case search = 1
     case release = 2
     case tracks = 3

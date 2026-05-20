@@ -5,7 +5,14 @@
 //  Created by Hild György on 2026. 04. 11..
 //
 
+
+#if canImport(UIKit)
 import UIKit
+typealias PlatformImage = UIImage
+#elseif canImport(AppKit)
+import AppKit
+typealias PlatformImage = NSImage
+#endif
 
 enum CoverArtSize: Sendable {
     case thumbnail
@@ -22,12 +29,12 @@ enum CoverArtSize: Sendable {
 actor CoverArtCache {
     static let shared = CoverArtCache()
 
-    private var cache: [String: UIImage] = [:]
-    private var inFlight: [String: Task<UIImage?, Never>] = [:]
+    private var cache: [String: PlatformImage] = [:]
+    private var inFlight: [String: Task<PlatformImage?, Never>] = [:]
 
     private init() {}
 
-    func image(for releaseID: String, size: CoverArtSize = .thumbnail) async -> UIImage? {
+    func image(for releaseID: String, size: CoverArtSize = .thumbnail) async -> PlatformImage? {
         let key = "\(releaseID)-\(size.urlSuffix)"
 
         if let cached = cache[key] {
@@ -38,7 +45,7 @@ actor CoverArtCache {
             return await existing.value
         }
 
-        let task = Task<UIImage?, Never> {
+        let task = Task<PlatformImage?, Never> {
             await fetchCover(releaseID: releaseID, size: size)
         }
 
@@ -53,7 +60,7 @@ actor CoverArtCache {
         return result
     }
 
-    private func fetchCover(releaseID: String, size: CoverArtSize) async -> UIImage? {
+    private func fetchCover(releaseID: String, size: CoverArtSize) async -> PlatformImage? {
         guard let url = URL(
             string: "https://coverartarchive.org/release/\(releaseID)/\(size.urlSuffix)"
         ) else { return nil }
@@ -66,7 +73,11 @@ actor CoverArtCache {
                 return nil
             }
 
+            #if canImport(UIKit)
             return UIImage(data: data)
+            #else
+            return NSImage(data: data)
+            #endif
         } catch {
             return nil
         }

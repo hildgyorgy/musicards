@@ -10,8 +10,25 @@ import SwiftUI
 @main
 struct CardsApp: App {
     var body: some Scene {
+        #if os(macOS)
+        WindowGroup {
+            ContentView()
+                .frame(
+                    width: MacWindowMetrics.contentSize.width,
+                    height: MacWindowMetrics.contentSize.height
+                )
+                .background(WindowAccessor())
+        }
+        .windowStyle(.hiddenTitleBar)
+        .windowResizability(.contentSize)
+        .defaultSize(
+            width: MacWindowMetrics.contentSize.width,
+            height: MacWindowMetrics.contentSize.height
+        )
+        #else
         WindowGroup {
             ContentView()
         }
+        #endif
     }
 }

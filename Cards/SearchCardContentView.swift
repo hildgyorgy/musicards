@@ -37,7 +37,7 @@ struct SearchCardContentView: View {
     private var contentView: some View {
         if isReleaseGroupMode {
             if viewModel.isSearching {
-                ProgressView()
+                MusiCardsSpinner()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .padding(.top, 24)
             } else if viewModel.searchError != nil {
@@ -53,7 +53,7 @@ struct SearchCardContentView: View {
             }
         } else {
             if viewModel.isSearching {
-                ProgressView()
+                MusiCardsSpinner()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .padding(.top, 24)
             } else if viewModel.searchError != nil {
@@ -106,7 +106,7 @@ struct SearchCardContentView: View {
 
             // Loading indicator at the bottom when fetching next page
             if viewModel.isLoadingMoreVersions {
-                ProgressView()
+                MusiCardsSpinner()
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
             }
@@ -133,7 +133,7 @@ struct SearchCardContentView: View {
             }
 
             if viewModel.isLoadingMore {
-                ProgressView()
+                MusiCardsSpinner()
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
             }
@@ -152,7 +152,7 @@ struct SearchCardContentView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(artist.name)
                             .font(.body)
-                            .foregroundStyle(Color(uiColor: .link))
+                            .foregroundStyle(Color.blue)
                             .lineLimit(1)
                         if !artist.lifeSpan.isEmpty {
                             Text(artist.lifeSpan)
@@ -172,7 +172,7 @@ struct SearchCardContentView: View {
             }
 
             if viewModel.isLoadingMore {
-                ProgressView()
+                MusiCardsSpinner()
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
             }
@@ -194,7 +194,7 @@ struct SearchCardContentView: View {
                     .lineLimit(1)
                 Text(release.artistLine)
                     .font(.subheadline)
-                    .foregroundStyle(Color(uiColor: .link))
+                    .foregroundStyle(Color.blue)
                     .lineLimit(1)
                 if !release.metaLine.isEmpty {
                     Text(release.metaLine)
@@ -284,7 +284,7 @@ struct SearchCardContentView: View {
     private func artistRow(_ artist: SearchArtistRow) -> some View {
         Text(artist.name)
             .font(.body)
-            .foregroundStyle(Color(uiColor: .link))
+            .foregroundStyle(Color.blue)
             .lineLimit(1)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.vertical, 0)
@@ -299,10 +299,12 @@ struct SearchCardContentView: View {
     }
 
     private func dismissKeyboard() {
+#if os(iOS)
         UIApplication.shared.sendAction(
             #selector(UIResponder.resignFirstResponder),
             to: nil, from: nil, for: nil
         )
+#endif
     }
 
     private struct LiveWaveformIcon: View {

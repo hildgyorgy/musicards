@@ -348,9 +348,11 @@ struct MBRecordingSearchResult: Decodable, Identifiable {
 }
 
 struct MBReleaseGroupBrowseResponse: Decodable {
+    let count: Int
     let releaseGroups: [MBReleaseGroupSummary]
 
     enum CodingKeys: String, CodingKey {
+        case count = "release-group-count"
         case releaseGroups = "release-groups"
     }
 }

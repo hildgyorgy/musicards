@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import UIKit
 
 struct ArtistCreditLinksView: View {
     let artistCredits: [MBArtistCredit]?
@@ -30,10 +29,15 @@ struct ArtistCreditLinksView: View {
     }
 
     private var maxHeightForCurrentFont: CGFloat {
-        let lineHeight = UIFont.preferredFont(forTextStyle: .title3).lineHeight
+        let lineHeight: CGFloat
+        #if canImport(UIKit)
+        lineHeight = UIFont.preferredFont(forTextStyle: .title3).lineHeight
+        #else
+        lineHeight = NSFont.preferredFont(forTextStyle: .title3).pointSize * 1.2
+        #endif
         return lineHeight * CGFloat(maxLines)
     }
-
+    
     private func tokenView(_ token: ArtistCreditToken) -> some View {
         Group {
             switch token.kind {

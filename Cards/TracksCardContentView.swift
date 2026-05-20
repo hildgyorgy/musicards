@@ -194,7 +194,7 @@ struct TracksCardContentView: View {
 
             if isExpanded(row) {
                 if detailStore.isLoading(row.recordingID) {
-                    ProgressView()
+                    MusiCardsSpinner()
                         .padding()
                 } else {
                     TrackDetailPagerView(
@@ -217,7 +217,7 @@ struct TracksCardContentView: View {
         ZStack {
             if isExpanded(row) {
                 Capsule(style: .continuous)
-                    .fill(Color(uiColor: .secondarySystemFill))
+                    .fill(Color.gray.opacity(0.15))
             }
 
             HStack(alignment: .firstTextBaseline, spacing: 10) {

@@ -42,12 +42,12 @@ struct ArtistCardContentView: View {
                         // Wikipedia excerpt
                         VStack(alignment: .leading, spacing: 8) {
                             if isLoadingWikipedia {
-                                ProgressView()
+                                MusiCardsSpinner()
                                     .padding(.top, 8)
                                     .padding(.bottom, 16)
                             } else if let wikipedia {
                                 Text(
-                                    "\(Text(displayExcerpt(for: wikipedia.extract)).foregroundStyle(.primary))\(Text(" Read more →").foregroundStyle(Color(uiColor: .link)))"
+                                    "\(Text(displayExcerpt(for: wikipedia.extract)).foregroundStyle(.primary))\(Text(" Read more →").foregroundStyle(Color.blue))"
                                 )
                                 .font(.callout)
                                 .onTapGesture {
@@ -64,12 +64,14 @@ struct ArtistCardContentView: View {
                                 VStack(alignment: .leading, spacing: 0) {
                                     ForEach(section.items) { group in
                                         Button {
+#if os(iOS)
                                             UIApplication.shared.sendAction(
                                                 #selector(UIResponder.resignFirstResponder),
                                                 to: nil,
                                                 from: nil,
                                                 for: nil
                                             )
+#endif
                                             onSelectReleaseGroup(group)
                                         } label: {
                                             HStack(alignment: .firstTextBaseline, spacing: 16) {
@@ -80,7 +82,7 @@ struct ArtistCardContentView: View {
 
                                                 Text(group.title)
                                                     .font(.callout)
-                                                    .foregroundStyle(Color(uiColor: .link))
+                                                    .foregroundStyle(Color.blue)
                                                     .frame(maxWidth: .infinity, alignment: .leading)
                                             }
                                             .padding(.vertical, 4)
@@ -99,7 +101,7 @@ struct ArtistCardContentView: View {
 
                         // Loading indicator at the bottom
                         if isLoadingMore {
-                            ProgressView()
+                            MusiCardsSpinner()
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 16)
                         }
@@ -116,6 +118,7 @@ struct ArtistCardContentView: View {
                     .padding(.top, 0)
             }
         }
+#if os(iOS)
         .sheet(isPresented: $isShowingWikipedia) {
             if let wikipedia,
                let url = wikipediaURL(for: wikipedia.title) {
@@ -123,6 +126,7 @@ struct ArtistCardContentView: View {
                     .presentationDetents([.fraction(0.83)])
             }
         }
+#endif
     }
 
     // MARK: - Helpers

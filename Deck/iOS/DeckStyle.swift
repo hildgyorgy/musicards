@@ -13,15 +13,15 @@ enum DeckStyle {
 
     static let horizontalInset: CGFloat = 8
 
-    static let expandedTop: CGFloat = -30
     static let expandedBottomPadding: CGFloat = 90
 
-    static let peek: CGFloat = 40
-
-    static let collapsedBottomPadding: CGFloat = 4
+    static let expandedTopOffset: CGFloat = -28
+    static let collapsedBottomOffset: CGFloat = 8
+    static let minimumCardHeight: CGFloat = 180
+    
     static let collapsedExtraPeekCount: CGFloat = 2.8
-    
-    
+
+    static let peek: CGFloat = 40
 
     // MARK: - Card shape
 
@@ -30,7 +30,7 @@ enum DeckStyle {
     // MARK: - Card border
 
     static let strokeLight = Color.black.opacity(0.2)
-    static let strokeDark: Color = Color(uiColor: .opaqueSeparator)
+    static let strokeDark: Color = Color(UIColor.opaqueSeparator)
     static let strokeWidth: CGFloat = 1
 
     // MARK: - Card shadow
@@ -64,16 +64,17 @@ enum DeckStyle {
 
     // MARK: - Container (box / base)
 
-    static let boxBackgroundLight: Color = Color(uiColor: .secondarySystemBackground)
-    static let boxBackgroundDark: Color = Color(uiColor: .systemBackground)
+    static let boxBackgroundLight: Color = Color(UIColor.secondarySystemBackground)
+    static let boxBackgroundDark: Color = Color(UIColor.systemBackground)
 
     // MARK: - Card background
 
-    static let lightCardBackgroundColor: Color = Color(uiColor: .systemBackground)
-    static let darkCardBackgroundColor: Color = Color(uiColor: .secondarySystemBackground)
+    static let lightCardBackgroundColor: Color = Color(UIColor.systemBackground)
+    static let darkCardBackgroundColor: Color = Color(UIColor.secondarySystemBackground)
 
     // MARK: - Content area
 
-    static let contentBackgroundLight: Color = Color(uiColor: .secondarySystemFill)
-    static let contentBackgroundDark: Color = Color(uiColor: .secondarySystemFill)
+    static let contentBackgroundLight: Color = Color(UIColor.secondarySystemFill)
+    static let contentBackgroundDark: Color = Color(UIColor.secondarySystemFill)
+
 }

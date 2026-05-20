@@ -6,23 +6,28 @@
 //
 
 import SwiftUI
-import UIKit
 
 struct ReleaseThumbnailView: View {
     let releaseID: String
     let hasCoverArt: Bool
 
-    @State private var image: UIImage?
+    @State private var image: PlatformImage?
 
     var body: some View {
         Group {
             if hasCoverArt, let image {
+                #if canImport(UIKit)
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
+                #else
+                Image(nsImage: image)
+                    .resizable()
+                    .scaledToFill()
+                #endif
             } else {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color(uiColor: .systemBackground))
+                Color.gray.opacity(0.15)
             }
         }
         .task(id: releaseID) {

@@ -232,7 +232,9 @@ struct MusicBrainzService {
         guard let url = components?.url else { throw URLError(.badURL) }
         let data = try await data(from: url)
         let result = try JSONDecoder().decode(MBReleaseGroupBrowseResponse.self, from: data)
-        return (result.releaseGroups, result.releaseGroups.count == limit)
+        let nextOffset = offset + result.releaseGroups.count
+        let hasMore = nextOffset < result.count
+        return (result.releaseGroups, hasMore)
     }
 
     func fetchWikipediaSummary(from wikidataURL: URL) async throws -> (title: String, extract: String)? {
