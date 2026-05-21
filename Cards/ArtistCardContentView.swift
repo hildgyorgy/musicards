@@ -24,10 +24,10 @@ struct ArtistCardContentView: View {
     @Environment(\.colorScheme) private var colorScheme
 
     private var cardBackground: Color {
-        colorScheme == .dark
-            ? DeckStyle.darkCardBackgroundColor
-            : DeckStyle.lightCardBackgroundColor
-    }
+            colorScheme == .dark
+                ? DeckStyle.darkCardBackgroundColor
+                : DeckStyle.lightCardBackgroundColor
+        }
 
     private var hasArtistContent: Bool {
         artist != nil
@@ -107,6 +107,8 @@ struct ArtistCardContentView: View {
                         }
                     }
                 }
+                .padding(.bottom, 36)
+            
             } else if artistError != nil {
                 ErrorStateView.artistRetry {
                     onRetryArtist()
@@ -125,6 +127,23 @@ struct ArtistCardContentView: View {
                 SafariView(url: url)
                     .presentationDetents([.fraction(0.83)])
             }
+        }
+#elseif os(macOS)
+        .sheet(isPresented: $isShowingWikipedia) {
+            if let wikipedia,
+                           let url = wikipediaURL(for: wikipedia.title) {
+                            WikipediaSheetView(url: url)
+                                .frame(
+                                    width: MacWindowMetrics.contentSize.width,
+                                    height: MacWindowMetrics.contentSize.height
+                                )
+                                .clipShape(
+                                    RoundedRectangle(
+                                        cornerRadius: DeckStyle.cornerRadius,
+                                        style: .continuous
+                                    )
+                                )
+                        }
         }
 #endif
     }
@@ -149,9 +168,6 @@ struct ArtistCardContentView: View {
     }
 
     private func typeSectionHeader(_ title: String) -> some View {
-        ZStack {
-            cardBackground
-
             HStack {
                 Text(title.uppercased())
                     .font(DeckStyle.cardLabelFont)
@@ -161,8 +177,14 @@ struct ArtistCardContentView: View {
                 Spacer()
             }
             .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background {
+                #if os(macOS)
+                Rectangle().fill(.ultraThinMaterial)
+                #else
+                Rectangle().fill(cardBackground)
+                #endif
+            }
+            .zIndex(1)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .zIndex(1)
-    }
 }

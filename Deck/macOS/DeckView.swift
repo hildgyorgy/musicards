@@ -35,10 +35,6 @@ struct DeckView<HeaderContent: View, CardContent: View>: View {
             )
 
             VStack(spacing: 0) {
-                DeckBackgroundView()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipped()
-                
                 ForEach(Array(cards.enumerated()), id: \.element.id) { visualIndex, card in
                     let isActive = visualIndex == activeIndex
 

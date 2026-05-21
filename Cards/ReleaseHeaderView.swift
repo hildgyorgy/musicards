@@ -28,7 +28,7 @@ struct ReleaseHeaderView: View {
                         radius: 12,
                         y: 6
                     )
-                    .padding(.top, -35)
+                    .padding(.top, -36)
                 #else
                 Image(nsImage: coverImage)
                     .resizable()
@@ -41,13 +41,13 @@ struct ReleaseHeaderView: View {
                         radius: 12,
                         y: 6
                     )
-                    .padding(.top, -35)
+                    .padding(.top, -20)
                 #endif
             }
 
             if let release {
                 Text(release.title)
-                    .font(.title2.weight(.bold))
+                    .font(DeckStyle.releaseHeaderTitleFont.weight(.bold))
                     .foregroundStyle(.primary)
                     .lineLimit(3)
                     .padding(.top, 6)
@@ -57,7 +57,7 @@ struct ReleaseHeaderView: View {
                     onSelectArtist: onSelectArtist,
                     maxLines: 2
                 )
-                .font(.body)
+                .font(DeckStyle.releaseHeaderArtistFont)
             }
         }
         .fixedSize(horizontal: false, vertical: true)

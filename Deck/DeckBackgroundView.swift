@@ -64,15 +64,19 @@ struct DeckBackgroundView: View {
                     .padding(.top, 32)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .multilineTextAlignment(.leading)
-                    .padding(.horizontal, 48)
+                    .padding(.horizontal, 24)
 
+#if os(iOS)
                     Image(systemName: "arrow.up")
                         .font(.title3)
                         .foregroundStyle(.tint)
                         .padding(.top, 8)
                         .padding(.bottom, 190)
+#endif
                 }
+#if os(iOS)
                 .padding(.top, 100)
+#endif
                 .frame(maxWidth: .infinity)
                 .multilineTextAlignment(.center)
             }

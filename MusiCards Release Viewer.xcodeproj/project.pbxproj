@@ -46,6 +46,9 @@
 		F59B714B2F8539C60086AB37 /* MusicBrainzService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F59B714A2F8539C60086AB37 /* MusicBrainzService.swift */; };
 		F59B714D2F853B7C0086AB37 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = F59B714C2F853B7C0086AB37 /* Models.swift */; };
 		F59B714F2F8540170086AB37 /* MusiCardsAppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F59B714E2F8540150086AB37 /* MusiCardsAppModel.swift */; };
+		F59CE9352FBFB7BC00649EA1 /* SafariView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F530226E2F865D420002C907 /* SafariView.swift */; };
+		F59CE9372FBFBACF00649EA1 /* WikipediaSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F59CE9362FBFBACE00649EA1 /* WikipediaSheetView.swift */; };
+		F59CE9382FBFBACF00649EA1 /* WikipediaSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F59CE9362FBFBACE00649EA1 /* WikipediaSheetView.swift */; };
 		F59F29102F90DBF900A50F8C /* MBDateTextFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F59F290F2F90DBF700A50F8C /* MBDateTextFormatter.swift */; };
 		F59F29122F923B1E00A50F8C /* MusiCards.icon in Resources */ = {isa = PBXBuildFile; fileRef = F59F29112F923B1E00A50F8C /* MusiCards.icon */; };
 		F5A09F782FBC867D00E5404B /* ReleaseHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5E62CD32F86ABA600E4B5AF /* ReleaseHeaderView.swift */; };
@@ -132,6 +135,7 @@
 		F59B714A2F8539C60086AB37 /* MusicBrainzService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicBrainzService.swift; sourceTree = "<group>"; };
 		F59B714C2F853B7C0086AB37 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		F59B714E2F8540150086AB37 /* MusiCardsAppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusiCardsAppModel.swift; sourceTree = "<group>"; };
+		F59CE9362FBFBACE00649EA1 /* WikipediaSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WikipediaSheetView.swift; sourceTree = "<group>"; };
 		F59F290F2F90DBF700A50F8C /* MBDateTextFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MBDateTextFormatter.swift; sourceTree = "<group>"; };
 		F59F29112F923B1E00A50F8C /* MusiCards.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = MusiCards.icon; sourceTree = "<group>"; };
 		F5A09F5D2FBC746A00E5404B /* MusiCardsMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MusiCardsMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -305,6 +309,7 @@
 				F5918A062F845AFE00E625DD /* SearchCardContentView.swift */,
 				F5ECDD4D2F85A989006161E3 /* SearchCardHeaderView.swift */,
 				F530226E2F865D420002C907 /* SafariView.swift */,
+				F59CE9362FBFBACE00649EA1 /* WikipediaSheetView.swift */,
 				F56054C52FB62962009EEF0A /* MusiCardsSpinner.swift */,
 			);
 			path = Cards;
@@ -413,6 +418,7 @@
 		F5A09F592FBC746A00E5404B /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			files = (
+				F59CE9372FBFBACF00649EA1 /* WikipediaSheetView.swift in Sources */,
 				F5A09F782FBC867D00E5404B /* ReleaseHeaderView.swift in Sources */,
 				F507A9B02FBDBD99001FB1B8 /* DeckBackgroundView.swift in Sources */,
 				F5A09F792FBC867D00E5404B /* ArtistCreditLinksView.swift in Sources */,
@@ -447,6 +453,7 @@
 				F5A09F892FBC88FF00E5404B /* DeckStyle.swift in Sources */,
 				F5A09F832FBC867D00E5404B /* ReleaseCardContentView.swift in Sources */,
 				F5A09F842FBC867D00E5404B /* AboutView.swift in Sources */,
+				F59CE9352FBFB7BC00649EA1 /* SafariView.swift in Sources */,
 				F5A09F852FBC867D00E5404B /* SearchCardHeaderView.swift in Sources */,
 				F5C775B12FBCFC8400AE439F /* CoverArtCache.swift in Sources */,
 				F5C775B22FBCFC8400AE439F /* TrackDetailStore.swift in Sources */,
@@ -459,6 +466,7 @@
 		F5E5213B2F8292AD00D2CEAE /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			files = (
+				F59CE9382FBFBACF00649EA1 /* WikipediaSheetView.swift in Sources */,
 				F5BB4C212F982A62001CA927 /* BarcodeScannerView.swift in Sources */,
 				F530226B2F8647DF0002C907 /* ArtistCreditLinksView.swift in Sources */,
 				F53A320B2F840607005A436B /* CardsApp.swift in Sources */,

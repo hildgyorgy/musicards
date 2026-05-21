@@ -12,15 +12,15 @@ enum DeckStyle {
     // MARK: - Window geometry
 
     static let windowHeightRatio: CGFloat = 0.58
-    static let minimumWindowHeight: CGFloat = 640
-    static let windowWidthToHeightRatio: CGFloat = 0.52
+    static let minimumWindowHeight: CGFloat = 720
+    static let windowWidthToHeightRatio: CGFloat = 0.47
 
     // MARK: - Deck geometry
 
     static let horizontalInset: CGFloat = 0
     static let topInset: CGFloat = 0
     static let cornerRadius: CGFloat = 34
-    static let collapsedCardHeight: CGFloat = 46
+    static let collapsedCardHeight: CGFloat = 40
 
     // MARK: - Glass surface
 
@@ -42,10 +42,10 @@ enum DeckStyle {
     // MARK: - Borders
 
     static let strokeWidth: CGFloat = 1
-    static let separatorStrength: Double = 0.16
+    static let separatorStrength: Double = 0.24
     static let outerStrokeStrength: Double = 0.20
 
-    static let strokeColor: Color = Color.white.opacity(separatorStrength)
+    static let strokeColor: Color = Color.black.opacity(separatorStrength)
     static let outerStrokeColor: Color = Color.white.opacity(outerStrokeStrength)
 
     // MARK: - Surfaces
@@ -55,7 +55,7 @@ enum DeckStyle {
 
     // MARK: - Card label
 
-    static let cardLabelFontSize: CGFloat = 13
+    static let cardLabelFontSize: CGFloat = 12
     static let cardLabelFontWeight: Font.Weight = .medium
     static let cardLabelTracking: CGFloat = 4
     static let cardLabelColor: Color = .secondary
@@ -92,4 +92,7 @@ enum DeckStyle {
     static let boxBackgroundLight = Color.white.opacity(0.25)
     static let strokeDark = Color.white.opacity(0.15)
     static let strokeLight = Color.black.opacity(0.1)
+    
+    static let releaseHeaderTitleFont: Font = .title
+    static let releaseHeaderArtistFont: Font = .title3
 }

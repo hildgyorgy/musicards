@@ -27,7 +27,7 @@ struct ReleaseThumbnailView: View {
                 #endif
             } else {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                Color.gray.opacity(0.15)
+                    .fill(Color.gray.opacity(0.15))
             }
         }
         .task(id: releaseID) {

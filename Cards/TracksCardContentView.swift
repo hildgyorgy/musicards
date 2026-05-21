@@ -23,10 +23,10 @@ struct TracksCardContentView: View {
     // MARK: - Derived colours
 
     private var cardBackground: Color {
-        colorScheme == .dark
-            ? DeckStyle.darkCardBackgroundColor
-            : DeckStyle.lightCardBackgroundColor
-    }
+            colorScheme == .dark
+                ? DeckStyle.darkCardBackgroundColor
+                : DeckStyle.lightCardBackgroundColor
+        }
 
     // MARK: - Classical detection
     //
@@ -390,17 +390,19 @@ struct TracksCardContentView: View {
 
     @ViewBuilder
     private func mediumHeader(_ title: String) -> some View {
-        ZStack {
-            cardBackground
-
             Text(title)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 0)
                 .padding(.vertical, 10)
+                .background {
+                    #if os(macOS)
+                    Rectangle().fill(.ultraThinMaterial)
+                    #else
+                    Rectangle().fill(cardBackground)
+                    #endif
+                }
         }
-    }
 
     // MARK: - Expand / collapse
 

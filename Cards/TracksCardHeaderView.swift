@@ -15,7 +15,7 @@ struct TracksCardHeaderView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: DeckStyle.headerSpacing) {
             Text(title)
-                .font(.title2.weight(.bold))
+                .font(DeckStyle.releaseHeaderTitleFont.weight(.bold))
                 .foregroundStyle(.primary)
                 .lineLimit(3)
 
@@ -24,6 +24,7 @@ struct TracksCardHeaderView: View {
                 onSelectArtist: onSelectArtist,
                 maxLines: 2
             )
+            .font(DeckStyle.releaseHeaderArtistFont)
         }
     }
 }

@@ -76,5 +76,8 @@ enum DeckStyle {
 
     static let contentBackgroundLight: Color = Color(UIColor.secondarySystemFill)
     static let contentBackgroundDark: Color = Color(UIColor.secondarySystemFill)
+    
+    static let releaseHeaderTitleFont: Font = .title2
+    static let releaseHeaderArtistFont: Font = .body
 
 }

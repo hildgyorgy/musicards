@@ -14,7 +14,7 @@ struct MusiCardsSpinner: View {
             .tint(Color.blue)
             .frame(width: 44, height: 44)
              .background(
-                 Circle().fill(Color(white: 1.0).opacity(0.9))
+                 Circle().fill(Color(white: 1.0).opacity(0.5))
              .overlay(
                  Circle()
                      .stroke(Color.gray.opacity(0.3), lineWidth: 1)

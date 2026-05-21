@@ -221,6 +221,7 @@ struct ContentView: View {
             .ignoresSafeArea()
             #endif
 
+#if os(iOS)
             if appModel.isBlockingNavigationLoad {
                 ZStack {
                     MusiCardsSpinner()
@@ -228,6 +229,7 @@ struct ContentView: View {
                 .zIndex(999)
                 .transition(.opacity)
             }
+#endif
         }
         .animation(.easeInOut(duration: 0.15), value: appModel.isBlockingNavigationLoad)
     }

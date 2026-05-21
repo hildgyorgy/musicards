@@ -22,21 +22,27 @@ struct GlassCardBackground: View {
             .fill(Color.white.opacity(0.08))
         )
         .overlay(
-            LinearGradient(
-                colors: [
-                    DeckStyle.glassHighlightColor
-                        .opacity(DeckStyle.glassHighlightStrength),
+                    RoundedRectangle(
+                        cornerRadius: DeckStyle.cornerRadius,
+                        style: .continuous
+                    )
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                DeckStyle.glassHighlightColor
+                                    .opacity(DeckStyle.glassHighlightStrength),
 
-                    DeckStyle.glassMidColor
-                        .opacity(DeckStyle.glassMidStrength),
+                                DeckStyle.glassMidColor
+                                    .opacity(DeckStyle.glassMidStrength),
 
-                    DeckStyle.glassBottomColor
-                        .opacity(DeckStyle.glassBottomStrength)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
+                                DeckStyle.glassBottomColor
+                                    .opacity(DeckStyle.glassBottomStrength)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                )
         .overlay(
             RoundedRectangle(
                 cornerRadius: DeckStyle.cornerRadius,
