@@ -55,7 +55,6 @@ struct ReleaseHeaderView: View {
                 ArtistCreditLinksView(
                     artistCredits: release.artistCredit,
                     onSelectArtist: onSelectArtist,
-                    maxLines: 2
                 )
                 .font(DeckStyle.releaseHeaderArtistFont)
             }

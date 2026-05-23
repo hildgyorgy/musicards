@@ -2,7 +2,7 @@
 //  DeckView.swift
 //  MusiCards
 //
-//  Drag model transplanted from Cards template
+//
 //
 
 import SwiftUI
@@ -212,7 +212,7 @@ struct DeckView<HeaderContent: View, CardContent: View>: View {
                 nudgeOffset = 0
             }
 
-            try? await Task.sleep(nanoseconds: 400_000_000) // 0.4s Short pause between the two repetitions
+            try? await Task.sleep(nanoseconds: 400_000_000) // 0.4s pause between the two repetitions
         }
     }
 }

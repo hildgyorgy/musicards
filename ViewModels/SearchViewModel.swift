@@ -71,7 +71,7 @@ final class SearchViewModel: ObservableObject {
 
         if q.isEmpty { return .idle }
 
-        if q.contains(",") || isBareBarcode(q) || isMBID(q) {
+        if q.contains(",") || MBIdentifiers.isBareBarcode(q) || MBIdentifiers.isMBID(q) {
             return .releaseResults
         } else {
             return .artistResults
@@ -201,7 +201,7 @@ final class SearchViewModel: ObservableObject {
     }
 
     private func yearRangeText(from lifeSpan: MBLifeSpan?) -> String {
-        MBDateTextFormatter.lifeSpanTextOrEmpty(from: lifeSpan)
+        MBTextFormatter.lifeSpanTextOrEmpty(from: lifeSpan)
     }
 
     private func performSearch() async {
@@ -216,8 +216,8 @@ final class SearchViewModel: ObservableObject {
         searchError = nil
 
         do {
-            if q.contains(",") || isBareBarcode(q) || isMBID(q) {
-                if isBareBarcode(q) || isMBID(q) {
+            if q.contains(",") || MBIdentifiers.isBareBarcode(q) || MBIdentifiers.isMBID(q) {
+                if MBIdentifiers.isBareBarcode(q) || MBIdentifiers.isMBID(q) {
                     // Barcode / MBID — release lookup only, no track search
                     let results = try await musicBrainzService.searchReleases(
                         query: q,
@@ -458,7 +458,7 @@ final class SearchViewModel: ObservableObject {
         guard !q.isEmpty else { return }
 
         do {
-            if q.contains(",") && !isBareBarcode(q) && !isMBID(q) {
+            if q.contains(",") && !MBIdentifiers.isBareBarcode(q) && !MBIdentifiers.isMBID(q) {
                 // Parallel release + track search, same merge logic as initial search
                 let parsed = parseCommaQuery(q)
 
@@ -542,24 +542,6 @@ final class SearchViewModel: ObservableObject {
 
     // MARK: - Row builders
 
-    private nonisolated func artistLine(from artistCredit: [MBArtistCredit]?) -> String {
-        artistCredit?.compactMap { $0.name }.joined(separator: ", ") ?? ""
-    }
-
-    private nonisolated func releaseMetaLine(
-        date: String?, country: String?,
-        labelInfo: [MBLabelInfo]?, media: [MBMedium]?
-    ) -> String {
-        let parts = [
-            MBDateTextFormatter.year(from: date),
-            country ?? "",
-            labelInfo?.compactMap { $0.label?.name }.first ?? "",
-            media?.compactMap { $0.format }.first ?? ""
-        ].filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-
-        return parts.joined(separator: " • ")
-    }
-
     private func appendUniqueReleaseRow(_ row: SearchReleaseRow) {
         guard !releaseResults.contains(where: { $0.id == row.id }) else { return }
         releaseResults.append(row)
@@ -579,8 +561,13 @@ final class SearchViewModel: ObservableObject {
     ) -> SearchReleaseRow {
         SearchReleaseRow(
             id: id, title: title,
-            artistLine: artistLine(from: artistCredit),
-            metaLine: releaseMetaLine(date: date, country: country, labelInfo: labelInfo, media: media),
+            artistLine: MBTextFormatter.artistLine(from: artistCredit),
+            metaLine: MBTextFormatter.releaseMetaLine(
+                year: MBTextFormatter.year(from: date),
+                country: country,
+                label: labelInfo?.compactMap { $0.label?.name }.first,
+                format: media?.compactMap { $0.format }.first
+            ),
             disambiguation: disambiguation ?? "",
             hasCoverArt: hasCoverArt
         )
@@ -768,13 +755,4 @@ final class SearchViewModel: ObservableObject {
         guard let date, date.count >= 4 else { return Int.max }
         return Int(date.prefix(4)) ?? Int.max
     }
-}
-
-private func isBareBarcode(_ text: String) -> Bool {
-    text.allSatisfy(\.isNumber) && text.count >= 8
-}
-
-private func isMBID(_ text: String) -> Bool {
-    let pattern = #"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"#
-    return text.range(of: pattern, options: .regularExpression) != nil
 }

@@ -75,7 +75,7 @@ struct ArtistCardContentView: View {
                                             onSelectReleaseGroup(group)
                                         } label: {
                                             HStack(alignment: .firstTextBaseline, spacing: 16) {
-                                                Text(MBDateTextFormatter.year(from: group.firstReleaseDate))
+                                                Text(MBTextFormatter.year(from: group.firstReleaseDate))
                                                     .font(.callout)
                                                     .foregroundStyle(.secondary)
                                                     .frame(width: 40, alignment: .leading)

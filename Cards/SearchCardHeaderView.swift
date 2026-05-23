@@ -106,7 +106,7 @@ struct SearchCardHeaderView: View {
 
             if isReleaseGroupMode {
                 Text(viewModel.displayTitle)
-                    .font(.title.weight(.bold))
+                    .font(.title2.weight(.bold))
                     .foregroundStyle(.primary)
                     .lineLimit(2)
 
@@ -114,8 +114,8 @@ struct SearchCardHeaderView: View {
                     onTapCurrentArtist()
                 } label: {
                     Text(viewModel.displayArtist)
-                        .font(.body)
-                        .foregroundStyle(.tint)
+                        .font(.title3)
+                        .foregroundStyle(.blue)
                         .lineLimit(1)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }

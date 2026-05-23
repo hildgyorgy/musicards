@@ -14,8 +14,8 @@ struct ReleaseCardContentView: View {
     var body: some View {
         if let release {
             ScrollView {
-                VStack(alignment: .leading, spacing: 6) {
-                    metaRow("Date", MBDateTextFormatter.displayDate(from: release.date))
+                VStack(alignment: .leading, spacing: 5) {
+                    metaRow("Date", MBTextFormatter.displayDate(from: release.date))
                     metaRow("Country", release.country ?? "")
                     metaRow("Label", labelText(from: release))
                     metaRow("Cat. no.", catalogNumberText(from: release))
@@ -25,10 +25,12 @@ struct ReleaseCardContentView: View {
                         onShowVersions()
                     }) {
                         Text("Other versions →")
-                            .font(.callout)
-                            .foregroundStyle(.tint)
+                            .font(.body)
+                            .foregroundStyle(.blue)
                     }
+                    .buttonStyle(.plain)
                     .padding(.top, 8)
+                    .padding(.leading, 92)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.bottom, 24)
@@ -52,6 +54,7 @@ struct ReleaseCardContentView: View {
                 Text(value)
                     .foregroundStyle(.primary)
                     .font(.subheadline)
+                    .lineSpacing(4)
 
                 Spacer()
             }

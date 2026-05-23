@@ -37,6 +37,8 @@
 		F54FE62F2F9C08ED00646913 /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F54FE62E2F9C08EC00646913 /* AboutView.swift */; };
 		F54FE6332F9C106300646913 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = F54FE6322F9C104D00646913 /* PrivacyInfo.xcprivacy */; };
 		F56054C62FB62968009EEF0A /* MusiCardsSpinner.swift in Sources */ = {isa = PBXBuildFile; fileRef = F56054C52FB62962009EEF0A /* MusiCardsSpinner.swift */; };
+		F575FB7F2FC0C46400BDCB93 /* MBIdentifiers.swift in Sources */ = {isa = PBXBuildFile; fileRef = F575FB7E2FC0C46300BDCB93 /* MBIdentifiers.swift */; };
+		F575FB802FC0C46400BDCB93 /* MBIdentifiers.swift in Sources */ = {isa = PBXBuildFile; fileRef = F575FB7E2FC0C46300BDCB93 /* MBIdentifiers.swift */; };
 		F57FC69D2F8FFBBC00422295 /* PanHandleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F57FC69C2F8FFBBA00422295 /* PanHandleView.swift */; };
 		F57FC69F2F8FFBDB00422295 /* DeckPhysics.swift in Sources */ = {isa = PBXBuildFile; fileRef = F57FC69E2F8FFBD900422295 /* DeckPhysics.swift */; };
 		F5918A072F845AFF00E625DD /* SearchCardContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5918A062F845AFE00E625DD /* SearchCardContentView.swift */; };
@@ -49,7 +51,7 @@
 		F59CE9352FBFB7BC00649EA1 /* SafariView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F530226E2F865D420002C907 /* SafariView.swift */; };
 		F59CE9372FBFBACF00649EA1 /* WikipediaSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F59CE9362FBFBACE00649EA1 /* WikipediaSheetView.swift */; };
 		F59CE9382FBFBACF00649EA1 /* WikipediaSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F59CE9362FBFBACE00649EA1 /* WikipediaSheetView.swift */; };
-		F59F29102F90DBF900A50F8C /* MBDateTextFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F59F290F2F90DBF700A50F8C /* MBDateTextFormatter.swift */; };
+		F59F29102F90DBF900A50F8C /* MBTextFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F59F290F2F90DBF700A50F8C /* MBTextFormatter.swift */; };
 		F59F29122F923B1E00A50F8C /* MusiCards.icon in Resources */ = {isa = PBXBuildFile; fileRef = F59F29112F923B1E00A50F8C /* MusiCards.icon */; };
 		F5A09F782FBC867D00E5404B /* ReleaseHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5E62CD32F86ABA600E4B5AF /* ReleaseHeaderView.swift */; };
 		F5A09F792FBC867D00E5404B /* ArtistCreditLinksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F530226A2F8647DD0002C907 /* ArtistCreditLinksView.swift */; };
@@ -80,7 +82,7 @@
 		F5C775B02FBCFC4200AE439F /* DiscographyGrouping.swift in Sources */ = {isa = PBXBuildFile; fileRef = F53022702F8691210002C907 /* DiscographyGrouping.swift */; };
 		F5C775B12FBCFC8400AE439F /* CoverArtCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51CEEB12F8ACE2800E70ACD /* CoverArtCache.swift */; };
 		F5C775B22FBCFC8400AE439F /* TrackDetailStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51CEDDF2F899A3D00E70ACD /* TrackDetailStore.swift */; };
-		F5C775B32FBCFC8400AE439F /* MBDateTextFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F59F290F2F90DBF700A50F8C /* MBDateTextFormatter.swift */; };
+		F5C775B32FBCFC8400AE439F /* MBTextFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F59F290F2F90DBF700A50F8C /* MBTextFormatter.swift */; };
 		F5C775B42FBCFC8400AE439F /* MusicBrainzService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F59B714A2F8539C60086AB37 /* MusicBrainzService.swift */; };
 		F5C775B52FBCFC8400AE439F /* ClassicalMetadataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50A4F7C2F8EF16E006FD7A7 /* ClassicalMetadataStore.swift */; };
 		F5C775B62FBCFC8400AE439F /* ClassicalTrackFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50A4F7D2F8EF16E006FD7A7 /* ClassicalTrackFormatter.swift */; };
@@ -126,6 +128,7 @@
 		F54FE62E2F9C08EC00646913 /* AboutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutView.swift; sourceTree = "<group>"; };
 		F54FE6322F9C104D00646913 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		F56054C52FB62962009EEF0A /* MusiCardsSpinner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusiCardsSpinner.swift; sourceTree = "<group>"; };
+		F575FB7E2FC0C46300BDCB93 /* MBIdentifiers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MBIdentifiers.swift; sourceTree = "<group>"; };
 		F57FC69C2F8FFBBA00422295 /* PanHandleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanHandleView.swift; sourceTree = "<group>"; };
 		F57FC69E2F8FFBD900422295 /* DeckPhysics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckPhysics.swift; sourceTree = "<group>"; };
 		F5918A062F845AFE00E625DD /* SearchCardContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchCardContentView.swift; sourceTree = "<group>"; };
@@ -136,7 +139,7 @@
 		F59B714C2F853B7C0086AB37 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		F59B714E2F8540150086AB37 /* MusiCardsAppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusiCardsAppModel.swift; sourceTree = "<group>"; };
 		F59CE9362FBFBACE00649EA1 /* WikipediaSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WikipediaSheetView.swift; sourceTree = "<group>"; };
-		F59F290F2F90DBF700A50F8C /* MBDateTextFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MBDateTextFormatter.swift; sourceTree = "<group>"; };
+		F59F290F2F90DBF700A50F8C /* MBTextFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MBTextFormatter.swift; sourceTree = "<group>"; };
 		F59F29112F923B1E00A50F8C /* MusiCards.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = MusiCards.icon; sourceTree = "<group>"; };
 		F5A09F5D2FBC746A00E5404B /* MusiCardsMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MusiCardsMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F5A09F6A2FBC763200E5404B /* DeckStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckStyle.swift; sourceTree = "<group>"; };
@@ -183,8 +186,6 @@
 		F5A09F682FBC750100E5404B /* iOS */ = {
 			isa = PBXGroup;
 			children = (
-				F5D185AB2F93F71A00CDDB1C /* ErrorStateView.swift */,
-				F5D185A92F93E4A100CDDB1C /* EmptyStateView.swift */,
 				F57FC69E2F8FFBD900422295 /* DeckPhysics.swift */,
 				F57FC69C2F8FFBBA00422295 /* PanHandleView.swift */,
 				F53A32072F840607005A436B /* DeckCardView.swift */,
@@ -263,7 +264,8 @@
 		F5ECDD532F85CED1006161E3 /* Services */ = {
 			isa = PBXGroup;
 			children = (
-				F59F290F2F90DBF700A50F8C /* MBDateTextFormatter.swift */,
+				F575FB7E2FC0C46300BDCB93 /* MBIdentifiers.swift */,
+				F59F290F2F90DBF700A50F8C /* MBTextFormatter.swift */,
 				F51CEEB12F8ACE2800E70ACD /* CoverArtCache.swift */,
 				F51CEDDF2F899A3D00E70ACD /* TrackDetailStore.swift */,
 				F59B714A2F8539C60086AB37 /* MusicBrainzService.swift */,
@@ -288,6 +290,8 @@
 				F5A09F682FBC750100E5404B /* iOS */,
 				F53A32062F840607005A436B /* DeckCard.swift */,
 				F50AC8752F8E5EE100776C7E /* DeckBackgroundView.swift */,
+				F5D185AB2F93F71A00CDDB1C /* ErrorStateView.swift */,
+				F5D185A92F93E4A100CDDB1C /* EmptyStateView.swift */,
 			);
 			path = Deck;
 			sourceTree = "<group>";
@@ -437,6 +441,7 @@
 				F5A09F7B2FBC867D00E5404B /* TracksCardContentView.swift in Sources */,
 				F507A9AA2FBD9D5C001FB1B8 /* MusiCardsAppModel.swift in Sources */,
 				F5C775B72FBCFC8E00AE439F /* SearchViewModel.swift in Sources */,
+				F575FB7F2FC0C46400BDCB93 /* MBIdentifiers.swift in Sources */,
 				F5A09F7D2FBC867D00E5404B /* TrackDetailPagerView.swift in Sources */,
 				F5C775BB2FBD0B9100AE439F /* MusiCardsSpinner.swift in Sources */,
 				F5C775B82FBD005B00AE439F /* DeckCard.swift in Sources */,
@@ -457,7 +462,7 @@
 				F5A09F852FBC867D00E5404B /* SearchCardHeaderView.swift in Sources */,
 				F5C775B12FBCFC8400AE439F /* CoverArtCache.swift in Sources */,
 				F5C775B22FBCFC8400AE439F /* TrackDetailStore.swift in Sources */,
-				F5C775B32FBCFC8400AE439F /* MBDateTextFormatter.swift in Sources */,
+				F5C775B32FBCFC8400AE439F /* MBTextFormatter.swift in Sources */,
 				F5C775B42FBCFC8400AE439F /* MusicBrainzService.swift in Sources */,
 				F5C775B52FBCFC8400AE439F /* ClassicalMetadataStore.swift in Sources */,
 				F5C775B62FBCFC8400AE439F /* ClassicalTrackFormatter.swift in Sources */,
@@ -485,6 +490,7 @@
 				F59B714B2F8539C60086AB37 /* MusicBrainzService.swift in Sources */,
 				F5ECDD4E2F85A98B006161E3 /* SearchCardHeaderView.swift in Sources */,
 				F53A320E2F840607005A436B /* DeckCardView.swift in Sources */,
+				F575FB802FC0C46400BDCB93 /* MBIdentifiers.swift in Sources */,
 				F5ECDD4C2F8583D3006161E3 /* ReleaseCardContentView.swift in Sources */,
 				F5E62CD42F86ABA800E4B5AF /* ReleaseHeaderView.swift in Sources */,
 				F54FE62F2F9C08ED00646913 /* AboutView.swift in Sources */,
@@ -506,7 +512,7 @@
 				F53022652F862DA40002C907 /* ArtistCardContentView.swift in Sources */,
 				F53022712F8691230002C907 /* DiscographyGrouping.swift in Sources */,
 				F51CEDE02F899A4300E70ACD /* TrackDetailStore.swift in Sources */,
-				F59F29102F90DBF900A50F8C /* MBDateTextFormatter.swift in Sources */,
+				F59F29102F90DBF900A50F8C /* MBTextFormatter.swift in Sources */,
 				F53A32112F840607005A436B /* DeckView.swift in Sources */,
 				F5ECDD502F85C6FB006161E3 /* SearchArtistRow.swift in Sources */,
 			);
@@ -536,7 +542,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.5;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = hu.hildgyorgy.MusiCardsMac;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -582,7 +588,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.5;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = hu.hildgyorgy.MusiCardsMac;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -739,13 +745,14 @@
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.3;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.3;
+				MARKETING_VERSION = 1.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "-hu.hildgyorgy.musicards";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -759,7 +766,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 1;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
 		};
@@ -785,13 +792,14 @@
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.3;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.3;
+				MARKETING_VERSION = 1.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = hu.hildgyorgy.musicards;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -806,7 +814,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 1;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
 		};

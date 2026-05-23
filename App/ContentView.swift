@@ -20,7 +20,7 @@ struct ContentView: View {
 
         let artistTitle = appModel.selectedArtist?.name ?? "Artist"
 
-        let artistSubtitle = MBDateTextFormatter.lifeSpanTextOrEmpty(
+        let artistSubtitle = MBTextFormatter.lifeSpanTextOrEmpty(
             from: appModel.selectedArtist?.lifeSpan
         )
 

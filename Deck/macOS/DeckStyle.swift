@@ -13,19 +13,18 @@ enum DeckStyle {
 
     static let windowHeightRatio: CGFloat = 0.58
     static let minimumWindowHeight: CGFloat = 720
-    static let windowWidthToHeightRatio: CGFloat = 0.47
+    static let windowWidthToHeightRatio: CGFloat = 0.46
 
     // MARK: - Deck geometry
 
     static let horizontalInset: CGFloat = 0
     static let topInset: CGFloat = 0
-    static let cornerRadius: CGFloat = 34
+    static let cornerRadius: CGFloat = 35
     static let collapsedCardHeight: CGFloat = 40
 
     // MARK: - Glass surface
 
     static let glassMaterial: Material = .ultraThinMaterial
-
     static let glassHighlightColor: Color = .white
     static let glassMidColor: Color = .white
     static let glassBottomColor: Color = Color(red: 0.02, green: 0.06, blue: 0.24)
@@ -55,7 +54,7 @@ enum DeckStyle {
 
     // MARK: - Card label
 
-    static let cardLabelFontSize: CGFloat = 12
+    static let cardLabelFontSize: CGFloat = 11
     static let cardLabelFontWeight: Font.Weight = .medium
     static let cardLabelTracking: CGFloat = 4
     static let cardLabelColor: Color = .secondary
@@ -69,7 +68,7 @@ enum DeckStyle {
 
     static let subtitleFontSize: CGFloat = 20
     static let subtitleFontWeight: Font.Weight = .regular
-    static let subtitleColor: Color = Color(nsColor: .linkColor)
+    static let subtitleColor: Color = .blue
 
     // MARK: - Expanded content layout
 
@@ -93,6 +92,6 @@ enum DeckStyle {
     static let strokeDark = Color.white.opacity(0.15)
     static let strokeLight = Color.black.opacity(0.1)
     
-    static let releaseHeaderTitleFont: Font = .title
+    static let releaseHeaderTitleFont: Font = .title2
     static let releaseHeaderArtistFont: Font = .title3
 }

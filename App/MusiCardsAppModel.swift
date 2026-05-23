@@ -17,11 +17,7 @@ import MediaPlayer
 
 @MainActor
 final class MusiCardsAppModel: ObservableObject {
-    #if os(macOS)
     @Published var activeIndex: Int = 0
-    #else
-    @Published var activeIndex: Int = 1
-    #endif
     @Published var selectedReleaseID: String?
     @Published var selectedRelease: MBRelease?
     @Published var selectedReleaseCover: PlatformImage?
@@ -85,6 +81,7 @@ final class MusiCardsAppModel: ObservableObject {
     func selectRelease(_ row: SearchReleaseRow) {
         selectedReleaseID = row.id
         isLoadingRelease = true
+        releaseError = nil
         selectedRelease = nil
         selectedReleaseCover = nil
 
@@ -122,6 +119,7 @@ final class MusiCardsAppModel: ObservableObject {
             selectedRelease = nil
             selectedReleaseCover = nil
             isLoadingRelease = false
+            releaseError = error
         }
     }
 
@@ -411,11 +409,11 @@ final class MusiCardsAppModel: ObservableObject {
                 id: best.id,
                 title: best.title,
                 artistLine: best.artistCredit?.compactMap { $0.name }.joined(separator: ", ") ?? "",
-                metaLine: releaseMetaLine(
-                    date: best.date,
+                metaLine: MBTextFormatter.releaseMetaLine(
+                    year: MBTextFormatter.year(from: best.date),
                     country: best.country,
-                    labelInfo: best.labelInfo,
-                    media: best.media
+                    label: best.labelInfo?.compactMap { $0.label?.name }.first,
+                    format: best.media?.compactMap { $0.format }.first
                 ),
                 disambiguation: best.disambiguation ?? "",
                 hasCoverArt: hasCoverArt
@@ -431,22 +429,6 @@ final class MusiCardsAppModel: ObservableObject {
             nowPlayingReleaseGroupTitle = nil
             nowPlayingArtistName = nil
         }
-    }
-
-    private func releaseMetaLine(
-        date: String?,
-        country: String?,
-        labelInfo: [MBLabelInfo]?,
-        media: [MBMedium]?
-    ) -> String {
-        let parts = [
-            MBDateTextFormatter.year(from: date),
-            country ?? "",
-            labelInfo?.compactMap { $0.label?.name }.first ?? "",
-            media?.compactMap { $0.format }.first ?? ""
-        ].filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-
-        return parts.joined(separator: " • ")
     }
 #endif
 }

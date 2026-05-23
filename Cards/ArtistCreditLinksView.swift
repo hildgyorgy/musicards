@@ -10,7 +10,6 @@ import SwiftUI
 struct ArtistCreditLinksView: View {
     let artistCredits: [MBArtistCredit]?
     let onSelectArtist: (String) -> Void
-    var maxLines: Int = 2
 
     private let tokenSpacing: CGFloat = 0
     private let lineSpacing: CGFloat = 0
@@ -27,16 +26,6 @@ struct ArtistCreditLinksView: View {
             EmptyView()
         }
     }
-
-    private var maxHeightForCurrentFont: CGFloat {
-        let lineHeight: CGFloat
-        #if canImport(UIKit)
-        lineHeight = UIFont.preferredFont(forTextStyle: .title3).lineHeight
-        #else
-        lineHeight = NSFont.preferredFont(forTextStyle: .title3).pointSize * 1.2
-        #endif
-        return lineHeight * CGFloat(maxLines)
-    }
     
     private func tokenView(_ token: ArtistCreditToken) -> some View {
         Group {
@@ -46,7 +35,7 @@ struct ArtistCreditLinksView: View {
                     onSelectArtist(id)
                 } label: {
                     Text(token.text)
-                        .foregroundStyle(.tint)
+                        .foregroundStyle(.blue)
                 }
                 .buttonStyle(.plain)
 

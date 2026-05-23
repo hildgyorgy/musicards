@@ -1,5 +1,5 @@
 //
-//  MBDateTextFormatter.swift.swift
+//  MBTextFormatter.swift.swift
 //  MusiCards
 //
 //  Created by Hild György on 2026. 04. 16..
@@ -7,7 +7,7 @@
 
 import Foundation
 
-nonisolated enum MBDateTextFormatter {
+nonisolated enum MBTextFormatter {
     static func year(from text: String?) -> String {
         guard let text, !text.isEmpty else { return "" }
         return String(text.prefix(4))
@@ -49,5 +49,31 @@ nonisolated enum MBDateTextFormatter {
             }
         }
         return text
+    }
+    
+    static func releaseMetaLine(
+        year: String?,
+        country: String?,
+        label: String?,
+        format: String?
+    ) -> String {
+        [
+            year,
+            country,
+            label,
+            format
+        ]
+        .compactMap { value in
+            guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !trimmed.isEmpty else {
+                return nil
+            }
+            return trimmed
+        }
+        .joined(separator: " • ")
+    }
+    
+    static func artistLine(from artistCredit: [MBArtistCredit]?) -> String {
+        artistCredit?.compactMap { $0.name }.joined(separator: ", ") ?? ""
     }
 }

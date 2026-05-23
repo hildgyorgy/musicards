@@ -33,7 +33,16 @@ struct MusicBrainzService {
         var request = URLRequest(url: url)
         request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
 
-        let (data, _) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+
         return data
     }
 
@@ -44,11 +53,11 @@ struct MusicBrainzService {
     ) async throws -> [MBReleaseSearchResult] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        if isMBID(trimmed) {
+        if MBIdentifiers.isMBID(trimmed) {
             return try await fetchReleaseByMBID(trimmed)
         }
 
-        if isBareBarcode(trimmed) {
+        if MBIdentifiers.isBareBarcode(trimmed) {
             return try await searchReleasesByBarcode(trimmed, limit: limit, offset: offset)
         }
 
@@ -160,11 +169,6 @@ struct MusicBrainzService {
         url.lastPathComponent
     }
 
-    private func isMBID(_ text: String) -> Bool {
-        let pattern = #"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"#
-        return text.range(of: pattern, options: .regularExpression) != nil
-    }
-
     func searchReleasesByBarcode(
         _ barcode: String,
         limit: Int = 25,
@@ -186,10 +190,6 @@ struct MusicBrainzService {
         let data = try await data(from: url)
         let response = try JSONDecoder().decode(MBReleaseSearchResponse.self, from: data)
         return response.releases
-    }
-
-    private func isBareBarcode(_ text: String) -> Bool {
-        text.allSatisfy(\.isNumber) && text.count >= 8
     }
 
     func fetchReleaseByMBID(_ mbid: String) async throws -> [MBReleaseSearchResult] {

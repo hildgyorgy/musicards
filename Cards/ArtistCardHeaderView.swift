@@ -17,7 +17,7 @@ struct ArtistCardHeaderView: View {
                     .font(.title.weight(.bold))
                     .foregroundStyle(.primary)
 
-                if let lifeSpan = MBDateTextFormatter.lifeSpanText(from: artist.lifeSpan) {
+                if let lifeSpan = MBTextFormatter.lifeSpanText(from: artist.lifeSpan) {
                     Text(lifeSpan)
                         .font(.body)
                         .foregroundStyle(.secondary)

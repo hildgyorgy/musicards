@@ -22,7 +22,6 @@ struct TracksCardHeaderView: View {
             ArtistCreditLinksView(
                 artistCredits: artistCredits,
                 onSelectArtist: onSelectArtist,
-                maxLines: 2
             )
             .font(DeckStyle.releaseHeaderArtistFont)
         }
