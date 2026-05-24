@@ -8,10 +8,10 @@ struct DeckView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
     let cards: [DeckCard<ID>]
     @Binding var selection: DeckSelection<ID>
 
-    private var activeIndex: Int {
+    private var activeSlotIndex: Int {
         selection.activeSlotIndex
     }
-    private func setActiveIndex(_ newValue: Int) {
+    private func setActiveSlotIndex(_ newValue: Int) {
         selection.selectSlot(newValue)
     }
     let headerProvider: (DeckCard<ID>) -> HeaderContent
@@ -50,7 +50,7 @@ struct DeckView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
 
                     let y = DeckLayout.yPosition(
                         index: index,
-                        activeIndex: activeIndex,
+                        activeSlotIndex: activeSlotIndex,
                         totalCards: cards.count,
                         containerHeight: proxy.size.height,
                         safeAreaTop: proxy.safeAreaInsets.top,
@@ -64,7 +64,7 @@ struct DeckView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
                         },
                         isPanEnabled: DeckPhysics.dragKind(
                             for: index,
-                            activeIndex: activeIndex,
+                            activeSlotIndex: activeSlotIndex,
                             cardCount: cards.count
                         ) != nil,
                         onPanBegan: {
@@ -79,7 +79,7 @@ struct DeckView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
 
                             guard let kind = DeckPhysics.dragKind(
                                 for: index,
-                                activeIndex: activeIndex,
+                                activeSlotIndex: activeSlotIndex,
                                 cardCount: cards.count
                             ) else {
                                 return
@@ -95,7 +95,7 @@ struct DeckView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
 
                             guard let kind = DeckPhysics.dragKind(
                                 for: index,
-                                activeIndex: activeIndex,
+                                activeSlotIndex: activeSlotIndex,
                                 cardCount: cards.count
                             ) else {
                                 return
@@ -110,7 +110,7 @@ struct DeckView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
                             switch decision {
                             case .commit(let delta):
                                 withAnimation(DeckStyle.animation) {
-                                    setActiveIndex(activeIndex + delta)
+                                    setActiveSlotIndex(activeSlotIndex + delta)
                                     dragOffset = 0
                                 }
 
@@ -154,13 +154,13 @@ struct DeckView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
     private func handleTap(on card: DeckCard<ID>) {
         let index = card.slotIndex
 
-        if index == activeIndex + 1, activeIndex < cards.count {
+        if index == activeSlotIndex + 1, activeSlotIndex < cards.count {
             withAnimation(DeckStyle.animation) {
                 selection.selectCard(card)
             }
-        } else if index == activeIndex, activeIndex > 0 {
+        } else if index == activeSlotIndex, activeSlotIndex > 0 {
             withAnimation(DeckStyle.animation) {
-                setActiveIndex(activeIndex - 1)
+                setActiveSlotIndex(activeSlotIndex - 1)
             }
         }
     }
@@ -168,9 +168,9 @@ struct DeckView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
     private func interactiveOffset(for index: Int) -> CGFloat {
         guard dragCardIndex == index else { return 0 }
 
-        if index == activeIndex {
+        if index == activeSlotIndex {
             return max(0, dragOffset)
-        } else if index == activeIndex + 1 {
+        } else if index == activeSlotIndex + 1 {
             return min(0, dragOffset)
         } else {
             return 0

@@ -28,14 +28,14 @@ enum DeckPhysics {
 
     static func dragKind(
         for index: Int,
-        activeIndex: Int,
+        activeSlotIndex: Int,
         cardCount: Int
     ) -> DeckDragKind? {
-        if index == activeIndex, activeIndex > 0 {
+        if index == activeSlotIndex, activeSlotIndex > 0 {
             return .collapseCurrent
         }
 
-        if index == activeIndex + 1, activeIndex < cardCount {
+        if index == activeSlotIndex + 1, activeSlotIndex < cardCount {
             return .expandNext
         }
 

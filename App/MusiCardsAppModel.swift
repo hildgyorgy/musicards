@@ -17,18 +17,10 @@ import MediaPlayer
 
 @MainActor
 final class MusiCardsAppModel: ObservableObject {
-    @Published var activeIndex: Int = 0
-    var deckSelection: DeckSelection<MusiCardID> {
-        get {
-            DeckSelection<MusiCardID>(
-                activeID: .home,
-                activeSlotIndex: activeIndex
-            )
-        }
-        set {
-            activeIndex = newValue.activeSlotIndex
-        }
-    }
+    @Published var deckSelection = DeckSelection<MusiCardID>(
+        activeID: .home,
+        activeSlotIndex: 0
+    )
     @Published var selectedReleaseID: String?
     @Published var selectedRelease: MBRelease?
     @Published var selectedReleaseCover: PlatformImage?
@@ -124,7 +116,10 @@ final class MusiCardsAppModel: ObservableObject {
             isLoadingRelease = false
 
             withAnimation(DeckStyle.animation) {
-                activeIndex = MusiCardID.release.activeIndex
+                deckSelection = DeckSelection<MusiCardID>(
+                    activeID: .release,
+                    activeSlotIndex: MusiCardID.release.slotIndex
+                )
             }
         } catch {
             selectedRelease = nil
@@ -189,7 +184,10 @@ final class MusiCardsAppModel: ObservableObject {
             isLoadingArtistHeader = false
 
             withAnimation(DeckStyle.animation) {
-                activeIndex = MusiCardID.artist.activeIndex
+                deckSelection = DeckSelection<MusiCardID>(
+                    activeID: .artist,
+                    activeSlotIndex: MusiCardID.artist.slotIndex
+                )
             }
 
             // Wikipedia loads after — non-blocking, card is already visible
@@ -270,7 +268,10 @@ final class MusiCardsAppModel: ObservableObject {
             artistName: artistName
         )
 
-        activeIndex = MusiCardID.search.activeIndex
+        deckSelection = DeckSelection<MusiCardID>(
+            activeID: .search,
+            activeSlotIndex: MusiCardID.search.slotIndex
+        )
     }
 
     // MARK: - Recents
@@ -331,7 +332,10 @@ final class MusiCardsAppModel: ObservableObject {
         )
 
         withAnimation(DeckStyle.animation) {
-            activeIndex = MusiCardID.search.activeIndex
+            deckSelection = DeckSelection<MusiCardID>(
+                activeID: .search,
+                activeSlotIndex: MusiCardID.search.slotIndex
+            )
         }
     }
 

@@ -29,13 +29,13 @@ enum DeckLayout {
 
     static func yPosition(
         index: Int,
-        activeIndex: Int,
+        activeSlotIndex: Int,
         totalCards: Int,
         containerHeight: CGFloat,
         safeAreaTop: CGFloat,
         safeAreaBottom: CGFloat
     ) -> CGFloat {
-        if index <= activeIndex {
+        if index <= activeSlotIndex {
             return expandedTop(safeAreaTop: safeAreaTop) + CGFloat(index - 1) * DeckStyle.peek
         } else {
             let collapsedBaseY =

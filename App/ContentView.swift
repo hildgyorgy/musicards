@@ -29,7 +29,7 @@ struct ContentView: View {
             result.append(
                 DeckCard(
                     id: .home,
-                    slotIndex: MusiCardID.home.activeIndex,
+                    slotIndex: MusiCardID.home.slotIndex,
                     cardLabel: "MusiCards",
                     title: "...",
                     subtitle: "..."
@@ -39,28 +39,28 @@ struct ContentView: View {
         result.append(contentsOf: [
             DeckCard(
                 id: .search,
-                slotIndex: MusiCardID.search.activeIndex,
+                slotIndex: MusiCardID.search.slotIndex,
                 cardLabel: "Search",
                 title: "",
                 subtitle: ""
             ),
             DeckCard(
                 id: .release,
-                slotIndex: MusiCardID.release.activeIndex,
+                slotIndex: MusiCardID.release.slotIndex,
                 cardLabel: "Release",
                 title: releaseTitle,
                 subtitle: releaseSubtitle
             ),
             DeckCard(
                 id: .tracks,
-                slotIndex: MusiCardID.tracks.activeIndex,
+                slotIndex: MusiCardID.tracks.slotIndex,
                 cardLabel: "Tracks",
                 title: releaseTitle,
                 subtitle: releaseSubtitle
             ),
             DeckCard(
                 id: .artist,
-                slotIndex: MusiCardID.artist.activeIndex,
+                slotIndex: MusiCardID.artist.slotIndex,
                 cardLabel: "Artist & Discography",
                 title: artistTitle,
                 subtitle: artistSubtitle

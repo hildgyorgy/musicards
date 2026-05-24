@@ -15,5 +15,5 @@ enum MusiCardID: Int, CaseIterable, Identifiable {
     case artist = 4
 
     var id: Int { rawValue }
-    var activeIndex: Int { rawValue }
+    var slotIndex: Int { rawValue }
 }

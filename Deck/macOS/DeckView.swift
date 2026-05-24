@@ -7,10 +7,10 @@ import SwiftUI
 struct DeckView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
     let cards: [DeckCard<ID>]
     @Binding var selection: DeckSelection<ID>
-    private var activeIndex: Int {
+    private var activeSlotIndex: Int {
         selection.activeSlotIndex
     }
-    private func setActiveIndex(_ newValue: Int) {
+    private func setActiveSlotIndex(_ newValue: Int) {
         selection.selectSlot(newValue)
     }
     let headerProvider: (DeckCard<ID>) -> HeaderContent
@@ -39,7 +39,7 @@ struct DeckView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
 
             VStack(spacing: 0) {
                 ForEach(Array(cards.enumerated()), id: \.element.id) { visualIndex, card in
-                    let isActive = visualIndex == activeIndex
+                    let isActive = visualIndex == activeSlotIndex
 
                     DeckCardView(
                         card: card,
@@ -68,14 +68,14 @@ struct DeckView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
             )
             .padding(.horizontal, DeckStyle.horizontalInset)
             .padding(.top, DeckStyle.topInset)
-            .animation(DeckStyle.animation, value: activeIndex)
+            .animation(DeckStyle.animation, value: activeSlotIndex)
         }
     }
 
     private func handleTap(on visualIndex: Int) {
         withAnimation(DeckStyle.animation) {
-            if visualIndex == activeIndex {
-                setActiveIndex(max(activeIndex - 1, 0))
+            if visualIndex == activeSlotIndex {
+                setActiveSlotIndex(max(activeSlotIndex - 1, 0))
             } else {
                 selection.selectCard(cards[visualIndex])
             }
