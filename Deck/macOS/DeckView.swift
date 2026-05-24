@@ -7,17 +7,17 @@
 
 import SwiftUI
 
-struct DeckView<HeaderContent: View, CardContent: View>: View {
-    let cards: [DeckCard]
+struct DeckView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
+    let cards: [DeckCard<ID>]
     @Binding var activeIndex: Int
-    let headerProvider: (DeckCard) -> HeaderContent
-    let contentProvider: (DeckCard) -> CardContent
+    let headerProvider: (DeckCard<ID>) -> HeaderContent
+    let contentProvider: (DeckCard<ID>) -> CardContent
 
     init(
-        cards: [DeckCard],
+        cards: [DeckCard<ID>],
         activeIndex: Binding<Int>,
-        @ViewBuilder headerProvider: @escaping (DeckCard) -> HeaderContent,
-        @ViewBuilder contentProvider: @escaping (DeckCard) -> CardContent
+        @ViewBuilder headerProvider: @escaping (DeckCard<ID>) -> HeaderContent,
+        @ViewBuilder contentProvider: @escaping (DeckCard<ID>) -> CardContent
     ) {
         self.cards = cards
         self._activeIndex = activeIndex

@@ -9,7 +9,7 @@ import SwiftUI
 
 struct ContentView: View {
     
-    private var cards: [DeckCard] {
+    private var cards: [DeckCard<MusiCardID>] {
 
         let releaseTitle = appModel.selectedRelease?.title ?? "Release"
 
@@ -24,20 +24,21 @@ struct ContentView: View {
             from: appModel.selectedArtist?.lifeSpan
         )
 
-        var result: [DeckCard] = []
+        var result: [DeckCard<MusiCardID>] = []
         #if os(macOS)
         result.append(DeckCard(
-            kind: .home,
+            id: .home,
+            index: MusiCardID.home.activeIndex,
             cardLabel: "MusiCards",
-            title: "",
-            subtitle: ""
+            title: "...",
+            subtitle: "..."
         ))
         #endif
         result.append(contentsOf: [
-            DeckCard(kind: .search, cardLabel: "Search", title: "", subtitle: ""),
-            DeckCard(kind: .release, cardLabel: "Release", title: releaseTitle, subtitle: releaseSubtitle),
-            DeckCard(kind: .tracks, cardLabel: "Tracks", title: releaseTitle, subtitle: releaseSubtitle),
-            DeckCard(kind: .artist, cardLabel: "Artist & Discography", title: artistTitle, subtitle: artistSubtitle)
+            DeckCard(id: .search, index: MusiCardID.search.activeIndex, cardLabel: "Search", title: "", subtitle: ""),
+            DeckCard(id: .release, index: MusiCardID.release.activeIndex, cardLabel: "Release", title: releaseTitle, subtitle: releaseSubtitle),
+            DeckCard(id: .tracks, index: MusiCardID.tracks.activeIndex, cardLabel: "Tracks", title: releaseTitle, subtitle: releaseSubtitle),
+            DeckCard(id: .artist, index: MusiCardID.artist.activeIndex, cardLabel: "Artist & Discography", title: artistTitle, subtitle: artistSubtitle)
         ])
         return result
     }
@@ -52,9 +53,9 @@ struct ContentView: View {
             : DeckStyle.boxBackgroundLight
     }
     
-    @ViewBuilder private func headerContent(_ card: DeckCard) -> some View {
+    @ViewBuilder private func headerContent(_ card: DeckCard<MusiCardID>) -> some View {
 
-        switch card.kind {
+        switch card.id {
         case .home:
             EmptyView()
         case .search:
@@ -62,7 +63,7 @@ struct ContentView: View {
                 viewModel: appModel.searchViewModel,
                 onTapCurrentArtist: {
                     withAnimation(DeckStyle.animation) {
-                        appModel.activeIndex = DeckCardID.artist.activeIndex
+                        appModel.activeIndex = MusiCardID.artist.activeIndex
                     }
                 },
                 onBarcodeScanned: { code in
@@ -103,8 +104,8 @@ struct ContentView: View {
         }
     }
 
-    @ViewBuilder private func cardContent(_ card: DeckCard) -> some View {
-        switch card.kind {
+    @ViewBuilder private func cardContent(_ card: DeckCard<MusiCardID>) -> some View {
+        switch card.id {
         case .home:
             DeckBackgroundView()
         case .search:
@@ -153,7 +154,7 @@ struct ContentView: View {
                             artistName: artist
                         )
                         withAnimation(DeckStyle.animation) {
-                            appModel.activeIndex = DeckCardID.search.activeIndex
+                            appModel.activeIndex = MusiCardID.search.activeIndex
                         }
                     }
                 )

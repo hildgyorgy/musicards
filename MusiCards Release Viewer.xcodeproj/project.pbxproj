@@ -99,6 +99,8 @@
 		F5ECDD4C2F8583D3006161E3 /* ReleaseCardContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5ECDD4B2F8583D2006161E3 /* ReleaseCardContentView.swift */; };
 		F5ECDD4E2F85A98B006161E3 /* SearchCardHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5ECDD4D2F85A989006161E3 /* SearchCardHeaderView.swift */; };
 		F5ECDD502F85C6FB006161E3 /* SearchArtistRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5ECDD4F2F85C6FA006161E3 /* SearchArtistRow.swift */; };
+		F5F5565A2FC303E300CFE831 /* MusiCardID.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5F556592FC303E200CFE831 /* MusiCardID.swift */; };
+		F5F5565B2FC303E300CFE831 /* MusiCardID.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5F556592FC303E200CFE831 /* MusiCardID.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -159,6 +161,7 @@
 		F5ECDD4B2F8583D2006161E3 /* ReleaseCardContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseCardContentView.swift; sourceTree = "<group>"; };
 		F5ECDD4D2F85A989006161E3 /* SearchCardHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchCardHeaderView.swift; sourceTree = "<group>"; };
 		F5ECDD4F2F85C6FA006161E3 /* SearchArtistRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchArtistRow.swift; sourceTree = "<group>"; };
+		F5F556592FC303E200CFE831 /* MusiCardID.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusiCardID.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -240,6 +243,7 @@
 		F5ECDD512F85CE95006161E3 /* App */ = {
 			isa = PBXGroup;
 			children = (
+				F5F556592FC303E200CFE831 /* MusiCardID.swift */,
 				F53A32042F840607005A436B /* CardsApp.swift */,
 				F53A32052F840607005A436B /* ContentView.swift */,
 				F59B714E2F8540150086AB37 /* MusiCardsAppModel.swift */,
@@ -430,6 +434,7 @@
 				F5A09F8A2FBC890D00E5404B /* MacWindowMetrics.swift in Sources */,
 				F5A09F8B2FBC890D00E5404B /* GlassCardBackground.swift in Sources */,
 				F5C775AA2FBCFC4200AE439F /* SearchArtistRow.swift in Sources */,
+				F5F5565B2FC303E300CFE831 /* MusiCardID.swift in Sources */,
 				F5C775AB2FBCFC4200AE439F /* SearchReleaseRow.swift in Sources */,
 				F5C775AC2FBCFC4200AE439F /* SearchContentState.swift in Sources */,
 				F5C775AD2FBCFC4200AE439F /* Models.swift in Sources */,
@@ -479,6 +484,7 @@
 				F59B714D2F853B7C0086AB37 /* Models.swift in Sources */,
 				F520FA8B2F8D75A50020D8E2 /* ArtistCardHeaderView.swift in Sources */,
 				F53022672F8639500002C907 /* SearchMode.swift in Sources */,
+				F5F5565A2FC303E300CFE831 /* MusiCardID.swift in Sources */,
 				F5D185AC2F93F71B00CDDB1C /* ErrorStateView.swift in Sources */,
 				F53A320C2F840607005A436B /* ContentView.swift in Sources */,
 				F59B714F2F8540170086AB37 /* MusiCardsAppModel.swift in Sources */,

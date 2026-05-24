@@ -7,26 +7,26 @@
 
 import SwiftUI
 
-struct DeckCardView<Header: View, Content: View>: View {
-    let card: DeckCard
+struct DeckCardView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
+    let card: DeckCard<ID>
     let onTap: () -> Void
     let isPanEnabled: Bool
     let onPanBegan: (() -> Void)?
     let onPanChanged: (CGFloat) -> Void
     let onPanEnded: (_ translationY: CGFloat, _ velocityY: CGFloat) -> Void
 
-    let header: Header
-    let content: Content
+    let header: HeaderContent
+    let content: CardContent
 
     init(
-        card: DeckCard,
+        card: DeckCard<ID>,
         onTap: @escaping () -> Void,
         isPanEnabled: Bool,
         onPanBegan: (() -> Void)? = nil,
         onPanChanged: @escaping (CGFloat) -> Void,
         onPanEnded: @escaping (_ translationY: CGFloat, _ velocityY: CGFloat) -> Void,
-        @ViewBuilder header: () -> Header,
-        @ViewBuilder content: () -> Content
+        @ViewBuilder header: () -> HeaderContent,
+        @ViewBuilder content: () -> CardContent
     ) {
         self.card = card
         self.onTap = onTap

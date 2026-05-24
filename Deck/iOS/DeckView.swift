@@ -7,11 +7,11 @@
 
 import SwiftUI
 
-struct DeckView<HeaderContent: View, CardContent: View>: View {
-    let cards: [DeckCard]
+struct DeckView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
+    let cards: [DeckCard<ID>]
     @Binding var activeIndex: Int
-    let headerProvider: (DeckCard) -> HeaderContent
-    let contentProvider: (DeckCard) -> CardContent
+    let headerProvider: (DeckCard<ID>) -> HeaderContent
+    let contentProvider: (DeckCard<ID>) -> CardContent
 
     @State private var dragCardIndex: Int? = nil
     @State private var dragOffset: CGFloat = 0
@@ -21,10 +21,10 @@ struct DeckView<HeaderContent: View, CardContent: View>: View {
     @State private var nudgeTask: Task<Void, Never>? = nil
 
     init(
-        cards: [DeckCard],
+        cards: [DeckCard<ID>],
         activeIndex: Binding<Int>,
-        @ViewBuilder headerProvider: @escaping (DeckCard) -> HeaderContent,
-        @ViewBuilder contentProvider: @escaping (DeckCard) -> CardContent
+        @ViewBuilder headerProvider: @escaping (DeckCard<ID>) -> HeaderContent,
+        @ViewBuilder contentProvider: @escaping (DeckCard<ID>) -> CardContent
     ) {
         self.cards = cards
         self._activeIndex = activeIndex
@@ -36,7 +36,7 @@ struct DeckView<HeaderContent: View, CardContent: View>: View {
         GeometryReader { proxy in
             ZStack {
                 ForEach(Array(cards.enumerated()), id: \.element.id) { _, card in
-                    let index = card.id
+                    let index = card.index
 
                     let cardHeight = DeckLayout.cardHeight(
                         totalCards: cards.count,

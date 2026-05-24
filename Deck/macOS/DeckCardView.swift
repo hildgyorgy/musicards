@@ -7,15 +7,15 @@
 
 import SwiftUI
 
-struct DeckCardView<HeaderContent: View, CardContent: View>: View {
-    let card: DeckCard
+struct DeckCardView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
+    let card: DeckCard<ID>
     let isActive: Bool
     let onTap: () -> Void
     let header: HeaderContent
     let content: CardContent
 
     init(
-        card: DeckCard,
+        card: DeckCard<ID>,
         isActive: Bool,
         onTap: @escaping () -> Void,
         @ViewBuilder header: () -> HeaderContent,

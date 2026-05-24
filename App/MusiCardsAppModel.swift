@@ -113,7 +113,7 @@ final class MusiCardsAppModel: ObservableObject {
             isLoadingRelease = false
 
             withAnimation(DeckStyle.animation) {
-                activeIndex = DeckCardID.release.activeIndex
+                activeIndex = MusiCardID.release.activeIndex
             }
         } catch {
             selectedRelease = nil
@@ -178,7 +178,7 @@ final class MusiCardsAppModel: ObservableObject {
             isLoadingArtistHeader = false
 
             withAnimation(DeckStyle.animation) {
-                activeIndex = DeckCardID.artist.activeIndex
+                activeIndex = MusiCardID.artist.activeIndex
             }
 
             // Wikipedia loads after — non-blocking, card is already visible
@@ -259,7 +259,7 @@ final class MusiCardsAppModel: ObservableObject {
             artistName: artistName
         )
 
-        activeIndex = DeckCardID.search.activeIndex
+        activeIndex = MusiCardID.search.activeIndex
     }
 
     // MARK: - Recents
@@ -320,7 +320,7 @@ final class MusiCardsAppModel: ObservableObject {
         )
 
         withAnimation(DeckStyle.animation) {
-            activeIndex = DeckCardID.search.activeIndex
+            activeIndex = MusiCardID.search.activeIndex
         }
     }
 
