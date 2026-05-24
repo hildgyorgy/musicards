@@ -243,6 +243,7 @@
 		F5ECDD512F85CE95006161E3 /* App */ = {
 			isa = PBXGroup;
 			children = (
+				F5F5565C2FC335F400CFE831 /* StateViews */,
 				F5F556592FC303E200CFE831 /* MusiCardID.swift */,
 				F53A32042F840607005A436B /* CardsApp.swift */,
 				F53A32052F840607005A436B /* ContentView.swift */,
@@ -290,12 +291,10 @@
 		F5ECDD552F85CF0C006161E3 /* Deck */ = {
 			isa = PBXGroup;
 			children = (
+				F5F5565D2FC3383B00CFE831 /* Shared */,
 				F5A09F692FBC751100E5404B /* macOS */,
 				F5A09F682FBC750100E5404B /* iOS */,
 				F53A32062F840607005A436B /* DeckCard.swift */,
-				F50AC8752F8E5EE100776C7E /* DeckBackgroundView.swift */,
-				F5D185AB2F93F71A00CDDB1C /* ErrorStateView.swift */,
-				F5D185A92F93E4A100CDDB1C /* EmptyStateView.swift */,
 			);
 			path = Deck;
 			sourceTree = "<group>";
@@ -329,6 +328,23 @@
 				F53A32032F840607005A436B /* Assets.xcassets */,
 			);
 			path = Resources;
+			sourceTree = "<group>";
+		};
+		F5F5565C2FC335F400CFE831 /* StateViews */ = {
+			isa = PBXGroup;
+			children = (
+				F50AC8752F8E5EE100776C7E /* DeckBackgroundView.swift */,
+				F5D185AB2F93F71A00CDDB1C /* ErrorStateView.swift */,
+				F5D185A92F93E4A100CDDB1C /* EmptyStateView.swift */,
+			);
+			path = StateViews;
+			sourceTree = "<group>";
+		};
+		F5F5565D2FC3383B00CFE831 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Shared;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */

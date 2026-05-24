@@ -1,8 +1,5 @@
 //
 //  DeckCardView.swift
-//  MusiCards
-//
-//  Drag handle integrated into top label area
 //
 
 import SwiftUI

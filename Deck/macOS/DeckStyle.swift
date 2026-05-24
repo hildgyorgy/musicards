@@ -1,8 +1,5 @@
 //
 //  DeckStyle.swift
-//  MusiCards Release Viewer
-//
-//  Created by Hild György on 2026. 05. 19..
 //
 
 import SwiftUI
@@ -92,6 +89,6 @@ enum DeckStyle {
     static let strokeDark = Color.white.opacity(0.15)
     static let strokeLight = Color.black.opacity(0.1)
     
-    static let releaseHeaderTitleFont: Font = .title2
-    static let releaseHeaderArtistFont: Font = .title3
+    static let primaryHeaderFont: Font = .title2
+    static let secondaryHeaderFont: Font = .title3
 }

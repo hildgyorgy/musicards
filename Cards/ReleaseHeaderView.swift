@@ -47,7 +47,7 @@ struct ReleaseHeaderView: View {
 
             if let release {
                 Text(release.title)
-                    .font(DeckStyle.releaseHeaderTitleFont.weight(.bold))
+                    .font(DeckStyle.primaryHeaderFont.weight(.bold))
                     .foregroundStyle(.primary)
                     .lineLimit(3)
                     .padding(.top, 6)
@@ -56,7 +56,7 @@ struct ReleaseHeaderView: View {
                     artistCredits: release.artistCredit,
                     onSelectArtist: onSelectArtist,
                 )
-                .font(DeckStyle.releaseHeaderArtistFont)
+                .font(DeckStyle.secondaryHeaderFont)
             }
         }
         .fixedSize(horizontal: false, vertical: true)

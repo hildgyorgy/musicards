@@ -1,8 +1,5 @@
 //
 //  DeckView.swift
-//  MusiCards
-//
-//
 //
 
 import SwiftUI

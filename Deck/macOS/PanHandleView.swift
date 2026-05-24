@@ -1,8 +1,5 @@
 //
 //  PanHandleView.swift
-//  MusiCards Release Viewer
-//
-//  Created by Hild György on 2026. 05. 19..
 //
 
 import SwiftUI

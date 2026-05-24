@@ -1,8 +1,5 @@
 //
 //  DeckPhysics.swift
-//  MusiCards
-//
-//  Created by Hild György on 2026. 04. 15..
 //
 
 import CoreGraphics

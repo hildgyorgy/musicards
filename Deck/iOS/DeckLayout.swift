@@ -1,8 +1,5 @@
 //
 //  DeckLayout.swift
-//  Cards
-//
-//  Created by Hild György on 2026. 04. 05..
 //
 
 import CoreGraphics
