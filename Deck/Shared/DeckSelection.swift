@@ -11,10 +11,6 @@ struct DeckSelection<ID: Hashable> {
     mutating func selectSlot(_ slotIndex: Int) {
         activeSlotIndex = slotIndex
     }
-
-    mutating func selectID(_ id: ID) {
-        activeID = id
-    }
     
     mutating func selectID(_ id: ID, in cards: [DeckCard<ID>]) {
         guard let card = cards.first(where: { $0.id == id }) else { return }
