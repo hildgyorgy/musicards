@@ -18,6 +18,14 @@ import MediaPlayer
 @MainActor
 final class MusiCardsAppModel: ObservableObject {
     @Published var activeIndex: Int = 0
+    var deckSelection: DeckSelection {
+        get {
+            DeckSelection(activeSlotIndex: activeIndex)
+        }
+        set {
+            activeIndex = newValue.activeSlotIndex
+        }
+    }
     @Published var selectedReleaseID: String?
     @Published var selectedRelease: MBRelease?
     @Published var selectedReleaseCover: PlatformImage?

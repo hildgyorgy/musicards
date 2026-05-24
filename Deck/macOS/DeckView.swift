@@ -6,18 +6,24 @@ import SwiftUI
 
 struct DeckView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
     let cards: [DeckCard<ID>]
-    @Binding var activeIndex: Int
+    @Binding var selection: DeckSelection
+    private var activeIndex: Int {
+        selection.activeSlotIndex
+    }
+    private func setActiveIndex(_ newValue: Int) {
+        selection.activeSlotIndex = newValue
+    }
     let headerProvider: (DeckCard<ID>) -> HeaderContent
     let contentProvider: (DeckCard<ID>) -> CardContent
 
     init(
         cards: [DeckCard<ID>],
-        activeIndex: Binding<Int>,
+        selection: Binding<DeckSelection>,
         @ViewBuilder headerProvider: @escaping (DeckCard<ID>) -> HeaderContent,
         @ViewBuilder contentProvider: @escaping (DeckCard<ID>) -> CardContent
     ) {
         self.cards = cards
-        self._activeIndex = activeIndex
+        self._selection = selection
         self.headerProvider = headerProvider
         self.contentProvider = contentProvider
     }
@@ -69,9 +75,9 @@ struct DeckView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
     private func handleTap(on visualIndex: Int) {
         withAnimation(DeckStyle.animation) {
             if visualIndex == activeIndex {
-                activeIndex = max(activeIndex - 1, 0)
+                setActiveIndex(max(activeIndex - 1, 0))
             } else {
-                activeIndex = visualIndex
+                setActiveIndex(visualIndex)
             }
         }
     }

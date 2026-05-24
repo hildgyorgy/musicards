@@ -6,7 +6,14 @@ import SwiftUI
 
 struct DeckView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
     let cards: [DeckCard<ID>]
-    @Binding var activeIndex: Int
+    @Binding var selection: DeckSelection
+
+    private var activeIndex: Int {
+        selection.activeSlotIndex
+    }
+    private func setActiveIndex(_ newValue: Int) {
+        selection.activeSlotIndex = newValue
+    }
     let headerProvider: (DeckCard<ID>) -> HeaderContent
     let contentProvider: (DeckCard<ID>) -> CardContent
 
@@ -19,12 +26,12 @@ struct DeckView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
 
     init(
         cards: [DeckCard<ID>],
-        activeIndex: Binding<Int>,
+        selection: Binding<DeckSelection>,
         @ViewBuilder headerProvider: @escaping (DeckCard<ID>) -> HeaderContent,
         @ViewBuilder contentProvider: @escaping (DeckCard<ID>) -> CardContent
     ) {
         self.cards = cards
-        self._activeIndex = activeIndex
+        self._selection = selection
         self.headerProvider = headerProvider
         self.contentProvider = contentProvider
     }
@@ -33,7 +40,7 @@ struct DeckView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
         GeometryReader { proxy in
             ZStack {
                 ForEach(Array(cards.enumerated()), id: \.element.id) { _, card in
-                    let index = card.index
+                    let index = card.slotIndex
 
                     let cardHeight = DeckLayout.cardHeight(
                         totalCards: cards.count,
@@ -103,7 +110,7 @@ struct DeckView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
                             switch decision {
                             case .commit(let delta):
                                 withAnimation(DeckStyle.animation) {
-                                    activeIndex += delta
+                                    setActiveIndex(activeIndex + delta)
                                     dragOffset = 0
                                 }
 
@@ -147,11 +154,11 @@ struct DeckView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
     private func handleTap(on index: Int) {
         if index == activeIndex + 1, activeIndex < cards.count {
             withAnimation(DeckStyle.animation) {
-                activeIndex += 1
+                setActiveIndex(activeIndex + 1)
             }
         } else if index == activeIndex, activeIndex > 0 {
             withAnimation(DeckStyle.animation) {
-                activeIndex -= 1
+                setActiveIndex(activeIndex - 1)
             }
         }
     }

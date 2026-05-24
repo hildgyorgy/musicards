@@ -101,6 +101,8 @@
 		F5ECDD502F85C6FB006161E3 /* SearchArtistRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5ECDD4F2F85C6FA006161E3 /* SearchArtistRow.swift */; };
 		F5F5565A2FC303E300CFE831 /* MusiCardID.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5F556592FC303E200CFE831 /* MusiCardID.swift */; };
 		F5F5565B2FC303E300CFE831 /* MusiCardID.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5F556592FC303E200CFE831 /* MusiCardID.swift */; };
+		F5F5565F2FC3572700CFE831 /* DeckSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5F5565E2FC3572500CFE831 /* DeckSelection.swift */; };
+		F5F556602FC35D3300CFE831 /* DeckSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5F5565E2FC3572500CFE831 /* DeckSelection.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -162,6 +164,7 @@
 		F5ECDD4D2F85A989006161E3 /* SearchCardHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchCardHeaderView.swift; sourceTree = "<group>"; };
 		F5ECDD4F2F85C6FA006161E3 /* SearchArtistRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchArtistRow.swift; sourceTree = "<group>"; };
 		F5F556592FC303E200CFE831 /* MusiCardID.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusiCardID.swift; sourceTree = "<group>"; };
+		F5F5565E2FC3572500CFE831 /* DeckSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckSelection.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -189,12 +192,12 @@
 		F5A09F682FBC750100E5404B /* iOS */ = {
 			isa = PBXGroup;
 			children = (
-				F57FC69E2F8FFBD900422295 /* DeckPhysics.swift */,
-				F57FC69C2F8FFBBA00422295 /* PanHandleView.swift */,
 				F53A32072F840607005A436B /* DeckCardView.swift */,
 				F53A32082F840607005A436B /* DeckLayout.swift */,
+				F57FC69E2F8FFBD900422295 /* DeckPhysics.swift */,
 				F53A32092F840607005A436B /* DeckStyle.swift */,
 				F53A320A2F840607005A436B /* DeckView.swift */,
+				F57FC69C2F8FFBBA00422295 /* PanHandleView.swift */,
 			);
 			path = iOS;
 			sourceTree = "<group>";
@@ -203,12 +206,12 @@
 			isa = PBXGroup;
 			children = (
 				F5A09F762FBC785400E5404B /* DeckCardView.swift */,
+				F5A09F6A2FBC763200E5404B /* DeckStyle.swift */,
 				F5A09F742FBC771200E5404B /* DeckView.swift */,
-				F5A09F722FBC76F300E5404B /* PanHandleView.swift */,
 				F5A09F702FBC76C400E5404B /* GlassCardBackground.swift */,
+				F5A09F722FBC76F300E5404B /* PanHandleView.swift */,
 				F5A09F6E2FBC769600E5404B /* WindowAccessor.swift */,
 				F5A09F6C2FBC767800E5404B /* MacWindowMetrics.swift */,
-				F5A09F6A2FBC763200E5404B /* DeckStyle.swift */,
 			);
 			path = macOS;
 			sourceTree = "<group>";
@@ -343,6 +346,7 @@
 		F5F5565D2FC3383B00CFE831 /* Shared */ = {
 			isa = PBXGroup;
 			children = (
+				F5F5565E2FC3572500CFE831 /* DeckSelection.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -483,6 +487,7 @@
 				F5A09F852FBC867D00E5404B /* SearchCardHeaderView.swift in Sources */,
 				F5C775B12FBCFC8400AE439F /* CoverArtCache.swift in Sources */,
 				F5C775B22FBCFC8400AE439F /* TrackDetailStore.swift in Sources */,
+				F5F5565F2FC3572700CFE831 /* DeckSelection.swift in Sources */,
 				F5C775B32FBCFC8400AE439F /* MBTextFormatter.swift in Sources */,
 				F5C775B42FBCFC8400AE439F /* MusicBrainzService.swift in Sources */,
 				F5C775B52FBCFC8400AE439F /* ClassicalMetadataStore.swift in Sources */,
@@ -533,6 +538,7 @@
 				F530226D2F86481E0002C907 /* TracksCardHeaderView.swift in Sources */,
 				F53022652F862DA40002C907 /* ArtistCardContentView.swift in Sources */,
 				F53022712F8691230002C907 /* DiscographyGrouping.swift in Sources */,
+				F5F556602FC35D3300CFE831 /* DeckSelection.swift in Sources */,
 				F51CEDE02F899A4300E70ACD /* TrackDetailStore.swift in Sources */,
 				F59F29102F90DBF900A50F8C /* MBTextFormatter.swift in Sources */,
 				F53A32112F840607005A436B /* DeckView.swift in Sources */,

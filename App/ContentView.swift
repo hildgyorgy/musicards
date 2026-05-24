@@ -8,15 +8,15 @@
 import SwiftUI
 
 struct ContentView: View {
-    
+
     private var cards: [DeckCard<MusiCardID>] {
 
         let releaseTitle = appModel.selectedRelease?.title ?? "Release"
 
         let releaseSubtitle =
             appModel.selectedRelease?.artistCredit?
-                .compactMap { $0.name }
-                .joined(separator: ", ") ?? ""
+            .compactMap { $0.name }
+            .joined(separator: ", ") ?? ""
 
         let artistTitle = appModel.selectedArtist?.name ?? "Artist"
 
@@ -26,25 +26,51 @@ struct ContentView: View {
 
         var result: [DeckCard<MusiCardID>] = []
         #if os(macOS)
-        result.append(DeckCard(
-            id: .home,
-            index: MusiCardID.home.activeIndex,
-            cardLabel: "MusiCards",
-            title: "...",
-            subtitle: "..."
-        ))
+            result.append(
+                DeckCard(
+                    id: .home,
+                    slotIndex: MusiCardID.home.activeIndex,
+                    cardLabel: "MusiCards",
+                    title: "...",
+                    subtitle: "..."
+                )
+            )
         #endif
         result.append(contentsOf: [
-            DeckCard(id: .search, index: MusiCardID.search.activeIndex, cardLabel: "Search", title: "", subtitle: ""),
-            DeckCard(id: .release, index: MusiCardID.release.activeIndex, cardLabel: "Release", title: releaseTitle, subtitle: releaseSubtitle),
-            DeckCard(id: .tracks, index: MusiCardID.tracks.activeIndex, cardLabel: "Tracks", title: releaseTitle, subtitle: releaseSubtitle),
-            DeckCard(id: .artist, index: MusiCardID.artist.activeIndex, cardLabel: "Artist & Discography", title: artistTitle, subtitle: artistSubtitle)
+            DeckCard(
+                id: .search,
+                slotIndex: MusiCardID.search.activeIndex,
+                cardLabel: "Search",
+                title: "",
+                subtitle: ""
+            ),
+            DeckCard(
+                id: .release,
+                slotIndex: MusiCardID.release.activeIndex,
+                cardLabel: "Release",
+                title: releaseTitle,
+                subtitle: releaseSubtitle
+            ),
+            DeckCard(
+                id: .tracks,
+                slotIndex: MusiCardID.tracks.activeIndex,
+                cardLabel: "Tracks",
+                title: releaseTitle,
+                subtitle: releaseSubtitle
+            ),
+            DeckCard(
+                id: .artist,
+                slotIndex: MusiCardID.artist.activeIndex,
+                cardLabel: "Artist & Discography",
+                title: artistTitle,
+                subtitle: artistSubtitle
+            ),
         ])
         return result
     }
 
     @StateObject private var appModel = MusiCardsAppModel()
-    
+
     @Environment(\.colorScheme) private var colorScheme
 
     var boxBackground: Color {
@@ -52,8 +78,10 @@ struct ContentView: View {
             ? DeckStyle.boxBackgroundDark
             : DeckStyle.boxBackgroundLight
     }
-    
-    @ViewBuilder private func headerContent(_ card: DeckCard<MusiCardID>) -> some View {
+
+    @ViewBuilder private func headerContent(_ card: DeckCard<MusiCardID>)
+        -> some View
+    {
 
         switch card.id {
         case .home:
@@ -104,7 +132,9 @@ struct ContentView: View {
         }
     }
 
-    @ViewBuilder private func cardContent(_ card: DeckCard<MusiCardID>) -> some View {
+    @ViewBuilder private func cardContent(_ card: DeckCard<MusiCardID>)
+        -> some View
+    {
         switch card.id {
         case .home:
             DeckBackgroundView()
@@ -131,9 +161,9 @@ struct ContentView: View {
                     appModel.addRecentRelease(release)
                 },
                 onSelectNowPlayingRelease: {
-#if os(iOS)
-                    appModel.openNowPlayingVersions()
-#endif
+                    #if os(iOS)
+                        appModel.openNowPlayingVersions()
+                    #endif
                 }
             )
         case .release:
@@ -144,8 +174,11 @@ struct ContentView: View {
                 ReleaseCardContentView(
                     release: release,
                     onShowVersions: {
-                        guard let groupID = release.releaseGroup?.id else { return }
-                        let artist = release.artistCredit?
+                        guard let groupID = release.releaseGroup?.id else {
+                            return
+                        }
+                        let artist =
+                            release.artistCredit?
                             .compactMap { $0.name }
                             .joined(separator: ", ") ?? ""
                         appModel.searchViewModel.loadReleaseGroupResults(
@@ -182,13 +215,17 @@ struct ContentView: View {
                     artist: appModel.selectedArtist,
                     releaseGroups: appModel.artistReleaseGroups,
                     wikipedia: appModel.artistWikipedia,
-                    onSelectReleaseGroup: { group in appModel.selectReleaseGroup(group) },
+                    onSelectReleaseGroup: { group in
+                        appModel.selectReleaseGroup(group)
+                    },
                     isLoadingWikipedia: appModel.isLoadingArtistWikipedia,
                     artistError: appModel.artistError,
                     onRetryArtist: { appModel.retryArtist() },
                     isLoadingMore: appModel.isLoadingMoreReleaseGroups,
                     onLoadMoreIfNeeded: { group in
-                        appModel.loadMoreReleaseGroupsIfNeeded(currentItem: group)
+                        appModel.loadMoreReleaseGroupsIfNeeded(
+                            currentItem: group
+                        )
                     }
                 )
             }
@@ -198,40 +235,45 @@ struct ContentView: View {
     var body: some View {
         ZStack {
             #if os(macOS)
-            DeckView(
-                cards: cards,
-                activeIndex: $appModel.activeIndex,
-                headerProvider: { card in headerContent(card) },
-                contentProvider: { card in cardContent(card) }
-            )
-            #else
-            DeckView(
-                cards: cards,
-                activeIndex: $appModel.activeIndex
-            ) { card in
-                headerContent(card)
-            } contentProvider: { card in
-                cardContent(card)
-            }
-            .background(
-                ZStack {
-                    boxBackground
-                    DeckBackgroundView()
+                DeckView(
+                    cards: cards,
+                    selection: $appModel.deckSelection
+                ) { card in
+                    headerContent(card)
+                } contentProvider: { card in
+                    cardContent(card)
                 }
-            )
-            .ignoresSafeArea()
+            #else
+                DeckView(
+                    cards: cards,
+                    selection: $appModel.deckSelection
+                ) { card in
+                    headerContent(card)
+                } contentProvider: { card in
+                    cardContent(card)
+                }
+                .background(
+                    ZStack {
+                        boxBackground
+                        DeckBackgroundView()
+                    }
+                )
+                .ignoresSafeArea()
             #endif
 
-#if os(iOS)
-            if appModel.isBlockingNavigationLoad {
-                ZStack {
-                    MusiCardsSpinner()
+            #if os(iOS)
+                if appModel.isBlockingNavigationLoad {
+                    ZStack {
+                        MusiCardsSpinner()
+                    }
+                    .zIndex(999)
+                    .transition(.opacity)
                 }
-                .zIndex(999)
-                .transition(.opacity)
-            }
-#endif
+            #endif
         }
-        .animation(.easeInOut(duration: 0.15), value: appModel.isBlockingNavigationLoad)
+        .animation(
+            .easeInOut(duration: 0.15),
+            value: appModel.isBlockingNavigationLoad
+        )
     }
-    }
+}
