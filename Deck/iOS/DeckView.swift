@@ -12,7 +12,7 @@ struct DeckView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
         selection.activeSlotIndex
     }
     private func setActiveIndex(_ newValue: Int) {
-        selection.activeSlotIndex = newValue
+        selection.selectSlot(newValue)
     }
     let headerProvider: (DeckCard<ID>) -> HeaderContent
     let contentProvider: (DeckCard<ID>) -> CardContent
