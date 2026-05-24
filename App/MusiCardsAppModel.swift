@@ -18,9 +18,12 @@ import MediaPlayer
 @MainActor
 final class MusiCardsAppModel: ObservableObject {
     @Published var activeIndex: Int = 0
-    var deckSelection: DeckSelection {
+    var deckSelection: DeckSelection<MusiCardID> {
         get {
-            DeckSelection(activeSlotIndex: activeIndex)
+            DeckSelection<MusiCardID>(
+                activeID: nil,
+                activeSlotIndex: activeIndex
+            )
         }
         set {
             activeIndex = newValue.activeSlotIndex

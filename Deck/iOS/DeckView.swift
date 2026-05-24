@@ -6,7 +6,7 @@ import SwiftUI
 
 struct DeckView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
     let cards: [DeckCard<ID>]
-    @Binding var selection: DeckSelection
+    @Binding var selection: DeckSelection<ID>
 
     private var activeIndex: Int {
         selection.activeSlotIndex
@@ -26,7 +26,7 @@ struct DeckView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
 
     init(
         cards: [DeckCard<ID>],
-        selection: Binding<DeckSelection>,
+        selection: Binding<DeckSelection<ID>>,
         @ViewBuilder headerProvider: @escaping (DeckCard<ID>) -> HeaderContent,
         @ViewBuilder contentProvider: @escaping (DeckCard<ID>) -> CardContent
     ) {
