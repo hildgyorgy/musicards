@@ -21,7 +21,7 @@ final class MusiCardsAppModel: ObservableObject {
     var deckSelection: DeckSelection<MusiCardID> {
         get {
             DeckSelection<MusiCardID>(
-                activeID: nil,
+                activeID: .home,
                 activeSlotIndex: activeIndex
             )
         }

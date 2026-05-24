@@ -77,7 +77,7 @@ struct DeckView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
             if visualIndex == activeIndex {
                 setActiveIndex(max(activeIndex - 1, 0))
             } else {
-                setActiveIndex(visualIndex)
+                selection.selectCard(cards[visualIndex])
             }
         }
     }

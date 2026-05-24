@@ -60,7 +60,7 @@ struct DeckView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
                     DeckCardView(
                         card: card,
                         onTap: {
-                            handleTap(on: index)
+                            handleTap(on: card)
                         },
                         isPanEnabled: DeckPhysics.dragKind(
                             for: index,
@@ -151,10 +151,12 @@ struct DeckView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
         }
     }
 
-    private func handleTap(on index: Int) {
+    private func handleTap(on card: DeckCard<ID>) {
+        let index = card.slotIndex
+
         if index == activeIndex + 1, activeIndex < cards.count {
             withAnimation(DeckStyle.animation) {
-                setActiveIndex(activeIndex + 1)
+                selection.selectCard(card)
             }
         } else if index == activeIndex, activeIndex > 0 {
             withAnimation(DeckStyle.animation) {

@@ -91,7 +91,7 @@ struct ContentView: View {
                 viewModel: appModel.searchViewModel,
                 onTapCurrentArtist: {
                     withAnimation(DeckStyle.animation) {
-                        appModel.activeIndex = MusiCardID.artist.activeIndex
+                        appModel.deckSelection.selectID(.artist, in: cards)
                     }
                 },
                 onBarcodeScanned: { code in
@@ -187,7 +187,7 @@ struct ContentView: View {
                             artistName: artist
                         )
                         withAnimation(DeckStyle.animation) {
-                            appModel.activeIndex = MusiCardID.search.activeIndex
+                            appModel.deckSelection.selectID(.search, in: cards)
                         }
                     }
                 )
