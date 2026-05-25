@@ -251,13 +251,12 @@ struct ContentView: View {
                     headerContent(card)
                 } contentProvider: { card in
                     cardContent(card)
-                }
-                .background(
+                } background: {
                     ZStack {
                         boxBackground
                         DeckBackgroundView()
                     }
-                )
+                }
                 .ignoresSafeArea()
             #endif
 

@@ -39,7 +39,7 @@ struct DeckView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
 
             VStack(spacing: 0) {
                 ForEach(Array(cards.enumerated()), id: \.element.id) { visualIndex, card in
-                    let isActive = visualIndex == activeSlotIndex
+                    let isActive = card.slotIndex == activeSlotIndex
 
                     DeckCardView(
                         card: card,

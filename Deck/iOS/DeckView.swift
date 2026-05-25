@@ -4,7 +4,8 @@
 
 import SwiftUI
 
-struct DeckView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
+struct DeckView<ID: Hashable, BackgroundContent: View, HeaderContent: View, CardContent: View>: View {
+    let backgroundProvider: () -> BackgroundContent
     let cards: [DeckCard<ID>]
     @Binding var selection: DeckSelection<ID>
 
@@ -28,17 +29,20 @@ struct DeckView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
         cards: [DeckCard<ID>],
         selection: Binding<DeckSelection<ID>>,
         @ViewBuilder headerProvider: @escaping (DeckCard<ID>) -> HeaderContent,
-        @ViewBuilder contentProvider: @escaping (DeckCard<ID>) -> CardContent
+        @ViewBuilder contentProvider: @escaping (DeckCard<ID>) -> CardContent,
+        @ViewBuilder background: @escaping () -> BackgroundContent,
     ) {
         self.cards = cards
         self._selection = selection
         self.headerProvider = headerProvider
         self.contentProvider = contentProvider
+        self.backgroundProvider = background
     }
 
     var body: some View {
         GeometryReader { proxy in
             ZStack {
+                backgroundProvider()
                 ForEach(Array(cards.enumerated()), id: \.element.id) { _, card in
                     let index = card.slotIndex
 
@@ -56,7 +60,6 @@ struct DeckView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
                         safeAreaTop: proxy.safeAreaInsets.top,
                         safeAreaBottom: proxy.safeAreaInsets.bottom
                     )
-
                     DeckCardView(
                         card: card,
                         onTap: {
@@ -142,9 +145,7 @@ struct DeckView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
                 }
             }
             .onAppear {
-
                 scheduleInitialNudge()
-
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .clipped()

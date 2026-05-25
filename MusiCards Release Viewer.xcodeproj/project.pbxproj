@@ -103,6 +103,7 @@
 		F5F5565B2FC303E300CFE831 /* MusiCardID.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5F556592FC303E200CFE831 /* MusiCardID.swift */; };
 		F5F5565F2FC3572700CFE831 /* DeckSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5F5565E2FC3572500CFE831 /* DeckSelection.swift */; };
 		F5F556602FC35D3300CFE831 /* DeckSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5F5565E2FC3572500CFE831 /* DeckSelection.swift */; };
+		F5F5576F2FC3B49400CFE831 /* DeckWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5F5576E2FC3B49000CFE831 /* DeckWindow.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -165,6 +166,7 @@
 		F5ECDD4F2F85C6FA006161E3 /* SearchArtistRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchArtistRow.swift; sourceTree = "<group>"; };
 		F5F556592FC303E200CFE831 /* MusiCardID.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusiCardID.swift; sourceTree = "<group>"; };
 		F5F5565E2FC3572500CFE831 /* DeckSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckSelection.swift; sourceTree = "<group>"; };
+		F5F5576E2FC3B49000CFE831 /* DeckWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckWindow.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -205,6 +207,7 @@
 		F5A09F692FBC751100E5404B /* macOS */ = {
 			isa = PBXGroup;
 			children = (
+				F5F5576E2FC3B49000CFE831 /* DeckWindow.swift */,
 				F5A09F762FBC785400E5404B /* DeckCardView.swift */,
 				F5A09F6A2FBC763200E5404B /* DeckStyle.swift */,
 				F5A09F742FBC771200E5404B /* DeckView.swift */,
@@ -297,7 +300,6 @@
 				F5F5565D2FC3383B00CFE831 /* Shared */,
 				F5A09F692FBC751100E5404B /* macOS */,
 				F5A09F682FBC750100E5404B /* iOS */,
-				F53A32062F840607005A436B /* DeckCard.swift */,
 			);
 			path = Deck;
 			sourceTree = "<group>";
@@ -347,6 +349,7 @@
 			isa = PBXGroup;
 			children = (
 				F5F5565E2FC3572500CFE831 /* DeckSelection.swift */,
+				F53A32062F840607005A436B /* DeckCard.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -473,6 +476,7 @@
 				F5A09F7E2FBC867D00E5404B /* ArtistCardContentView.swift in Sources */,
 				F5A09F7F2FBC867D00E5404B /* ArtistCardHeaderView.swift in Sources */,
 				F5A09F802FBC867D00E5404B /* TracksCardHeaderView.swift in Sources */,
+				F5F5576F2FC3B49400CFE831 /* DeckWindow.swift in Sources */,
 				F5A09F812FBC867D00E5404B /* ReleaseThumbnailView.swift in Sources */,
 				F507A9A92FBD9D3A001FB1B8 /* ContentView.swift in Sources */,
 				F5A09F862FBC88FF00E5404B /* PanHandleView.swift in Sources */,
