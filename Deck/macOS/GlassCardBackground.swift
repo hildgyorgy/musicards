@@ -2,6 +2,7 @@
 //  GlassCardBackground.swift
 //
 
+#if os(macOS)
 import SwiftUI
 
 struct GlassCardBackground: View {
@@ -52,3 +53,4 @@ struct GlassCardBackground: View {
         )
     }
 }
+#endif

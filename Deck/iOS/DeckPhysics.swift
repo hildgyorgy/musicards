@@ -2,6 +2,7 @@
 //  DeckPhysics.swift
 //
 
+#if os(iOS)
 import CoreGraphics
 
 enum DeckDragKind {
@@ -79,3 +80,4 @@ enum DeckPhysics {
         return .snapBack
     }
 }
+#endif

@@ -2,6 +2,7 @@
 //  DeckWindow.swift
 //
 
+#if os(macOS)
 import SwiftUI
 
 struct DeckWindow<Content: View>: View {
@@ -20,3 +21,4 @@ struct DeckWindow<Content: View>: View {
             .background(WindowAccessor())
     }
 }
+#endif

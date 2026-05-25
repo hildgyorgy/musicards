@@ -2,6 +2,7 @@
 //  PanHandleView.swift
 //
 
+#if os(macOS)
 import SwiftUI
 import AppKit
 
@@ -85,3 +86,4 @@ struct PanHandleView: NSViewRepresentable {
         }
     }
 }
+#endif

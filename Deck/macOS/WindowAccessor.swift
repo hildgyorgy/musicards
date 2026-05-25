@@ -2,6 +2,7 @@
 //  WindowAccessor.swift
 //
 
+#if os(macOS)
 import SwiftUI
 import AppKit
 
@@ -38,3 +39,4 @@ struct WindowAccessor: NSViewRepresentable {
 
     func updateNSView(_ nsView: NSView, context: Context) {}
 }
+#endif

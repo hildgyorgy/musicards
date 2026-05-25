@@ -2,6 +2,7 @@
 //  DeckLayout.swift
 //
 
+#if os(iOS)
 import CoreGraphics
 
 enum DeckLayout {
@@ -51,3 +52,4 @@ enum DeckLayout {
         Double(index)
     }
 }
+#endif

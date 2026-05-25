@@ -2,6 +2,7 @@
 //  DeckView.swift
 //
 
+#if os(iOS)
 import SwiftUI
 
 struct DeckView<ID: Hashable, BackgroundContent: View, HeaderContent: View, CardContent: View>: View {
@@ -223,3 +224,4 @@ struct DeckView<ID: Hashable, BackgroundContent: View, HeaderContent: View, Card
         }
     }
 }
+#endif

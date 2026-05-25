@@ -2,6 +2,7 @@
 //  DeckStyle.swift
 //
 
+#if os(macOS)
 import SwiftUI
 
 enum DeckStyle {
@@ -92,3 +93,4 @@ enum DeckStyle {
     static let primaryHeaderFont: Font = .title2
     static let secondaryHeaderFont: Font = .title3
 }
+#endif

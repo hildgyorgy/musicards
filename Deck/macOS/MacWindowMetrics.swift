@@ -1,7 +1,7 @@
 //
 //  MacWindowMetrics.swift
 //
-
+#if os(macOS)
 import AppKit
 
 enum MacWindowMetrics {
@@ -16,4 +16,4 @@ enum MacWindowMetrics {
         return NSSize(width: width, height: height)
     }
 }
-
+#endif

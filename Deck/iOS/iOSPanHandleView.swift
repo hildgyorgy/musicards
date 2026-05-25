@@ -2,6 +2,7 @@
 //  PanHandleView.swift
 //
 
+#if os(iOS)
 import SwiftUI
 import UIKit
 
@@ -134,3 +135,4 @@ final class PassthroughView: UIView {
         fatalError("init(coder:) has not been implemented")
     }
 }
+#endif
