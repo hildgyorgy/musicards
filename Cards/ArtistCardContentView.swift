@@ -176,7 +176,7 @@ struct ArtistCardContentView: View {
 
                 Spacer()
             }
-            .padding(.vertical, 10)
+            .padding(.vertical, 5)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background {
                 #if os(macOS)

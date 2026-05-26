@@ -394,7 +394,7 @@ struct TracksCardContentView: View {
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, 10)
+                .padding(.vertical, 5)
                 .background {
                     #if os(macOS)
                     Rectangle().fill(.ultraThinMaterial)

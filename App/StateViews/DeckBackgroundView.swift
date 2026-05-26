@@ -50,60 +50,62 @@ struct DeckBackgroundView: View {
                         Text("Paste a MusicBrainz release MBID")
                         codeText("353021d1-3d84-4f17-9fe4-66788d785a9d")
                         Text("")
-#if os(iOS)
-                        Text("Tap \(Image(systemName: "barcode.viewfinder")) to scan the barcode of a CD")
-                        codeText("889853635726")
-#endif
+                        #if os(iOS)
+                            Text(
+                                "Tap \(Image(systemName: "barcode.viewfinder")) to scan the barcode of a CD"
+                            )
+                            codeText("889853635726")
+                        #endif
                         Text("")
                         Text("Tap the logo for app info")
                         Text("")
                         Text("")
                     }
-#if os(iOS)
-                    .font(.footnote)
-                    .padding(.horizontal, 24)
-#endif
-                    
-#if os(macOS)
-                    .font(.callout)
-                    .padding(.horizontal, 0)
-#endif
-                    
+                    #if os(iOS)
+                        .font(.footnote)
+                        .padding(.horizontal, 24)
+                    #endif
+
+                    #if os(macOS)
+                        .font(.callout)
+                        .padding(.horizontal, 0)
+                    #endif
+
                     .foregroundStyle(.primary)
                     .padding(.top, 32)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .multilineTextAlignment(.leading)
-
-#if os(iOS)
-                    Image(systemName: "arrow.up")
-                        .font(.title3)
-                        .foregroundStyle(.tint)
-                        .padding(.top, 8)
-                        .padding(.bottom, 190)
-#endif
                 }
-#if os(iOS)
-                .padding(.top, 100)
-#endif
+                #if os(iOS)
+                    .padding(.top, 100)
+                #endif
                 .frame(maxWidth: .infinity)
                 .multilineTextAlignment(.center)
             }
-                .scrollIndicators(.hidden)
-                .ignoresSafeArea(edges: .bottom)
-                .sheet(isPresented: $isShowingAbout) {
-                    AboutView()
-                }
+            .overlay(alignment: .bottom) {
+                #if os(iOS)
+                    Image(systemName: "arrow.up")
+                        .font(.title3)
+                        .foregroundStyle(.tint)
+                        .padding(.bottom, 195)
+                #endif
             }
+            .scrollIndicators(.hidden)
+            .ignoresSafeArea(edges: .bottom)
+            .sheet(isPresented: $isShowingAbout) {
+                AboutView()
+            }
+        }
     }
-    
+
     private func codeText(_ text: String) -> some View {
         Text(text)
-#if os(iOS)
-            .font(.system(.footnote, design: .monospaced))
-#endif
-#if os(macOS)
-            .font(.system(.callout, design: .monospaced))
-#endif
+            #if os(iOS)
+                .font(.system(.footnote, design: .monospaced))
+            #endif
+            #if os(macOS)
+                .font(.system(.callout, design: .monospaced))
+            #endif
             .foregroundStyle(.secondary)
     }
 }
