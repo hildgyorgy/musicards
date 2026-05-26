@@ -75,8 +75,8 @@ struct ContentView: View {
 
     var boxBackground: Color {
         colorScheme == .dark
-            ? DeckStyle.boxBackgroundDark
-            : DeckStyle.boxBackgroundLight
+            ? AppStyle.boxBackgroundDark
+            : AppStyle.boxBackgroundLight
     }
 
     @ViewBuilder private func headerContent(_ card: DeckCard<MusiCardID>)
@@ -90,7 +90,7 @@ struct ContentView: View {
             SearchCardHeaderView(
                 viewModel: appModel.searchViewModel,
                 onTapCurrentArtist: {
-                    withAnimation(DeckStyle.animation) {
+                    withAnimation(AppStyle.animation) {
                         appModel.deckSelection.selectID(.artist, in: cards)
                     }
                 },
@@ -186,7 +186,7 @@ struct ContentView: View {
                             releaseTitle: release.title,
                             artistName: artist
                         )
-                        withAnimation(DeckStyle.animation) {
+                        withAnimation(AppStyle.animation) {
                             appModel.deckSelection.selectID(.search, in: cards)
                         }
                     }

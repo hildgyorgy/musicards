@@ -79,6 +79,8 @@
 		F5C775BC2FBD167A00AE439F /* CardsApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F53A32042F840607005A436B /* CardsApp.swift */; };
 		F5D185AA2F93E4A200CDDB1C /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5D185A92F93E4A100CDDB1C /* EmptyStateView.swift */; };
 		F5D185AC2F93F71B00CDDB1C /* ErrorStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5D185AB2F93F71A00CDDB1C /* ErrorStateView.swift */; };
+		F5E5111C2FC4FDEB00E797D6 /* AppStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5E5111B2FC4F38800E797D6 /* AppStyle.swift */; };
+		F5E5111D2FC4FDEB00E797D6 /* AppStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5E5111B2FC4F38800E797D6 /* AppStyle.swift */; };
 		F5E62CD42F86ABA800E4B5AF /* ReleaseHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5E62CD32F86ABA600E4B5AF /* ReleaseHeaderView.swift */; };
 		F5ECDD4A2F85780C006161E3 /* TracksCardContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5ECDD492F857809006161E3 /* TracksCardContentView.swift */; };
 		F5ECDD4C2F8583D3006161E3 /* ReleaseCardContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5ECDD4B2F8583D2006161E3 /* ReleaseCardContentView.swift */; };
@@ -125,6 +127,7 @@
 		F5BB4C202F982A60001CA927 /* BarcodeScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BarcodeScannerView.swift; sourceTree = "<group>"; };
 		F5D185A92F93E4A100CDDB1C /* EmptyStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
 		F5D185AB2F93F71A00CDDB1C /* ErrorStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorStateView.swift; sourceTree = "<group>"; };
+		F5E5111B2FC4F38800E797D6 /* AppStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStyle.swift; sourceTree = "<group>"; };
 		F5E5213F2F8292AD00D2CEAE /* MusiCards Release Viewer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "MusiCards Release Viewer.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		F5E62CD32F86ABA600E4B5AF /* ReleaseHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseHeaderView.swift; sourceTree = "<group>"; };
 		F5E81AE92F982C6B008F35BB /* MusiCards Release Viewer-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "MusiCards Release Viewer-Info.plist"; sourceTree = "<group>"; };
@@ -162,6 +165,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		F5E5111A2FC4F35600E797D6 /* Styles */ = {
+			isa = PBXGroup;
+			children = (
+				F5E5111B2FC4F38800E797D6 /* AppStyle.swift */,
+			);
+			path = Styles;
+			sourceTree = "<group>";
+		};
 		F5E521362F8292AD00D2CEAE = {
 			isa = PBXGroup;
 			children = (
@@ -177,6 +188,7 @@
 				F5ECDD532F85CED1006161E3 /* Services */,
 				F59F29112F923B1E00A50F8C /* MusiCards.icon */,
 				F5E510E12FC4BDF300E797D6 /* Deck */,
+				F5E5111A2FC4F35600E797D6 /* Styles */,
 			);
 			sourceTree = "<group>";
 		};
@@ -390,6 +402,7 @@
 				F5C775BC2FBD167A00AE439F /* CardsApp.swift in Sources */,
 				F5C775AE2FBCFC4200AE439F /* SearchMode.swift in Sources */,
 				F5C775AF2FBCFC4200AE439F /* TrackDetailModels.swift in Sources */,
+				F5E5111D2FC4FDEB00E797D6 /* AppStyle.swift in Sources */,
 				F5C775B02FBCFC4200AE439F /* DiscographyGrouping.swift in Sources */,
 				F5A09F7B2FBC867D00E5404B /* TracksCardContentView.swift in Sources */,
 				F507A9AA2FBD9D5C001FB1B8 /* MusiCardsAppModel.swift in Sources */,
@@ -424,6 +437,7 @@
 				F530226B2F8647DF0002C907 /* ArtistCreditLinksView.swift in Sources */,
 				F53A320B2F840607005A436B /* CardsApp.swift in Sources */,
 				F5D185AA2F93E4A200CDDB1C /* EmptyStateView.swift in Sources */,
+				F5E5111C2FC4FDEB00E797D6 /* AppStyle.swift in Sources */,
 				F59B714D2F853B7C0086AB37 /* Models.swift in Sources */,
 				F520FA8B2F8D75A50020D8E2 /* ArtistCardHeaderView.swift in Sources */,
 				F53022672F8639500002C907 /* SearchMode.swift in Sources */,

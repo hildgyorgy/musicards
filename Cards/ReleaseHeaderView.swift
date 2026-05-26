@@ -14,7 +14,7 @@ struct ReleaseHeaderView: View {
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        VStack(alignment: .leading, spacing: DeckStyle.headerSpacing) {
+        VStack(alignment: .leading, spacing: AppStyle.headerSpacing) {
             if let coverImage {
                 #if canImport(UIKit)
                 Image(uiImage: coverImage)
@@ -47,7 +47,7 @@ struct ReleaseHeaderView: View {
 
             if let release {
                 Text(release.title)
-                    .font(DeckStyle.primaryHeaderFont.weight(.bold))
+                    .font(AppStyle.primaryHeaderFont.weight(.bold))
                     .foregroundStyle(.primary)
                     .lineLimit(3)
                     .padding(.top, 6)
@@ -56,7 +56,7 @@ struct ReleaseHeaderView: View {
                     artistCredits: release.artistCredit,
                     onSelectArtist: onSelectArtist,
                 )
-                .font(DeckStyle.secondaryHeaderFont)
+                .font(AppStyle.secondaryHeaderFont)
             }
         }
         .fixedSize(horizontal: false, vertical: true)

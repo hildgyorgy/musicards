@@ -11,7 +11,7 @@ struct ArtistCardHeaderView: View {
     let artist: MBArtistDetail?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: DeckStyle.headerSpacing) {
+        VStack(alignment: .leading, spacing: AppStyle.headerSpacing) {
             if let artist {
                 Text(artist.name)
                     .font(.title.weight(.bold))

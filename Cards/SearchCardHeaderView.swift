@@ -88,15 +88,15 @@ struct SearchCardHeaderView: View {
                 Capsule()
                     .fill(
                         colorScheme == .dark
-                        ? DeckStyle.boxBackgroundDark
-                        : DeckStyle.boxBackgroundLight
+                        ? AppStyle.boxBackgroundDark
+                        : AppStyle.boxBackgroundLight
                     )
                     .overlay(
                         Capsule()
                             .strokeBorder(
                                 colorScheme == .dark
-                                ? DeckStyle.strokeDark
-                                : DeckStyle.strokeLight,
+                                ? AppStyle.strokeDark
+                                : AppStyle.strokeLight,
                                 lineWidth: 0.5
                             )
                     )

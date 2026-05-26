@@ -292,8 +292,8 @@ struct SearchCardContentView: View {
 
     private func sectionLabel(_ text: String) -> some View {
         Text(text)
-            .font(DeckStyle.cardLabelFont)
-            .tracking(DeckStyle.cardLabelTracking)
+            .font(AppStyle.cardLabelFont)
+            .tracking(AppStyle.cardLabelTracking)
             .foregroundStyle(.secondary)
             .padding(.bottom, -2)
     }

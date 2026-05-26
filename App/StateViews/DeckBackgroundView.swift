@@ -59,12 +59,20 @@ struct DeckBackgroundView: View {
                         Text("")
                         Text("")
                     }
+#if os(iOS)
                     .font(.footnote)
+                    .padding(.horizontal, 24)
+#endif
+                    
+#if os(macOS)
+                    .font(.callout)
+                    .padding(.horizontal, 0)
+#endif
+                    
                     .foregroundStyle(.primary)
                     .padding(.top, 32)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .multilineTextAlignment(.leading)
-                    .padding(.horizontal, 24)
 
 #if os(iOS)
                     Image(systemName: "arrow.up")
@@ -90,7 +98,12 @@ struct DeckBackgroundView: View {
     
     private func codeText(_ text: String) -> some View {
         Text(text)
+#if os(iOS)
             .font(.system(.footnote, design: .monospaced))
+#endif
+#if os(macOS)
+            .font(.system(.callout, design: .monospaced))
+#endif
             .foregroundStyle(.secondary)
     }
 }

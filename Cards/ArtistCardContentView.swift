@@ -25,8 +25,8 @@ struct ArtistCardContentView: View {
 
     private var cardBackground: Color {
             colorScheme == .dark
-                ? DeckStyle.darkCardBackgroundColor
-                : DeckStyle.lightCardBackgroundColor
+                ? AppStyle.darkCardBackgroundColor
+                : AppStyle.lightCardBackgroundColor
         }
 
     private var hasArtistContent: Bool {
@@ -139,7 +139,7 @@ struct ArtistCardContentView: View {
                                 )
                                 .clipShape(
                                     RoundedRectangle(
-                                        cornerRadius: DeckStyle.cornerRadius,
+                                        cornerRadius: AppStyle.cornerRadius,
                                         style: .continuous
                                     )
                                 )
@@ -170,8 +170,8 @@ struct ArtistCardContentView: View {
     private func typeSectionHeader(_ title: String) -> some View {
             HStack {
                 Text(title.uppercased())
-                    .font(DeckStyle.cardLabelFont)
-                    .tracking(DeckStyle.cardLabelTracking)
+                    .font(AppStyle.cardLabelFont)
+                    .tracking(AppStyle.cardLabelTracking)
                     .foregroundStyle(.secondary)
 
                 Spacer()

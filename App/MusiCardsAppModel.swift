@@ -115,7 +115,7 @@ final class MusiCardsAppModel: ObservableObject {
             selectedReleaseCover = cover
             isLoadingRelease = false
 
-            withAnimation(DeckStyle.animation) {
+            withAnimation(AppStyle.animation) {
                 deckSelection = DeckSelection<MusiCardID>(
                     activeID: .release,
                     activeSlotIndex: MusiCardID.release.slotIndex
@@ -183,7 +183,7 @@ final class MusiCardsAppModel: ObservableObject {
 
             isLoadingArtistHeader = false
 
-            withAnimation(DeckStyle.animation) {
+            withAnimation(AppStyle.animation) {
                 deckSelection = DeckSelection<MusiCardID>(
                     activeID: .artist,
                     activeSlotIndex: MusiCardID.artist.slotIndex
@@ -331,7 +331,7 @@ final class MusiCardsAppModel: ObservableObject {
             artistName: nowPlayingArtistName ?? release.artistLine
         )
 
-        withAnimation(DeckStyle.animation) {
+        withAnimation(AppStyle.animation) {
             deckSelection = DeckSelection<MusiCardID>(
                 activeID: .search,
                 activeSlotIndex: MusiCardID.search.slotIndex

@@ -24,8 +24,8 @@ struct TracksCardContentView: View {
 
     private var cardBackground: Color {
             colorScheme == .dark
-                ? DeckStyle.darkCardBackgroundColor
-                : DeckStyle.lightCardBackgroundColor
+                ? AppStyle.darkCardBackgroundColor
+                : AppStyle.lightCardBackgroundColor
         }
 
     // MARK: - Classical detection
@@ -183,7 +183,7 @@ struct TracksCardContentView: View {
     private func expandableTrackRow(_ row: TrackRow) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             Button {
-                withAnimation(DeckStyle.animation) {
+                withAnimation(AppStyle.animation) {
                     toggleExpanded(for: row)
                 }
             } label: {
