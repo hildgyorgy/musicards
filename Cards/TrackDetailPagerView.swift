@@ -17,37 +17,32 @@ struct TrackDetailPagerView: View {
 
     var detailData: TrackDetailData? { detailStore.data(for: recordingID) }
 
-    var body: some View {
-        VStack(spacing: 0) {
-            TabView(selection: $selectedPage) {
-                creatorsPage
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .tag(0)
-
-                performersPage
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .tag(1)
-
-                technicalPage
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .tag(2)
-            }
-            #if os(iOS)
-            .tabViewStyle(.page(indexDisplayMode: .always))
-            #else
-            .tabViewStyle(.automatic)
-            #endif
-            .frame(height: maxPageHeight)
-
-            HStack(spacing: 6) {
-                ForEach(0..<3, id: \.self) { index in
-                    Circle()
-                        .fill(index == selectedPage ? Color.secondary : Color.secondary.opacity(0.35))
-                        .frame(width: 6, height: 6)
+    #if os(macOS)
+        private var selectedDetailPage: some View {
+            Group {
+                switch selectedPage {
+                case 0:
+                    creatorsPage
+                case 1:
+                    performersPage
+                case 2:
+                    technicalPage
+                default:
+                    performersPage
                 }
             }
-            .padding(.vertical, 8)
-            .frame(maxWidth: .infinity)
+        }
+    #endif
+
+    var body: some View {
+        VStack(spacing: 0) {
+            #if os(macOS)
+                pageSelector
+                pageContent
+            #else
+                pageContent
+                pageSelector
+            #endif
         }
         .background(
             VStack(spacing: 0) {
@@ -62,6 +57,93 @@ struct TrackDetailPagerView: View {
                 maxPageHeight = value
             }
         }
+    }
+    
+    private var pageContent: some View {
+        Group {
+            #if os(iOS)
+                TabView(selection: $selectedPage) {
+                    creatorsPage
+                        .frame(
+                            maxWidth: .infinity,
+                            maxHeight: .infinity,
+                            alignment: .topLeading
+                        )
+                        .tag(0)
+
+                    performersPage
+                        .frame(
+                            maxWidth: .infinity,
+                            maxHeight: .infinity,
+                            alignment: .topLeading
+                        )
+                        .tag(1)
+
+                    technicalPage
+                        .frame(
+                            maxWidth: .infinity,
+                            maxHeight: .infinity,
+                            alignment: .topLeading
+                        )
+                        .tag(2)
+                }
+                .tabViewStyle(.page(indexDisplayMode: .always))
+            #else
+                selectedDetailPage
+                    .frame(
+                        maxWidth: .infinity,
+                        maxHeight: .infinity,
+                        alignment: .topLeading
+                    )
+            #endif
+        }
+        .frame(height: maxPageHeight)
+    }
+    
+    private var pageSelector: some View {
+        Group {
+            #if os(macOS)
+
+                HStack(spacing: 16) {
+                    Button("CREATORS") {
+                        selectedPage = 0
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(selectedPage == 0 ? .blue : .secondary)
+
+                    Button("PERFORMERS") {
+                        selectedPage = 1
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(selectedPage == 1 ? .blue : .secondary)
+
+                    Button("TECHNICAL") {
+                        selectedPage = 2
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(selectedPage == 2 ? .blue : .secondary)
+                }
+                .font(.caption.weight(.medium))
+                .tracking(1)
+
+            #else
+
+                HStack(spacing: 6) {
+                    ForEach(0..<3, id: \.self) { index in
+                        Circle()
+                            .fill(
+                                index == selectedPage
+                                    ? Color.secondary
+                                    : Color.secondary.opacity(0.35)
+                            )
+                            .frame(width: 6, height: 6)
+                    }
+                }
+
+            #endif
+        }
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity)
     }
 
     @ViewBuilder
@@ -156,7 +238,10 @@ private struct TrackCreatorsWorkPage: View {
                 TrackEmptyDetailPage()
             } else {
                 if !detailData.creators.isEmpty {
-                    ForEach(Array(detailData.creators.enumerated()), id: \.offset) { _, item in
+                    ForEach(
+                        Array(detailData.creators.enumerated()),
+                        id: \.offset
+                    ) { _, item in
                         linkedAlignedDetailRow(
                             role: item.role,
                             artists: item.artists,
@@ -214,7 +299,8 @@ private struct TrackTechnicalDetailPage: View {
             if detailData.technical.isEmpty && detailData.notes.isEmpty {
                 TrackEmptyDetailPage()
             } else {
-                ForEach(Array(detailData.technical.enumerated()), id: \.offset) { _, item in
+                ForEach(Array(detailData.technical.enumerated()), id: \.offset)
+                { _, item in
                     alignedDetailRow(
                         role: item.role,
                         value: item.names.joined(separator: ", ")
@@ -294,7 +380,9 @@ private func linkedAlignedDetailRow(
             .buttonStyle(.plain)
         } else {
             InlineWrapLayout(spacing: 0, lineSpacing: 0) {
-                ForEach(Array(artists.enumerated()), id: \.element.id) { index, artist in
+                ForEach(Array(artists.enumerated()), id: \.element.id) {
+                    index,
+                    artist in
                     Button {
                         onSelectArtist(artist.id)
                     } label: {
@@ -377,7 +465,9 @@ private struct InlineWrapLayout: Layout {
                 ProposedViewSize(width: maxWidth, height: nil)
             )
 
-            if currentX > bounds.minX, currentX + size.width > bounds.minX + maxWidth {
+            if currentX > bounds.minX,
+                currentX + size.width > bounds.minX + maxWidth
+            {
                 currentX = bounds.minX
                 currentY += lineHeight + lineSpacing
                 lineHeight = 0
@@ -385,7 +475,10 @@ private struct InlineWrapLayout: Layout {
 
             subview.place(
                 at: CGPoint(x: currentX, y: currentY),
-                proposal: ProposedViewSize(width: size.width, height: size.height)
+                proposal: ProposedViewSize(
+                    width: size.width,
+                    height: size.height
+                )
             )
 
             currentX += size.width + spacing
@@ -448,7 +541,10 @@ private struct ColonAlignedRowLayout: Layout {
         )
 
         subviews[2].place(
-            at: CGPoint(x: bounds.minX + sideWidth + colonWidth, y: bounds.minY),
+            at: CGPoint(
+                x: bounds.minX + sideWidth + colonWidth,
+                y: bounds.minY
+            ),
             anchor: .topLeading,
             proposal: ProposedViewSize(width: sideWidth, height: bounds.height)
         )
