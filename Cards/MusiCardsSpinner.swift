@@ -1,22 +1,34 @@
 //
 //  MusiCardsSpinner.swift
-//  MusiCards Release Viewer
-//
-//  Created by Hild György on 2026. 05. 14..
 //
 
 import SwiftUI
 
 struct MusiCardsSpinner: View {
+
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
         ProgressView()
             .progressViewStyle(.circular)
-            .tint(Color.blue)
+            .tint(.blue)
             .frame(width: 40, height: 40)
+
 #if os(iOS)
             .background(
-                 Circle().fill(Color(white: 1.0).opacity(0.5))
-            .shadow(color: Color.black.opacity(0.1), radius: 10, x: 2, y: 2))
+                Circle()
+                    .fill(
+                        colorScheme == .dark
+                            ? AppStyle.darkCardBackgroundColor
+                            : AppStyle.lightCardBackgroundColor
+                    )
+                    .shadow(
+                        color: .black.opacity(0.1),
+                        radius: 10,
+                        x: 2,
+                        y: 2
+                    )
+            )
 #endif
     }
 }

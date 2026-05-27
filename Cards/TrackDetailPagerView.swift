@@ -14,6 +14,7 @@ struct TrackDetailPagerView: View {
     let onSelectArtist: (String) -> Void
 
     @State private var maxPageHeight: CGFloat = 80
+    @State private var hoveredPage: Int?
 
     var detailData: TrackDetailData? { detailStore.data(for: recordingID) }
 
@@ -95,6 +96,7 @@ struct TrackDetailPagerView: View {
                         maxHeight: .infinity,
                         alignment: .topLeading
                     )
+            
             #endif
         }
         .frame(height: maxPageHeight)
@@ -109,21 +111,44 @@ struct TrackDetailPagerView: View {
                         selectedPage = 0
                     }
                     .buttonStyle(.plain)
-                    .foregroundStyle(selectedPage == 0 ? .blue : .secondary)
+                    .font(.caption.weight(selectedPage == 0 ? .semibold : .medium))
+                    .foregroundStyle(
+                        hoveredPage == 0
+                            ? .blue
+                            : (selectedPage == 0 ? .primary : .secondary)
+                    )
+                    .onHover { hovering in
+                        hoveredPage = hovering ? 0 : nil
+                    }
 
                     Button("PERFORMERS") {
                         selectedPage = 1
                     }
                     .buttonStyle(.plain)
-                    .foregroundStyle(selectedPage == 1 ? .blue : .secondary)
+                    .font(.caption.weight(selectedPage == 1 ? .semibold : .medium))
+                    .foregroundStyle(
+                        hoveredPage == 1
+                            ? .blue
+                            : (selectedPage == 1 ? .primary : .secondary)
+                    )
+                    .onHover { hovering in
+                        hoveredPage = hovering ? 1 : nil
+                    }
 
                     Button("TECHNICAL") {
                         selectedPage = 2
                     }
                     .buttonStyle(.plain)
-                    .foregroundStyle(selectedPage == 2 ? .blue : .secondary)
+                    .font(.caption.weight(selectedPage == 2 ? .semibold : .medium))
+                    .foregroundStyle(
+                        hoveredPage == 2
+                            ? .blue
+                            : (selectedPage == 2 ? .primary : .secondary)
+                    )
+                    .onHover { hovering in
+                        hoveredPage = hovering ? 2 : nil
+                    }
                 }
-                .font(.caption.weight(.medium))
                 .tracking(1)
 
             #else

@@ -186,9 +186,9 @@
 				F5ECDD542F85CEE7006161E3 /* ViewModels */,
 				F5ECDD522F85CEBE006161E3 /* Models */,
 				F5ECDD532F85CED1006161E3 /* Services */,
-				F59F29112F923B1E00A50F8C /* MusiCards.icon */,
-				F5E510E12FC4BDF300E797D6 /* Deck */,
 				F5E5111A2FC4F35600E797D6 /* Styles */,
+				F5E510E12FC4BDF300E797D6 /* Deck */,
+				F59F29112F923B1E00A50F8C /* MusiCards.icon */,
 			);
 			sourceTree = "<group>";
 		};

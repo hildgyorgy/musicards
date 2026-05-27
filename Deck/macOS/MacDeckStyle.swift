@@ -25,7 +25,7 @@ enum DeckStyle {
     static let glassMaterial: Material = .ultraThinMaterial
     static let glassHighlightColor: Color = .white
     static let glassMidColor: Color = .white
-    static let glassBottomColor: Color = Color(red: 0.02, green: 0.06, blue: 0.24)
+    static let glassBottomColor: Color = .white
 
     static let glassHighlightStrength: Double = 0.10
     static let glassMidStrength: Double = 0.03

@@ -214,37 +214,10 @@ struct TracksCardContentView: View {
     // MARK: - Track row visual (shared between flat and classical)
 
     private func trackRowView(_ row: TrackRow) -> some View {
-        ZStack {
-            if isExpanded(row) {
-                Capsule(style: .continuous)
-                    .fill(Color.gray.opacity(0.15))
-            }
-
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Text(row.number.map(String.init) ?? "")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .frame(width: 20, alignment: .leading)
-                    .monospacedDigit()
-
-                Text(row.title)
-                    .font(.callout.weight(isExpanded(row) ? .semibold : .regular))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                    .padding(.leading, row.isMovement ? 0 : 0)
-
-                Spacer(minLength: 10)
-
-                Text(row.subtitle)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
-            }
-            .padding(.leading, 12)
-            .padding(.trailing, 12)
-            .padding(.vertical, 7)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        TrackRowVisualView(
+            row: row,
+            isExpanded: isExpanded(row)
+        )
     }
     
     // MARK: - Release-level liner notes
@@ -390,19 +363,23 @@ struct TracksCardContentView: View {
 
     @ViewBuilder
     private func mediumHeader(_ title: String) -> some View {
-            Text(title)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, 5)
-                .background {
-                    #if os(macOS)
-                    Rectangle().fill(.ultraThinMaterial)
-                    #else
-                    Rectangle().fill(cardBackground)
-                    #endif
-                }
-        }
+        Text(title)
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.vertical, 6)
+            .background {
+                #if os(macOS)
+                Capsule(style: .continuous)
+                    .fill(.ultraThinMaterial)
+                #else
+                Capsule(style: .continuous)
+                    .fill(cardBackground)
+                #endif
+            }
+            .padding(.horizontal, 0)
+            .padding(.bottom, 6)
+    }
 
     // MARK: - Expand / collapse
 
@@ -528,4 +505,54 @@ private struct ReleaseCreditRow: Identifiable {
     let id = UUID()
     let role: String
     let name: String
+}
+
+private struct TrackRowVisualView: View {
+    let row: TrackRow
+    let isExpanded: Bool
+
+    @State private var isHovering = false
+
+    private var showsPill: Bool {
+        isExpanded || isHovering
+    }
+
+    var body: some View {
+        ZStack {
+            if showsPill {
+                Capsule(style: .continuous)
+                    .fill(Color.gray.opacity(0.15))
+            }
+
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Text(row.number.map(String.init) ?? "")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 20, alignment: .leading)
+                    .monospacedDigit()
+
+                Text(row.title)
+                    .font(.callout.weight(isExpanded ? .semibold : .regular))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+
+                Spacer(minLength: 10)
+
+                Text(row.subtitle)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+            .padding(.leading, 12)
+            .padding(.trailing, 12)
+            .padding(.vertical, 7)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .onHover { hovering in
+            withAnimation(.easeOut(duration: 0.12)) {
+                isHovering = hovering
+            }
+        }
+    }
 }

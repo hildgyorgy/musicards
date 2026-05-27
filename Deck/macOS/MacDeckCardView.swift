@@ -27,6 +27,7 @@ struct DeckCardView<ID: Hashable, HeaderContent: View, CardContent: View>: View 
     }
 
     @Environment(\.colorScheme) private var colorScheme
+    @State private var isHoveringLabel = false
 
     var cardBackground: Color {
         DeckStyle.cardBackgroundColor
@@ -64,7 +65,12 @@ struct DeckCardView<ID: Hashable, HeaderContent: View, CardContent: View>: View 
             Text(card.cardLabel.uppercased())
                 .font(.system(size: DeckStyle.cardLabelFontSize, weight: DeckStyle.cardLabelFontWeight))
                 .tracking(DeckStyle.cardLabelTracking)
-                .foregroundStyle(DeckStyle.cardLabelColor)
+                .foregroundStyle(
+                    isHoveringLabel
+                           ? .blue
+                           : (isActive ? .primary : DeckStyle.cardLabelColor)
+                )
+                .animation(.easeOut(duration: 0.12), value: isHoveringLabel)
                 .frame(maxWidth: .infinity, alignment: .center)
 
             PanHandleView(
@@ -74,6 +80,10 @@ struct DeckCardView<ID: Hashable, HeaderContent: View, CardContent: View>: View 
                 onChanged: { _ in },
                 onEnded: { _, _ in }
             )
+            .contentShape(Rectangle())
+            .onHover { hovering in
+                isHoveringLabel = hovering
+            }
         }
         .frame(height: DeckStyle.cardLabelHitHeight)
     }
