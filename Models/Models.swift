@@ -36,6 +36,16 @@ struct MBRelease: Decodable {
         case annotation
     }
 }
+extension MBRelease {
+    var appleMusicURL: URL? {
+        relations?
+            .compactMap { $0.url?.resource }
+            .first { resource in
+                resource.localizedCaseInsensitiveContains("music.apple.com")
+            }
+            .flatMap(URL.init(string:))
+    }
+}
 
 struct MBReleaseGroupRef: Decodable {
     let id: String

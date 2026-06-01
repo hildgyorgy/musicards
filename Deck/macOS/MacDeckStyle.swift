@@ -39,10 +39,10 @@ enum DeckStyle {
     // MARK: - Borders
 
     static let strokeWidth: CGFloat = 1
-    static let separatorStrength: Double = 0.24
+    static let separatorStrength: Double = 0.3
     static let outerStrokeStrength: Double = 0.20
 
-    static let strokeColor: Color = Color.black.opacity(separatorStrength)
+    static let strokeColor: Color = Color.primary.opacity(separatorStrength)
     static let outerStrokeColor: Color = Color.white.opacity(outerStrokeStrength)
 
     // MARK: - Surfaces

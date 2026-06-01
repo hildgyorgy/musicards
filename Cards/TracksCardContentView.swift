@@ -373,8 +373,7 @@ struct TracksCardContentView: View {
                 Capsule(style: .continuous)
                     .fill(.ultraThinMaterial)
                 #else
-                Capsule(style: .continuous)
-                    .fill(cardBackground)
+                Rectangle().fill(cardBackground)
                 #endif
             }
             .padding(.horizontal, 0)

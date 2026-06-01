@@ -10,7 +10,9 @@ import SwiftUI
 struct AboutView: View {
     var body: some View {
         VStack(spacing: 6) {
+#if os(iOS)
             Spacer()
+#endif
             Text("Data provided by MusicBrainz")
                 .font(.headline)
 
@@ -47,7 +49,9 @@ struct AboutView: View {
             .padding(.top, 6)
         }
         .padding(28)
-        .presentationDetents([.height(150)])
-        .presentationDragIndicator(.visible)
+#if os(iOS)
+.presentationDetents([.height(152)])
+.presentationDragIndicator(.visible)
+#endif
     }
 }

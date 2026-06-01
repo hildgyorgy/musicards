@@ -21,6 +21,7 @@ struct ArtistCardContentView: View {
     let onLoadMoreIfNeeded: (MBReleaseGroupSummary) -> Void
 
     @State private var isShowingWikipedia = false
+    @State private var wikipediaURL_: URL? = nil
     @Environment(\.colorScheme) private var colorScheme
 
     private var cardBackground: Color {
@@ -51,7 +52,13 @@ struct ArtistCardContentView: View {
                                 )
                                 .font(.callout)
                                 .onTapGesture {
+                                    #if os(macOS)
+                                    if let url = wikipediaURL(for: wikipedia.title) {
+                                        wikipediaURL_ = url
+                                    }
+                                    #else
                                     isShowingWikipedia = true
+                                    #endif
                                 }
                                 .padding(.top, 8)
                                 .padding(.bottom, 16)
@@ -78,13 +85,19 @@ struct ArtistCardContentView: View {
                                                 Text(MBTextFormatter.year(from: group.firstReleaseDate))
                                                     .font(.callout)
                                                     .foregroundStyle(.secondary)
+#if os(iOS)
                                                     .frame(width: 40, alignment: .leading)
-
+                                                #else
+                                                    .frame(width: 30, alignment: .leading)
+#endif
                                                 Text(group.title)
                                                     .font(.callout)
                                                     .foregroundStyle(Color.blue)
                                                     .frame(maxWidth: .infinity, alignment: .leading)
                                             }
+#if os(macOS)
+                                            .padding(.leading, 10)
+#endif
                                             .padding(.vertical, 4)
                                         }
                                         .buttonStyle(.plain)
@@ -128,22 +141,33 @@ struct ArtistCardContentView: View {
                     .presentationDetents([.fraction(0.83)])
             }
         }
-#elseif os(macOS)
-        .sheet(isPresented: $isShowingWikipedia) {
-            if let wikipedia,
-                           let url = wikipediaURL(for: wikipedia.title) {
-                            WikipediaSheetView(url: url)
-                                .frame(
-                                    width: MacWindowMetrics.contentSize.width,
-                                    height: MacWindowMetrics.contentSize.height
-                                )
-                                .clipShape(
-                                    RoundedRectangle(
-                                        cornerRadius: AppStyle.cornerRadius,
-                                        style: .continuous
-                                    )
-                                )
-                        }
+#else
+        .overlay {
+            if wikipediaURL_ != nil {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        wikipediaURL_ = nil
+                    }
+            }
+        }
+        .overlay(alignment: .bottom) {
+            if let url = wikipediaURL_ {
+                WikipediaSheetView(url: url, onDismiss: {
+                    wikipediaURL_ = nil
+                })
+                .padding(5)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .onTapGesture { }  // swallow taps so they don't fall through to dismiss
+            }
+        }
+        .animation(.spring(duration: 0.35), value: wikipediaURL_)
+        .onKeyPress(.escape) {
+            if wikipediaURL_ != nil {
+                wikipediaURL_ = nil
+                return .handled
+            }
+            return .ignored
         }
 #endif
     }
@@ -168,23 +192,22 @@ struct ArtistCardContentView: View {
     }
 
     private func typeSectionHeader(_ title: String) -> some View {
-            HStack {
-                Text(title.uppercased())
-                    .font(AppStyle.cardLabelFont)
-                    .tracking(AppStyle.cardLabelTracking)
-                    .foregroundStyle(.secondary)
-
-                Spacer()
-            }
-            .padding(.vertical, 5)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        Text(title.uppercased())
+            .font(.footnote)
+            .tracking(AppStyle.cardLabelTracking)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.vertical, 6)
             .background {
                 #if os(macOS)
-                Rectangle().fill(.ultraThinMaterial)
+                Capsule(style: .continuous)
+                    .fill(.ultraThinMaterial)
                 #else
                 Rectangle().fill(cardBackground)
                 #endif
             }
+            .padding(.horizontal, 0)
+            .padding(.bottom, 6)
             .zIndex(1)
-        }
+    }
 }

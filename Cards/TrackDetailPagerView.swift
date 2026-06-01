@@ -88,7 +88,7 @@ struct TrackDetailPagerView: View {
                         )
                         .tag(2)
                 }
-                .tabViewStyle(.page(indexDisplayMode: .always))
+                .tabViewStyle(.page(indexDisplayMode: .never))
             #else
                 selectedDetailPage
                     .frame(

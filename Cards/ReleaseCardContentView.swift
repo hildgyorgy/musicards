@@ -57,6 +57,7 @@ struct ReleaseCardContentView: View {
                     .lineSpacing(4)
 
                 Spacer()
+                
             }
         }
     }

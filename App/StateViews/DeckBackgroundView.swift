@@ -10,6 +10,7 @@ import SwiftUI
 struct DeckBackgroundView: View {
 
     @State private var isShowingAbout = false
+    @State private var isHoveringLogo = false
 
     var body: some View {
         GeometryReader { proxy in
@@ -25,13 +26,38 @@ struct DeckBackgroundView: View {
                         .resizable()
                         .scaledToFit()
                         .frame(width: 52, height: 52)
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(
+                            isHoveringLogo ? Color.blue : .primary
+                        )
+                        .scaleEffect(
+                            isHoveringLogo ? 1.05 : 1.0
+                        )
+                        .shadow(
+                            color: isHoveringLogo
+                                ? Color.primary.opacity(0.12)
+                                : .clear,
+                            radius: 5,
+                            x: 0,
+                            y: 5
+                        )
                         .padding(.top, 10)
                         .padding(.bottom, 10)
                         .contentShape(Rectangle())
                         .onTapGesture {
                             isShowingAbout = true
                         }
+                        .animation(
+                            .spring(
+                                response: 0.22,
+                                dampingFraction: 0.72
+                            ),
+                            value: isHoveringLogo
+                        )
+                        #if os(macOS)
+                        .onHover { hovering in
+                            isHoveringLogo = hovering
+                        }
+                        #endif
 
                     Text("MusicBrainz Release Viewer")
                         .font(.footnote)
@@ -92,9 +118,39 @@ struct DeckBackgroundView: View {
             }
             .scrollIndicators(.hidden)
             .ignoresSafeArea(edges: .bottom)
-            .sheet(isPresented: $isShowingAbout) {
-                AboutView()
+#if os(iOS)
+.sheet(isPresented: $isShowingAbout) {
+    AboutView()
+}
+#elseif os(macOS)
+.overlay {
+    if isShowingAbout {
+        Color.clear
+            .contentShape(Rectangle())
+            .onTapGesture {
+                isShowingAbout = false
             }
+    }
+}
+.overlay {
+    if isShowingAbout {
+        AboutSheetView {
+            isShowingAbout = false
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .transition(.scale.combined(with: .opacity))
+        .onTapGesture { }
+    }
+}
+.animation(.spring(duration: 0.35), value: isShowingAbout)
+.onKeyPress(.escape) {
+    if isShowingAbout {
+        isShowingAbout = false
+        return .handled
+    }
+    return .ignored
+}
+#endif
         }
     }
 

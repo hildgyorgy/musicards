@@ -82,7 +82,7 @@ struct MusicBrainzService {
     }
 
     func loadRelease(id: String) async throws -> MBRelease {
-        let urlString = "https://musicbrainz.org/ws/2/release/\(id)?fmt=json&inc=recordings+artist-credits+recording-level-rels+artist-rels+label-rels+labels+release-groups+annotation"
+        let urlString = "https://musicbrainz.org/ws/2/release/\(id)?fmt=json&inc=recordings+artist-credits+recording-level-rels+artist-rels+label-rels+labels+release-groups+annotation+url-rels"
 
         guard let url = URL(string: urlString) else {
             throw URLError(.badURL)
