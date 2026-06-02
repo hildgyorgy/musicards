@@ -36,6 +36,9 @@ final class MusiCardsAppModel: ObservableObject {
     @Published var recentArtists: [SearchArtistRow] = []
     @Published var recentReleases: [SearchReleaseRow] = []
     @Published var nowPlayingRelease: SearchReleaseRow?
+    
+    @Published var isShazamListening: Bool = false
+    @Published var shazamStatusMessage: String?
 
     // Pagination for release groups
     @Published var isLoadingMoreReleaseGroups: Bool = false
@@ -51,13 +54,13 @@ final class MusiCardsAppModel: ObservableObject {
     private let recentReleasesKey = "recentReleases"
 
 #if os(iOS)
+    private let shazamService = ShazamRecognitionService()
     private var nowPlayingReleaseGroupID: String?
     private var nowPlayingReleaseGroupTitle: String?
     private var nowPlayingArtistName: String?
     private var nowPlayingObserver: NSObjectProtocol?
     #endif
 
-    // Pagination state
     private let releaseGroupsPageSize: Int = 25
     private var releaseGroupsOffset: Int = 0
     private var currentArtistIDForGroups: String?
@@ -316,6 +319,59 @@ final class MusiCardsAppModel: ObservableObject {
         }
     }
 
+    // MARK: - Shazam
+
+    func startShazamSearch() {
+    #if os(iOS)
+        guard !isShazamListening else { return }
+
+        isShazamListening = true
+        shazamStatusMessage = nil
+
+        Task {
+            do {
+                let match = try await shazamService.recognize()
+
+                print("Shazam match:", match.artist, "-", match.title)
+
+                searchViewModel.searchByRecognizedTrack(match)
+
+                isShazamListening = false
+                shazamStatusMessage = nil
+                
+            } catch {
+                print("Shazam error:", error)
+
+                shazamStatusMessage = shazamMessage(for: error)
+
+                Task {
+                    try? await Task.sleep(nanoseconds: 1_500_000_000)
+                    shazamStatusMessage = nil
+                }
+
+                isShazamListening = false
+            }
+        }
+    #endif
+    }
+    
+    private func shazamMessage(for error: Error) -> String {
+    #if os(iOS)
+        if let shazamError = error as? ShazamRecognitionError {
+            switch shazamError {
+            case .microphonePermissionDenied:
+                return "Microphone access denied"
+            case .noMatch:
+                return "No match"
+            case .missingTitleOrArtist:
+                return "Incomplete Shazam match"
+            }
+        }
+    #endif
+
+        return "Shazam failed"
+    }
+    
     // MARK: - Now Playing
 
 #if os(iOS)

@@ -10,8 +10,11 @@ import VisionKit
 
 struct SearchCardHeaderView: View {
     @ObservedObject var viewModel: SearchViewModel
+    let isShazamListening: Bool
+    let onShazamTapped: () -> Void
     let onTapCurrentArtist: () -> Void
     let onBarcodeScanned: (String) -> Void
+    let shazamStatusMessage: String?
 
     @FocusState private var isSearchFocused: Bool
     @State private var isShowingBarcodeScanner = false
@@ -22,14 +25,49 @@ struct SearchCardHeaderView: View {
         if case .releaseGroupResults = viewModel.mode { return true }
         return false
     }
+    
+    private var searchPlaceholder: String {
+    #if os(iOS)
+        if let shazamStatusMessage {
+            return shazamStatusMessage
+        }
+
+        return isShazamListening ? "Listening…" : "Artist, release"
+    #else
+        "Artist, release"
+    #endif
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
 
             HStack(spacing: 8) {
+#if os(iOS)
+                Button {
+                    onShazamTapped()
+                } label: {
+                    Image("shazam_icon")
+                        .renderingMode(Image.TemplateRenderingMode.template)
+                        .resizable()
+                        .scaledToFit()
+                        .foregroundColor(Color.blue)
+                        .frame(width: 18, height: 18)
+                        .scaleEffect(isShazamListening ? 1.2 : 1.0)
+                        .opacity(isShazamListening ? 1.0 : 1.0)
+                        .animation(
+                            isShazamListening
+                            ? Animation.easeInOut(duration: 0.75).repeatForever(autoreverses: true)
+                            : Animation.default,
+                            value: isShazamListening
+                        )
+                }
+                .buttonStyle(.plain)
+                .disabled(isShazamListening)
+#else
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
                     .font(.footnote)
+#endif
 
                 if isReleaseGroupMode {
                     Button {
@@ -48,7 +86,7 @@ struct SearchCardHeaderView: View {
                     .buttonStyle(.plain)
 
                 } else {
-                    TextField("Artist, release", text: $viewModel.searchQuery)
+                    TextField(searchPlaceholder, text: $viewModel.searchQuery)
                         .font(.callout)
                         .foregroundStyle(.primary)
                         .textFieldStyle(.plain)
@@ -80,6 +118,8 @@ struct SearchCardHeaderView: View {
                         .font(.callout)
                 }
                 .buttonStyle(.plain)
+                .opacity(isShazamListening ? 0.35 : 1.0)
+                .disabled(isShazamListening)
 #endif
             }
             .padding(.horizontal, 12)

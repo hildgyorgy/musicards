@@ -39,6 +39,7 @@ final class SearchViewModel: ObservableObject {
     @Published var isSearching = false
 
     private var searchTask: Task<Void, Never>?
+    private var suppressNextQueryChange = false
     private let musicBrainzService: MusicBrainzService
 
     init(service: MusicBrainzService) {
@@ -81,6 +82,11 @@ final class SearchViewModel: ObservableObject {
     // MARK: - Search entry point
 
     func queryDidChange() {
+        if suppressNextQueryChange {
+                suppressNextQueryChange = false
+                return
+            }
+        
         searchTask?.cancel()
         currentOffset = 0
         hasMoreResults = true
@@ -160,6 +166,103 @@ final class SearchViewModel: ObservableObject {
             }
         }
     }
+    #if os(iOS)
+    func searchByRecognizedTrack(_ match: ShazamMatch) {
+        searchTask?.cancel()
+
+        currentOffset = 0
+        hasMoreResults = false
+        isLoadingMore = false
+        searchError = nil
+        isSearching = true
+
+        mode = .search
+        artistRows = []
+        releaseResults = []
+
+        let artist = match.artist.trimmingCharacters(in: .whitespacesAndNewlines)
+        let title = match.title.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !artist.isEmpty, !title.isEmpty else {
+            isSearching = false
+            return
+        }
+
+        suppressNextQueryChange = true
+        searchQuery = "\(artist), \(title)"
+
+        searchTask = Task {
+            defer { isSearching = false }
+
+            do {
+                let recordings = try await musicBrainzService.searchRecordings(
+                    trackTitle: title,
+                    artistName: artist,
+                    limit: pageSize,
+                    offset: 0
+                )
+
+                let trackReleases = flattenRecordingResults(recordings)
+
+                let verifiedTrackReleases = await filterReleasesContainingTrack(
+                    trackReleases,
+                    trackTitle: title
+                )
+
+                let prioritizedTrackReleases = prioritizeAndFilterByArtist(
+                    verifiedTrackReleases,
+                    artistQuery: artist
+                )
+
+                if !prioritizedTrackReleases.isEmpty {
+                    artistRows = []
+                    releaseResults = []
+                    currentOffset = prioritizedTrackReleases.count
+                    hasMoreResults = recordings.count == pageSize
+
+                    await prepareReleaseRowsSequentially(
+                        from: prioritizedTrackReleases,
+                        append: false
+                    )
+                    return
+                }
+
+                // Fallback: if recording search finds nothing useful,
+                // fall back to the regular combined release query.
+                let fallbackQuery = "\(artist), \(title)"
+
+                let fallbackReleases = try await musicBrainzService.searchReleases(
+                    query: fallbackQuery,
+                    limit: pageSize,
+                    offset: 0
+                )
+
+                let sortedFallback = prioritizeAndFilterByArtist(
+                    sortRawReleases(fallbackReleases, query: fallbackQuery),
+                    artistQuery: artist
+                )
+
+                artistRows = []
+                releaseResults = []
+                currentOffset = sortedFallback.count
+                hasMoreResults = fallbackReleases.count == pageSize
+
+                await prepareReleaseRowsSequentially(
+                    from: sortedFallback,
+                    append: false
+                )
+
+            } catch is CancellationError {
+                return
+            } catch {
+                releaseResults = []
+                artistRows = []
+                hasMoreResults = false
+                searchError = error
+            }
+        }
+    }
+    #endif
 
     func retrySearch() {
         searchTask?.cancel()
@@ -260,7 +363,10 @@ final class SearchViewModel: ObservableObject {
                         trackReleases.filter { !releaseIDs.contains($0.id) },
                         artistQuery: parsed.before
                     )
-                    let merged     = sortedReleases + trackOnly
+                    let merged = prioritizeAndFilterByArtist(
+                        sortedReleases + trackOnly,
+                        artistQuery: parsed.before
+                    )
 
                     releaseResults = []
                     artistRows = []
@@ -485,7 +591,10 @@ final class SearchViewModel: ObservableObject {
                     trackReleases.filter { !releaseIDs.contains($0.id) },
                     artistQuery: parsed.before
                 )
-                let merged     = (sortedReleases + trackOnly).filter { !existing.contains($0.id) }
+                let merged = prioritizeAndFilterByArtist(
+                    (sortedReleases + trackOnly).filter { !existing.contains($0.id) },
+                    artistQuery: parsed.before
+                )
 
                 currentOffset += merged.count
                 hasMoreResults = releaseResults_.count == pageSize || trackReleases.count == pageSize
@@ -712,6 +821,49 @@ final class SearchViewModel: ObservableObject {
         }
         return out
     }
+    
+    private func filterReleasesContainingTrack(
+        _ releases: [MBReleaseSearchResult],
+        trackTitle: String
+    ) async -> [MBReleaseSearchResult] {
+        var verified: [MBReleaseSearchResult] = []
+
+        for release in releases {
+            guard let detailedRelease = try? await musicBrainzService.loadRelease(id: release.id) else {
+                continue
+            }
+
+            if releaseContainsTrackTitle(detailedRelease, trackTitle: trackTitle) {
+                verified.append(release)
+            }
+        }
+
+        return verified
+    }
+
+    private nonisolated func releaseContainsTrackTitle(
+        _ release: MBRelease,
+        trackTitle: String
+    ) -> Bool {
+        let needle = normalizedTrackTitle(trackTitle)
+
+        let tracks = release.media?
+            .flatMap { $0.tracks ?? [] } ?? []
+
+        return tracks.contains { track in
+            normalizedTrackTitle(track.title) == needle
+        }
+    }
+
+    private nonisolated func normalizedTrackTitle(_ title: String) -> String {
+        title
+            .lowercased()
+            .replacingOccurrences(of: "’", with: "'")
+            .replacingOccurrences(of: "‘", with: "'")
+            .replacingOccurrences(of: "“", with: "\"")
+            .replacingOccurrences(of: "”", with: "\"")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 
     /// Sort track-only results so the searched artist's own releases come first,
     /// then everything else (compilations, various-artists, etc.) in original order.
@@ -729,6 +881,86 @@ final class SearchViewModel: ObservableObject {
             if aMatch != bMatch { return aMatch }
             return false  // stable: preserve original order within each group
         }
+    }
+    
+    private nonisolated func prioritizeAndFilterByArtist(
+        _ releases: [MBReleaseSearchResult],
+        artistQuery: String
+    ) -> [MBReleaseSearchResult] {
+        let query = artistQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !query.isEmpty else { return releases }
+
+        let ranked = releases.map { release in
+            (release: release, rank: artistMatchRank(release.artistCredit, artistQuery: query))
+        }
+
+        let hasStrongArtistMatches = ranked.contains { $0.rank <= 1 }
+
+        let filtered = hasStrongArtistMatches
+            ? ranked.filter { $0.rank <= 2 }
+            : ranked
+
+        return filtered.sorted { a, b in
+            if a.rank != b.rank {
+                return a.rank < b.rank
+            }
+
+            return false
+        }
+        .map(\.release)
+    }
+
+    private nonisolated func artistMatchRank(
+        _ credit: [MBArtistCredit]?,
+        artistQuery: String
+    ) -> Int {
+        guard let credit else { return 3 }
+
+        let haystack = credit
+            .map(\.name)
+            .joined(separator: " ")
+            .lowercased()
+
+        let query = artistQuery.lowercased()
+
+        if haystack.contains(query) {
+            return 0
+        }
+
+        let strongTokens = artistQueryTokens(from: query)
+
+        if strongTokens.contains(where: { haystack.contains($0) }) {
+            return 1
+        }
+
+        let weakTokens = query
+            .split(whereSeparator: { !$0.isLetter && !$0.isNumber })
+            .map(String.init)
+            .filter { !$0.isEmpty }
+
+        if weakTokens.contains(where: { haystack.contains($0) }) {
+            return 2
+        }
+
+        return 3
+    }
+
+    private nonisolated func artistQueryTokens(from query: String) -> [String] {
+        let genericTokens: Set<String> = [
+            "the", "a", "an",
+            "and", "or", "of",
+            "band", "trio", "quartet", "quintet",
+            "ensemble", "orchestra", "choir",
+            "group", "project"
+        ]
+
+        return query
+            .split(whereSeparator: { !$0.isLetter && !$0.isNumber })
+            .map(String.init)
+            .filter { token in
+                token.count >= 3 && !genericTokens.contains(token)
+            }
     }
 
     private nonisolated func artistCreditMatches(

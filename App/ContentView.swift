@@ -89,6 +89,10 @@ struct ContentView: View {
         case .search:
             SearchCardHeaderView(
                 viewModel: appModel.searchViewModel,
+                isShazamListening: appModel.isShazamListening,
+                onShazamTapped: {
+                    appModel.startShazamSearch()
+                },
                 onTapCurrentArtist: {
                     withAnimation(AppStyle.animation) {
                         appModel.deckSelection.selectID(.artist, in: cards)
@@ -96,7 +100,8 @@ struct ContentView: View {
                 },
                 onBarcodeScanned: { code in
                     appModel.searchViewModel.searchByBarcode(code)
-                }
+                },
+                shazamStatusMessage: appModel.shazamStatusMessage
             )
         case .release:
             if appModel.isLoadingRelease {

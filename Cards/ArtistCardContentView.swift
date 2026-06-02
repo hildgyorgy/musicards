@@ -88,7 +88,7 @@ struct ArtistCardContentView: View {
 #if os(iOS)
                                                     .frame(width: 40, alignment: .leading)
                                                 #else
-                                                    .frame(width: 30, alignment: .leading)
+                                                    .frame(width: 35, alignment: .leading)
 #endif
                                                 Text(group.title)
                                                     .font(.callout)
