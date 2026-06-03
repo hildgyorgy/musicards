@@ -166,103 +166,94 @@ final class SearchViewModel: ObservableObject {
             }
         }
     }
-    #if os(iOS)
-    func searchByRecognizedTrack(_ match: ShazamMatch) {
-        searchTask?.cancel()
+#if os(iOS)
+func searchByRecognizedTrack(_ match: ShazamMatch) {
+    searchTask?.cancel()
 
-        currentOffset = 0
-        hasMoreResults = false
-        isLoadingMore = false
-        searchError = nil
-        isSearching = true
+    currentOffset = 0
+    hasMoreResults = false
+    isLoadingMore = false
+    searchError = nil
+    isSearching = true
 
-        mode = .search
-        artistRows = []
-        releaseResults = []
+    mode = .search
+    artistRows = []
+    releaseResults = []
 
-        let artist = match.artist.trimmingCharacters(in: .whitespacesAndNewlines)
-        let title = match.title.trimmingCharacters(in: .whitespacesAndNewlines)
+    let artist = match.artist.trimmingCharacters(in: .whitespacesAndNewlines)
+    let title = match.title.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        guard !artist.isEmpty, !title.isEmpty else {
-            isSearching = false
-            return
-        }
+    guard !artist.isEmpty, !title.isEmpty else {
+        isSearching = false
+        return
+    }
 
-        suppressNextQueryChange = true
-        searchQuery = "\(artist), \(title)"
+    suppressNextQueryChange = true
+    searchQuery = "\(artist), \(title)"
 
-        searchTask = Task {
-            defer { isSearching = false }
+    searchTask = Task {
+        defer { isSearching = false }
 
-            do {
-                let recordings = try await musicBrainzService.searchRecordings(
-                    trackTitle: title,
-                    artistName: artist,
-                    limit: pageSize,
-                    offset: 0
-                )
+        do {
+            let recordings = try await musicBrainzService.searchRecordings(
+                trackTitle: title,
+                artistName: artist,
+                limit: 20,
+                offset: 0
+            )
 
-                let trackReleases = flattenRecordingResults(recordings)
+            let trackReleases = flattenRecordingResults(recordings)
 
-                let verifiedTrackReleases = await filterReleasesContainingTrack(
-                    trackReleases,
-                    trackTitle: title
-                )
+            for candidate in trackReleases.prefix(20) {
+                guard artistMatchRank(candidate.artistCredit, artistQuery: artist) <= 1 else {
+                    continue
+                }
 
-                let prioritizedTrackReleases = prioritizeAndFilterByArtist(
-                    verifiedTrackReleases,
-                    artistQuery: artist
-                )
+                guard let detailedRelease = try? await musicBrainzService.loadRelease(id: candidate.id) else {
+                    continue
+                }
 
-                if !prioritizedTrackReleases.isEmpty {
-                    artistRows = []
-                    releaseResults = []
-                    currentOffset = prioritizedTrackReleases.count
-                    hasMoreResults = recordings.count == pageSize
+                guard releaseContainsTrackTitle(detailedRelease, trackTitle: title) else {
+                    continue
+                }
 
-                    await prepareReleaseRowsSequentially(
-                        from: prioritizedTrackReleases,
-                        append: false
+                if let releaseGroupID = detailedRelease.releaseGroup?.id {
+                    loadReleaseGroupResults(
+                        releaseGroupID: releaseGroupID,
+                        releaseTitle: detailedRelease.releaseGroup?.title ?? candidate.title,
+                        artistName: artist
                     )
                     return
                 }
 
-                // Fallback: if recording search finds nothing useful,
-                // fall back to the regular combined release query.
-                let fallbackQuery = "\(artist), \(title)"
-
-                let fallbackReleases = try await musicBrainzService.searchReleases(
-                    query: fallbackQuery,
-                    limit: pageSize,
-                    offset: 0
-                )
-
-                let sortedFallback = prioritizeAndFilterByArtist(
-                    sortRawReleases(fallbackReleases, query: fallbackQuery),
-                    artistQuery: artist
-                )
-
-                artistRows = []
                 releaseResults = []
-                currentOffset = sortedFallback.count
-                hasMoreResults = fallbackReleases.count == pageSize
+                artistRows = []
+                currentOffset = 1
+                hasMoreResults = false
 
                 await prepareReleaseRowsSequentially(
-                    from: sortedFallback,
+                    from: [candidate],
                     append: false
                 )
-
-            } catch is CancellationError {
                 return
-            } catch {
-                releaseResults = []
-                artistRows = []
-                hasMoreResults = false
-                searchError = error
             }
+
+            releaseResults = []
+            artistRows = []
+            hasMoreResults = false
+            searchError = nil
+
+        } catch is CancellationError {
+            return
+        } catch {
+            releaseResults = []
+            artistRows = []
+            hasMoreResults = false
+            searchError = error
         }
     }
-    #endif
+}
+#endif
 
     func retrySearch() {
         searchTask?.cancel()
@@ -820,25 +811,6 @@ final class SearchViewModel: ObservableObject {
             }
         }
         return out
-    }
-    
-    private func filterReleasesContainingTrack(
-        _ releases: [MBReleaseSearchResult],
-        trackTitle: String
-    ) async -> [MBReleaseSearchResult] {
-        var verified: [MBReleaseSearchResult] = []
-
-        for release in releases {
-            guard let detailedRelease = try? await musicBrainzService.loadRelease(id: release.id) else {
-                continue
-            }
-
-            if releaseContainsTrackTitle(detailedRelease, trackTitle: trackTitle) {
-                verified.append(release)
-            }
-        }
-
-        return verified
     }
 
     private nonisolated func releaseContainsTrackTitle(

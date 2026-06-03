@@ -58,9 +58,20 @@ struct DeckView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
                 height: availableHeight,
                 alignment: .top
             )
-            .background(
-                GlassCardBackground()
-            )
+            .background {
+                if #available(macOS 26.0, *) {
+                    Color.clear
+                        .glassEffect(
+                            .regular.interactive(),
+                            in: RoundedRectangle(
+                                cornerRadius: DeckStyle.cornerRadius,
+                                style: .continuous
+                            )
+                        )
+                } else {
+                    GlassCardBackground()
+                }
+            }
             .clipShape(
                 RoundedRectangle(
                     cornerRadius: DeckStyle.cornerRadius,

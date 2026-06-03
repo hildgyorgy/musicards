@@ -10,7 +10,7 @@ enum DeckStyle {
     // MARK: - Geometry
 
     static var horizontalInset: CGFloat {
-            UIDevice.current.userInterfaceIdiom == .pad ? 60 : 8
+            UIDevice.current.userInterfaceIdiom == .pad ? 100 : 8
         }
 
     static let expandedBottomPadding: CGFloat = 90

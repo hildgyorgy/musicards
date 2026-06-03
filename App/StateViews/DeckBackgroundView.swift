@@ -54,9 +54,9 @@ struct DeckBackgroundView: View {
                             value: isHoveringLogo
                         )
                         #if os(macOS)
-                        .onHover { hovering in
-                            isHoveringLogo = hovering
-                        }
+                            .onHover { hovering in
+                                isHoveringLogo = hovering
+                            }
                         #endif
 
                     Text("MusicBrainz Release Viewer")
@@ -89,7 +89,10 @@ struct DeckBackgroundView: View {
                     }
                     #if os(iOS)
                         .font(.footnote)
-                        .padding(.horizontal, 24)
+                        .padding(
+                            .horizontal,
+                            DeckStyle.horizontalInset + 40
+                        )
                     #endif
 
                     #if os(macOS)
@@ -118,39 +121,39 @@ struct DeckBackgroundView: View {
             }
             .scrollIndicators(.hidden)
             .ignoresSafeArea(edges: .bottom)
-#if os(iOS)
-.sheet(isPresented: $isShowingAbout) {
-    AboutView()
-}
-#elseif os(macOS)
-.overlay {
-    if isShowingAbout {
-        Color.clear
-            .contentShape(Rectangle())
-            .onTapGesture {
-                isShowingAbout = false
-            }
-    }
-}
-.overlay {
-    if isShowingAbout {
-        AboutSheetView {
-            isShowingAbout = false
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .transition(.scale.combined(with: .opacity))
-        .onTapGesture { }
-    }
-}
-.animation(.spring(duration: 0.35), value: isShowingAbout)
-.onKeyPress(.escape) {
-    if isShowingAbout {
-        isShowingAbout = false
-        return .handled
-    }
-    return .ignored
-}
-#endif
+            #if os(iOS)
+                .sheet(isPresented: $isShowingAbout) {
+                    AboutView()
+                }
+            #elseif os(macOS)
+                .overlay {
+                    if isShowingAbout {
+                        Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            isShowingAbout = false
+                        }
+                    }
+                }
+                .overlay {
+                    if isShowingAbout {
+                        AboutSheetView {
+                            isShowingAbout = false
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .transition(.scale.combined(with: .opacity))
+                        .onTapGesture {}
+                    }
+                }
+                .animation(.spring(duration: 0.35), value: isShowingAbout)
+                .onKeyPress(.escape) {
+                    if isShowingAbout {
+                        isShowingAbout = false
+                        return .handled
+                    }
+                    return .ignored
+                }
+            #endif
         }
     }
 
