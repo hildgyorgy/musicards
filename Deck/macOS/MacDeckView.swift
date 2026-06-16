@@ -17,6 +17,8 @@ struct DeckView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
     let headerProvider: (DeckCard<ID>) -> HeaderContent
     let contentProvider: (DeckCard<ID>) -> CardContent
 
+    @AppStorage("glassTransparent") private var glassTransparent = false
+
     init(
         cards: [DeckCard<ID>],
         selection: Binding<DeckSelection<ID>>,
@@ -32,7 +34,8 @@ struct DeckView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
     var body: some View {
         GeometryReader { proxy in
             let collapsedHeight = DeckStyle.collapsedCardHeight
-            let availableHeight = proxy.size.height - DeckStyle.topInset * 2
+            let titlebarOverlap: CGFloat = 32
+            let availableHeight = proxy.size.height - DeckStyle.topInset * 2 + titlebarOverlap
             let expandedHeight = max(
                 collapsedHeight,
                 availableHeight - collapsedHeight * CGFloat(cards.count - 1)
@@ -60,9 +63,12 @@ struct DeckView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
             )
             .background {
                 if #available(macOS 26.0, *) {
+                    let effect: Glass = glassTransparent
+                        ? .clear.interactive()
+                        : .regular.interactive()
                     Color.clear
                         .glassEffect(
-                            .regular.interactive(),
+                            effect,
                             in: RoundedRectangle(
                                 cornerRadius: DeckStyle.cornerRadius,
                                 style: .continuous
@@ -79,7 +85,7 @@ struct DeckView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
                 )
             )
             .padding(.horizontal, DeckStyle.horizontalInset)
-            .padding(.top, DeckStyle.topInset)
+            .padding(.top, DeckStyle.topInset - titlebarOverlap)
             .animation(DeckStyle.animation, value: activeSlotIndex)
         }
     }

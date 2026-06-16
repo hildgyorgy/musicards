@@ -16,7 +16,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "F5A09F5C2FBC746A00E5404B"
-               BuildableName = "MusiCardsMac.app"
+               BuildableName = "MusiCards.app"
                BlueprintName = "MusiCardsMac"
                ReferencedContainer = "container:MusiCards Release Viewer.xcodeproj">
             </BuildableReference>
@@ -46,7 +46,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "F5A09F5C2FBC746A00E5404B"
-            BuildableName = "MusiCardsMac.app"
+            BuildableName = "MusiCards.app"
             BlueprintName = "MusiCardsMac"
             ReferencedContainer = "container:MusiCards Release Viewer.xcodeproj">
          </BuildableReference>
@@ -63,7 +63,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "F5A09F5C2FBC746A00E5404B"
-            BuildableName = "MusiCardsMac.app"
+            BuildableName = "MusiCards.app"
             BlueprintName = "MusiCardsMac"
             ReferencedContainer = "container:MusiCards Release Viewer.xcodeproj">
          </BuildableReference>

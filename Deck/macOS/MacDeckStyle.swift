@@ -17,7 +17,7 @@ enum DeckStyle {
 
     static let horizontalInset: CGFloat = 0
     static let topInset: CGFloat = 0
-    static let cornerRadius: CGFloat = 35
+    static let cornerRadius: CGFloat = 18
     static let collapsedCardHeight: CGFloat = 40
 
     // MARK: - Glass surface

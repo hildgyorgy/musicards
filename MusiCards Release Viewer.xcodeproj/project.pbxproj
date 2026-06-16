@@ -129,7 +129,7 @@
 		F59CE9362FBFBACE00649EA1 /* WikipediaSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WikipediaSheetView.swift; sourceTree = "<group>"; };
 		F59F290F2F90DBF700A50F8C /* MBTextFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MBTextFormatter.swift; sourceTree = "<group>"; };
 		F59F29112F923B1E00A50F8C /* MusiCards.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = MusiCards.icon; sourceTree = "<group>"; };
-		F5A09F5D2FBC746A00E5404B /* MusiCardsMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MusiCardsMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F5A09F5D2FBC746A00E5404B /* MusiCards.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MusiCards.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F5BB4C202F982A60001CA927 /* BarcodeScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BarcodeScannerView.swift; sourceTree = "<group>"; };
 		F5D185A92F93E4A100CDDB1C /* EmptyStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
 		F5D185AB2F93F71A00CDDB1C /* ErrorStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorStateView.swift; sourceTree = "<group>"; };
@@ -202,7 +202,7 @@
 			isa = PBXGroup;
 			children = (
 				F5E5213F2F8292AD00D2CEAE /* MusiCards Release Viewer.app */,
-				F5A09F5D2FBC746A00E5404B /* MusiCardsMac.app */,
+				F5A09F5D2FBC746A00E5404B /* MusiCards.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -317,7 +317,7 @@
 			);
 			name = MusiCardsMac;
 			productName = MusiCardsMac;
-			productReference = F5A09F5D2FBC746A00E5404B /* MusiCardsMac.app */;
+			productReference = F5A09F5D2FBC746A00E5404B /* MusiCards.app */;
 			productType = "com.apple.product-type.application";
 		};
 		F5E5213E2F8292AD00D2CEAE /* MusiCards Release Viewer */ = {
@@ -497,7 +497,7 @@
 				CODE_SIGN_ENTITLEMENTS = MusiCardsMac/MusiCardsMac.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 963B9MS98N;
 				ENABLE_APP_SANDBOX = YES;
@@ -514,9 +514,9 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.5;
-				MARKETING_VERSION = 1.1.1;
+				MARKETING_VERSION = 1.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = hu.hildgyorgy.musicards;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = MusiCards;
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = macosx;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -538,7 +538,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 963B9MS98N;
 				ENABLE_APP_SANDBOX = YES;
@@ -565,10 +565,10 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.5;
-				MARKETING_VERSION = 1.1.1;
+				MARKETING_VERSION = 1.2.0;
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = hu.hildgyorgy.musicards;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = MusiCards;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = macosx;

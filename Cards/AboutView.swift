@@ -8,15 +8,23 @@
 import SwiftUI
 
 struct AboutView: View {
+
+    #if os(macOS)
+        @AppStorage("glassTransparent") private var glassTransparent = false
+    #endif
+
     var body: some View {
         VStack(spacing: 6) {
-#if os(iOS)
-            Spacer()
-#endif
+            #if os(iOS)
+                Spacer()
+            #endif
             Text("Data provided by MusicBrainz")
                 .font(.headline)
 
-            Link("musicbrainz.org", destination: URL(string: "https://musicbrainz.org")!)
+            Link(
+                "musicbrainz.org",
+                destination: URL(string: "https://musicbrainz.org")!
+            )
 
             Text("MusicBrainz data is available under the CC0 license.")
                 .font(.footnote)
@@ -27,31 +35,66 @@ struct AboutView: View {
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-            
+
             HStack(spacing: 4) {
-                Link("Support", destination: URL(string: "https://hildgyorgy.github.io/mb-release-viewer/support.html")!)
+                Link(
+                    "Support",
+                    destination: URL(
+                        string:
+                            "https://hildgyorgy.github.io/mb-release-viewer/support.html"
+                    )!
+                )
 
                 Text("•")
 
-                Link("Privacy", destination: URL(string: "https://hildgyorgy.github.io/mb-release-viewer/support.html#privacy")!)
-                
+                Link(
+                    "Privacy",
+                    destination: URL(
+                        string:
+                            "https://hildgyorgy.github.io/mb-release-viewer/support.html#privacy"
+                    )!
+                )
+
                 Text(" | ")
-                
+
                 Text("György Hild")
-                
+
                 Text("•")
-                
+
                 Text("2026")
 
             }
             .font(.footnote)
             .foregroundStyle(.secondary)
             .padding(.top, 6)
+            #if os(macOS)
+                if #available(macOS 26.0, *) {
+                    HStack(spacing: 8) {
+                        Text("FROSTED")
+                            .font(.caption)
+                            .tracking(1.5)
+                            .foregroundStyle(
+                                glassTransparent ? .secondary : .primary
+                            )
+                        Toggle("", isOn: $glassTransparent)
+                            .toggleStyle(.switch)
+                            .labelsHidden()
+                        Text("LIQUID")
+                            .font(.caption)
+                            .tracking(1.5)
+                            .foregroundStyle(
+                                glassTransparent ? .primary : .secondary
+                            )
+                    }
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.top, 16)
+                }
+            #endif
         }
         .padding(28)
-#if os(iOS)
-.presentationDetents([.height(152)])
-.presentationDragIndicator(.visible)
-#endif
+        #if os(iOS)
+            .presentationDetents([.height(152)])
+            .presentationDragIndicator(.visible)
+        #endif
     }
 }

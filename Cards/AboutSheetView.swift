@@ -15,7 +15,7 @@ struct AboutSheetView: View {
         ZStack(alignment: .topTrailing) {
             AboutView()
                 .frame(width: MacWindowMetrics.contentSize.width - 10)
-                .frame(height: 160)
+                .frame(height: 180)
                 .background {
                     if #available(macOS 26.0, *) {
                         Color.clear
