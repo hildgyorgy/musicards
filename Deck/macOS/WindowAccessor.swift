@@ -24,8 +24,18 @@
                 window.isMovableByWindowBackground = true
                 window.hasShadow = true
 
+                if window.toolbar == nil {
+                    let customToolbar = NSToolbar()
+                    window.toolbar = customToolbar
+                }
+
                 window.collectionBehavior.remove(.fullScreenPrimary)
-                window.collectionBehavior.insert(.fullScreenNone)
+                window.collectionBehavior.remove(.fullScreenAuxiliary)
+                
+                if let zoomButton = window.standardWindowButton(.zoomButton) {
+                    zoomButton.target = window
+                    zoomButton.action = #selector(NSWindow.performZoom(_:))
+                }
             }
 
             return view

@@ -34,7 +34,7 @@ struct DeckView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
     var body: some View {
         GeometryReader { proxy in
             let collapsedHeight = DeckStyle.collapsedCardHeight
-            let titlebarOverlap: CGFloat = 32
+            let titlebarOverlap: CGFloat = 65
             let availableHeight = proxy.size.height - DeckStyle.topInset * 2 + titlebarOverlap
             let expandedHeight = max(
                 collapsedHeight,
