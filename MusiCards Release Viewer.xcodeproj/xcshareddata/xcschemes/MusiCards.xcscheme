@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Scheme
-   LastUpgradeVersion = "2650"
+   LastUpgradeVersion = "2660"
    version = "1.7">
    <BuildAction
       parallelizeBuildables = "YES"
@@ -16,8 +16,8 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "F5E5213E2F8292AD00D2CEAE"
-               BuildableName = "MusiCards Release Viewer.app"
-               BlueprintName = "MusiCards Release Viewer"
+               BuildableName = "MusiCards.app"
+               BlueprintName = "MusiCards"
                ReferencedContainer = "container:MusiCards Release Viewer.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -46,8 +46,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "F5E5213E2F8292AD00D2CEAE"
-            BuildableName = "MusiCards Release Viewer.app"
-            BlueprintName = "MusiCards Release Viewer"
+            BuildableName = "MusiCards.app"
+            BlueprintName = "MusiCards"
             ReferencedContainer = "container:MusiCards Release Viewer.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
@@ -63,8 +63,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "F5E5213E2F8292AD00D2CEAE"
-            BuildableName = "MusiCards Release Viewer.app"
-            BlueprintName = "MusiCards Release Viewer"
+            BuildableName = "MusiCards.app"
+            BlueprintName = "MusiCards"
             ReferencedContainer = "container:MusiCards Release Viewer.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>

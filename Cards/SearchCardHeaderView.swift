@@ -6,7 +6,9 @@
 //
 
 import SwiftUI
+#if os(iOS)
 import VisionKit
+#endif
 
 struct SearchCardHeaderView: View {
     @ObservedObject var viewModel: SearchViewModel

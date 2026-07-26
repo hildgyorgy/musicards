@@ -88,6 +88,7 @@ enum RelationClassifier {
     ]
 
     private static let performerTypes: Set<String> = [
+        "performer",
         "instrument",
         "vocal",
         "performing orchestra",

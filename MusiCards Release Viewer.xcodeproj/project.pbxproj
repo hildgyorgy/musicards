@@ -7,10 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		F507A9A92FBD9D3A001FB1B8 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F53A32052F840607005A436B /* ContentView.swift */; };
-		F507A9AA2FBD9D5C001FB1B8 /* MusiCardsAppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F59B714E2F8540150086AB37 /* MusiCardsAppModel.swift */; };
-		F507A9B02FBDBD99001FB1B8 /* DeckBackgroundView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50AC8752F8E5EE100776C7E /* DeckBackgroundView.swift */; };
-		F507A9B12FBDC774001FB1B8 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F53A32032F840607005A436B /* Assets.xcassets */; };
 		F50A4F7E2F8EF16E006FD7A7 /* ClassicalMetadataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50A4F7C2F8EF16E006FD7A7 /* ClassicalMetadataStore.swift */; };
 		F50A4F7F2F8EF16E006FD7A7 /* ClassicalTrackFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50A4F7D2F8EF16E006FD7A7 /* ClassicalTrackFormatter.swift */; };
 		F50AC8762F8E5EE200776C7E /* DeckBackgroundView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50AC8752F8E5EE100776C7E /* DeckBackgroundView.swift */; };
@@ -21,7 +17,6 @@
 		F51CEEB42F8ACE8800E70ACD /* ReleaseThumbnailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51CEEB32F8ACE8500E70ACD /* ReleaseThumbnailView.swift */; };
 		F520FA8B2F8D75A50020D8E2 /* ArtistCardHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F520FA8A2F8D75A30020D8E2 /* ArtistCardHeaderView.swift */; };
 		F524BE572FC9C46D00D3730B /* AboutSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F524BE562FC9C46400D3730B /* AboutSheetView.swift */; };
-		F524BE582FC9C46D00D3730B /* AboutSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F524BE562FC9C46400D3730B /* AboutSheetView.swift */; };
 		F53022652F862DA40002C907 /* ArtistCardContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F53022642F862D9D0002C907 /* ArtistCardContentView.swift */; };
 		F53022672F8639500002C907 /* SearchMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = F53022662F86394E0002C907 /* SearchMode.swift */; };
 		F530226B2F8647DF0002C907 /* ArtistCreditLinksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F530226A2F8647DD0002C907 /* ArtistCreditLinksView.swift */; };
@@ -31,12 +26,10 @@
 		F53A320B2F840607005A436B /* CardsApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F53A32042F840607005A436B /* CardsApp.swift */; };
 		F53A320C2F840607005A436B /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F53A32052F840607005A436B /* ContentView.swift */; };
 		F53A32122F840607005A436B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F53A32032F840607005A436B /* Assets.xcassets */; };
-		F545EE652FCE36AF006A3A3A /* ShazamRecognitionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F545EE642FCE36AD006A3A3A /* ShazamRecognitionService.swift */; };
 		F545EE662FCE36AF006A3A3A /* ShazamRecognitionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F545EE642FCE36AD006A3A3A /* ShazamRecognitionService.swift */; };
 		F54FE62F2F9C08ED00646913 /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F54FE62E2F9C08EC00646913 /* AboutView.swift */; };
 		F54FE6332F9C106300646913 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = F54FE6322F9C104D00646913 /* PrivacyInfo.xcprivacy */; };
 		F56054C62FB62968009EEF0A /* MusiCardsSpinner.swift in Sources */ = {isa = PBXBuildFile; fileRef = F56054C52FB62962009EEF0A /* MusiCardsSpinner.swift */; };
-		F575FB7F2FC0C46400BDCB93 /* MBIdentifiers.swift in Sources */ = {isa = PBXBuildFile; fileRef = F575FB7E2FC0C46300BDCB93 /* MBIdentifiers.swift */; };
 		F575FB802FC0C46400BDCB93 /* MBIdentifiers.swift in Sources */ = {isa = PBXBuildFile; fileRef = F575FB7E2FC0C46300BDCB93 /* MBIdentifiers.swift */; };
 		F5918A072F845AFF00E625DD /* SearchCardContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5918A062F845AFE00E625DD /* SearchCardContentView.swift */; };
 		F5918A092F845C4900E625DD /* SearchContentState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5918A082F845C4900E625DD /* SearchContentState.swift */; };
@@ -45,53 +38,18 @@
 		F59B714B2F8539C60086AB37 /* MusicBrainzService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F59B714A2F8539C60086AB37 /* MusicBrainzService.swift */; };
 		F59B714D2F853B7C0086AB37 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = F59B714C2F853B7C0086AB37 /* Models.swift */; };
 		F59B714F2F8540170086AB37 /* MusiCardsAppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F59B714E2F8540150086AB37 /* MusiCardsAppModel.swift */; };
-		F59CE9352FBFB7BC00649EA1 /* SafariView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F530226E2F865D420002C907 /* SafariView.swift */; };
-		F59CE9372FBFBACF00649EA1 /* WikipediaSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F59CE9362FBFBACE00649EA1 /* WikipediaSheetView.swift */; };
 		F59CE9382FBFBACF00649EA1 /* WikipediaSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F59CE9362FBFBACE00649EA1 /* WikipediaSheetView.swift */; };
 		F59F29102F90DBF900A50F8C /* MBTextFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F59F290F2F90DBF700A50F8C /* MBTextFormatter.swift */; };
-		F59F29122F923B1E00A50F8C /* MusiCards.icon in Resources */ = {isa = PBXBuildFile; fileRef = F59F29112F923B1E00A50F8C /* MusiCards.icon */; };
-		F5A09F782FBC867D00E5404B /* ReleaseHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5E62CD32F86ABA600E4B5AF /* ReleaseHeaderView.swift */; };
-		F5A09F792FBC867D00E5404B /* ArtistCreditLinksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F530226A2F8647DD0002C907 /* ArtistCreditLinksView.swift */; };
-		F5A09F7A2FBC867D00E5404B /* SearchCardContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5918A062F845AFE00E625DD /* SearchCardContentView.swift */; };
-		F5A09F7B2FBC867D00E5404B /* TracksCardContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5ECDD492F857809006161E3 /* TracksCardContentView.swift */; };
-		F5A09F7D2FBC867D00E5404B /* TrackDetailPagerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51CEDE32F89A18800E70ACD /* TrackDetailPagerView.swift */; };
-		F5A09F7E2FBC867D00E5404B /* ArtistCardContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F53022642F862D9D0002C907 /* ArtistCardContentView.swift */; };
-		F5A09F7F2FBC867D00E5404B /* ArtistCardHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F520FA8A2F8D75A30020D8E2 /* ArtistCardHeaderView.swift */; };
-		F5A09F802FBC867D00E5404B /* TracksCardHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F530226C2F86481C0002C907 /* TracksCardHeaderView.swift */; };
-		F5A09F812FBC867D00E5404B /* ReleaseThumbnailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51CEEB32F8ACE8500E70ACD /* ReleaseThumbnailView.swift */; };
-		F5A09F832FBC867D00E5404B /* ReleaseCardContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5ECDD4B2F8583D2006161E3 /* ReleaseCardContentView.swift */; };
-		F5A09F842FBC867D00E5404B /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F54FE62E2F9C08EC00646913 /* AboutView.swift */; };
-		F5A09F852FBC867D00E5404B /* SearchCardHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5ECDD4D2F85A989006161E3 /* SearchCardHeaderView.swift */; };
 		F5BB4C212F982A62001CA927 /* BarcodeScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5BB4C202F982A60001CA927 /* BarcodeScannerView.swift */; };
-		F5C775AA2FBCFC4200AE439F /* SearchArtistRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5ECDD4F2F85C6FA006161E3 /* SearchArtistRow.swift */; };
-		F5C775AB2FBCFC4200AE439F /* SearchReleaseRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = F59B71482F8536750086AB37 /* SearchReleaseRow.swift */; };
-		F5C775AC2FBCFC4200AE439F /* SearchContentState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5918A082F845C4900E625DD /* SearchContentState.swift */; };
-		F5C775AD2FBCFC4200AE439F /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = F59B714C2F853B7C0086AB37 /* Models.swift */; };
-		F5C775AE2FBCFC4200AE439F /* SearchMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = F53022662F86394E0002C907 /* SearchMode.swift */; };
-		F5C775AF2FBCFC4200AE439F /* TrackDetailModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51CEDE12F89A0EA00E70ACD /* TrackDetailModels.swift */; };
-		F5C775B02FBCFC4200AE439F /* DiscographyGrouping.swift in Sources */ = {isa = PBXBuildFile; fileRef = F53022702F8691210002C907 /* DiscographyGrouping.swift */; };
-		F5C775B12FBCFC8400AE439F /* CoverArtCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51CEEB12F8ACE2800E70ACD /* CoverArtCache.swift */; };
-		F5C775B22FBCFC8400AE439F /* TrackDetailStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51CEDDF2F899A3D00E70ACD /* TrackDetailStore.swift */; };
-		F5C775B32FBCFC8400AE439F /* MBTextFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F59F290F2F90DBF700A50F8C /* MBTextFormatter.swift */; };
-		F5C775B42FBCFC8400AE439F /* MusicBrainzService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F59B714A2F8539C60086AB37 /* MusicBrainzService.swift */; };
-		F5C775B52FBCFC8400AE439F /* ClassicalMetadataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50A4F7C2F8EF16E006FD7A7 /* ClassicalMetadataStore.swift */; };
-		F5C775B62FBCFC8400AE439F /* ClassicalTrackFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50A4F7D2F8EF16E006FD7A7 /* ClassicalTrackFormatter.swift */; };
-		F5C775B72FBCFC8E00AE439F /* SearchViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F59B71462F84DBDF0086AB37 /* SearchViewModel.swift */; };
-		F5C775B92FBD011000AE439F /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5D185A92F93E4A100CDDB1C /* EmptyStateView.swift */; };
-		F5C775BA2FBD011000AE439F /* ErrorStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5D185AB2F93F71A00CDDB1C /* ErrorStateView.swift */; };
-		F5C775BB2FBD0B9100AE439F /* MusiCardsSpinner.swift in Sources */ = {isa = PBXBuildFile; fileRef = F56054C52FB62962009EEF0A /* MusiCardsSpinner.swift */; };
-		F5C775BC2FBD167A00AE439F /* CardsApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F53A32042F840607005A436B /* CardsApp.swift */; };
 		F5D185AA2F93E4A200CDDB1C /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5D185A92F93E4A100CDDB1C /* EmptyStateView.swift */; };
 		F5D185AC2F93F71B00CDDB1C /* ErrorStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5D185AB2F93F71A00CDDB1C /* ErrorStateView.swift */; };
 		F5E5111C2FC4FDEB00E797D6 /* AppStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5E5111B2FC4F38800E797D6 /* AppStyle.swift */; };
-		F5E5111D2FC4FDEB00E797D6 /* AppStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5E5111B2FC4F38800E797D6 /* AppStyle.swift */; };
 		F5E62CD42F86ABA800E4B5AF /* ReleaseHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5E62CD32F86ABA600E4B5AF /* ReleaseHeaderView.swift */; };
 		F5ECDD4A2F85780C006161E3 /* TracksCardContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5ECDD492F857809006161E3 /* TracksCardContentView.swift */; };
 		F5ECDD4C2F8583D3006161E3 /* ReleaseCardContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5ECDD4B2F8583D2006161E3 /* ReleaseCardContentView.swift */; };
 		F5ECDD4E2F85A98B006161E3 /* SearchCardHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5ECDD4D2F85A989006161E3 /* SearchCardHeaderView.swift */; };
 		F5ECDD502F85C6FB006161E3 /* SearchArtistRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5ECDD4F2F85C6FA006161E3 /* SearchArtistRow.swift */; };
 		F5F5565A2FC303E300CFE831 /* MusiCardID.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5F556592FC303E200CFE831 /* MusiCardID.swift */; };
-		F5F5565B2FC303E300CFE831 /* MusiCardID.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5F556592FC303E200CFE831 /* MusiCardID.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -129,12 +87,11 @@
 		F59CE9362FBFBACE00649EA1 /* WikipediaSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WikipediaSheetView.swift; sourceTree = "<group>"; };
 		F59F290F2F90DBF700A50F8C /* MBTextFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MBTextFormatter.swift; sourceTree = "<group>"; };
 		F59F29112F923B1E00A50F8C /* MusiCards.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = MusiCards.icon; sourceTree = "<group>"; };
-		F5A09F5D2FBC746A00E5404B /* MusiCards.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MusiCards.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F5BB4C202F982A60001CA927 /* BarcodeScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BarcodeScannerView.swift; sourceTree = "<group>"; };
 		F5D185A92F93E4A100CDDB1C /* EmptyStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
 		F5D185AB2F93F71A00CDDB1C /* ErrorStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorStateView.swift; sourceTree = "<group>"; };
 		F5E5111B2FC4F38800E797D6 /* AppStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStyle.swift; sourceTree = "<group>"; };
-		F5E5213F2F8292AD00D2CEAE /* MusiCards Release Viewer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "MusiCards Release Viewer.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		F5E5213F2F8292AD00D2CEAE /* MusiCards.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MusiCards.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F5E62CD32F86ABA600E4B5AF /* ReleaseHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseHeaderView.swift; sourceTree = "<group>"; };
 		F5E81AE92F982C6B008F35BB /* MusiCards Release Viewer-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "MusiCards Release Viewer-Info.plist"; sourceTree = "<group>"; };
 		F5ECDD492F857809006161E3 /* TracksCardContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TracksCardContentView.swift; sourceTree = "<group>"; };
@@ -158,11 +115,6 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		F5A09F5A2FBC746A00E5404B /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			files = (
-			);
-		};
 		F5E5213C2F8292AD00D2CEAE /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
@@ -201,8 +153,7 @@
 		F5E521402F8292AD00D2CEAE /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				F5E5213F2F8292AD00D2CEAE /* MusiCards Release Viewer.app */,
-				F5A09F5D2FBC746A00E5404B /* MusiCards.app */,
+				F5E5213F2F8292AD00D2CEAE /* MusiCards.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -301,28 +252,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		F5A09F5C2FBC746A00E5404B /* MusiCardsMac */ = {
+		F5E5213E2F8292AD00D2CEAE /* MusiCards */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = F5A09F672FBC746A00E5404B /* Build configuration list for PBXNativeTarget "MusiCardsMac" */;
-			buildPhases = (
-				F5A09F592FBC746A00E5404B /* Sources */,
-				F5A09F5A2FBC746A00E5404B /* Frameworks */,
-				F5A09F5B2FBC746A00E5404B /* Resources */,
-			);
-			buildRules = (
-			);
-			fileSystemSynchronizedGroups = (
-				F5A09F5E2FBC746A00E5404B /* MusiCardsMac */,
-				F5E510E12FC4BDF300E797D6 /* Deck */,
-			);
-			name = MusiCardsMac;
-			productName = MusiCardsMac;
-			productReference = F5A09F5D2FBC746A00E5404B /* MusiCards.app */;
-			productType = "com.apple.product-type.application";
-		};
-		F5E5213E2F8292AD00D2CEAE /* MusiCards Release Viewer */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = F5E5214A2F8292AE00D2CEAE /* Build configuration list for PBXNativeTarget "MusiCards Release Viewer" */;
+			buildConfigurationList = F5E5214A2F8292AE00D2CEAE /* Build configuration list for PBXNativeTarget "MusiCards" */;
 			buildPhases = (
 				F5E5213B2F8292AD00D2CEAE /* Sources */,
 				F5E5213C2F8292AD00D2CEAE /* Frameworks */,
@@ -331,11 +263,12 @@
 			buildRules = (
 			);
 			fileSystemSynchronizedGroups = (
+				F5A09F5E2FBC746A00E5404B /* MusiCardsMac */,
 				F5E510E12FC4BDF300E797D6 /* Deck */,
 			);
-			name = "MusiCards Release Viewer";
-			productName = Cards;
-			productReference = F5E5213F2F8292AD00D2CEAE /* MusiCards Release Viewer.app */;
+			name = MusiCards;
+			productName = MusiCards;
+			productReference = F5E5213F2F8292AD00D2CEAE /* MusiCards.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -346,11 +279,8 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 2650;
-				LastUpgradeCheck = 2650;
+				LastUpgradeCheck = 2660;
 				TargetAttributes = {
-					F5A09F5C2FBC746A00E5404B = {
-						CreatedOnToolsVersion = 26.5;
-					};
 					F5E5213E2F8292AD00D2CEAE = {
 						CreatedOnToolsVersion = 26.4;
 					};
@@ -370,75 +300,22 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				F5E5213E2F8292AD00D2CEAE /* MusiCards Release Viewer */,
-				F5A09F5C2FBC746A00E5404B /* MusiCardsMac */,
+				F5E5213E2F8292AD00D2CEAE /* MusiCards */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		F5A09F5B2FBC746A00E5404B /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			files = (
-				F507A9B12FBDC774001FB1B8 /* Assets.xcassets in Resources */,
-			);
-		};
 		F5E5213D2F8292AD00D2CEAE /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
 				F54FE6332F9C106300646913 /* PrivacyInfo.xcprivacy in Resources */,
-				F59F29122F923B1E00A50F8C /* MusiCards.icon in Resources */,
 				F53A32122F840607005A436B /* Assets.xcassets in Resources */,
 			);
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		F5A09F592FBC746A00E5404B /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			files = (
-				F59CE9372FBFBACF00649EA1 /* WikipediaSheetView.swift in Sources */,
-				F5A09F782FBC867D00E5404B /* ReleaseHeaderView.swift in Sources */,
-				F507A9B02FBDBD99001FB1B8 /* DeckBackgroundView.swift in Sources */,
-				F5A09F792FBC867D00E5404B /* ArtistCreditLinksView.swift in Sources */,
-				F5A09F7A2FBC867D00E5404B /* SearchCardContentView.swift in Sources */,
-				F5C775AA2FBCFC4200AE439F /* SearchArtistRow.swift in Sources */,
-				F5F5565B2FC303E300CFE831 /* MusiCardID.swift in Sources */,
-				F5C775AB2FBCFC4200AE439F /* SearchReleaseRow.swift in Sources */,
-				F5C775AC2FBCFC4200AE439F /* SearchContentState.swift in Sources */,
-				F5C775AD2FBCFC4200AE439F /* Models.swift in Sources */,
-				F5C775BC2FBD167A00AE439F /* CardsApp.swift in Sources */,
-				F5C775AE2FBCFC4200AE439F /* SearchMode.swift in Sources */,
-				F5C775AF2FBCFC4200AE439F /* TrackDetailModels.swift in Sources */,
-				F5E5111D2FC4FDEB00E797D6 /* AppStyle.swift in Sources */,
-				F5C775B02FBCFC4200AE439F /* DiscographyGrouping.swift in Sources */,
-				F524BE582FC9C46D00D3730B /* AboutSheetView.swift in Sources */,
-				F5A09F7B2FBC867D00E5404B /* TracksCardContentView.swift in Sources */,
-				F507A9AA2FBD9D5C001FB1B8 /* MusiCardsAppModel.swift in Sources */,
-				F5C775B72FBCFC8E00AE439F /* SearchViewModel.swift in Sources */,
-				F575FB7F2FC0C46400BDCB93 /* MBIdentifiers.swift in Sources */,
-				F5A09F7D2FBC867D00E5404B /* TrackDetailPagerView.swift in Sources */,
-				F5C775BB2FBD0B9100AE439F /* MusiCardsSpinner.swift in Sources */,
-				F5A09F7E2FBC867D00E5404B /* ArtistCardContentView.swift in Sources */,
-				F545EE652FCE36AF006A3A3A /* ShazamRecognitionService.swift in Sources */,
-				F5A09F7F2FBC867D00E5404B /* ArtistCardHeaderView.swift in Sources */,
-				F5A09F802FBC867D00E5404B /* TracksCardHeaderView.swift in Sources */,
-				F5A09F812FBC867D00E5404B /* ReleaseThumbnailView.swift in Sources */,
-				F507A9A92FBD9D3A001FB1B8 /* ContentView.swift in Sources */,
-				F5C775B92FBD011000AE439F /* EmptyStateView.swift in Sources */,
-				F5C775BA2FBD011000AE439F /* ErrorStateView.swift in Sources */,
-				F5A09F832FBC867D00E5404B /* ReleaseCardContentView.swift in Sources */,
-				F5A09F842FBC867D00E5404B /* AboutView.swift in Sources */,
-				F59CE9352FBFB7BC00649EA1 /* SafariView.swift in Sources */,
-				F5A09F852FBC867D00E5404B /* SearchCardHeaderView.swift in Sources */,
-				F5C775B12FBCFC8400AE439F /* CoverArtCache.swift in Sources */,
-				F5C775B22FBCFC8400AE439F /* TrackDetailStore.swift in Sources */,
-				F5C775B32FBCFC8400AE439F /* MBTextFormatter.swift in Sources */,
-				F5C775B42FBCFC8400AE439F /* MusicBrainzService.swift in Sources */,
-				F5C775B52FBCFC8400AE439F /* ClassicalMetadataStore.swift in Sources */,
-				F5C775B62FBCFC8400AE439F /* ClassicalTrackFormatter.swift in Sources */,
-			);
-		};
 		F5E5213B2F8292AD00D2CEAE /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			files = (
@@ -488,99 +365,6 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
-		F5A09F652FBC746A00E5404B /* Debug configuration for PBXNativeTarget "MusiCardsMac" */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
-				CODE_SIGN_ENTITLEMENTS = MusiCardsMac/MusiCardsMac.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 4;
-				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_TEAM = 963B9MS98N;
-				ENABLE_APP_SANDBOX = YES;
-				ENABLE_HARDENED_RUNTIME = YES;
-				ENABLE_PREVIEWS = YES;
-				ENABLE_USER_SELECTED_FILES = readonly;
-				EXCLUDED_ARCHS = "";
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = MusiCards;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/../Frameworks",
-				);
-				MACOSX_DEPLOYMENT_TARGET = 26.5;
-				MARKETING_VERSION = 1.3.0;
-				PRODUCT_BUNDLE_IDENTIFIER = hu.hildgyorgy.musicards;
-				PRODUCT_NAME = MusiCards;
-				REGISTER_APP_GROUPS = YES;
-				SDKROOT = macosx;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-			};
-			name = Debug;
-		};
-		F5A09F662FBC746A00E5404B /* Release configuration for PBXNativeTarget "MusiCardsMac" */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
-				CODE_SIGN_ENTITLEMENTS = MusiCardsMac/MusiCardsMac.entitlements;
-				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
-				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 4;
-				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_TEAM = 963B9MS98N;
-				ENABLE_APP_SANDBOX = YES;
-				ENABLE_HARDENED_RUNTIME = YES;
-				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
-				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
-				ENABLE_PREVIEWS = YES;
-				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
-				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
-				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
-				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
-				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
-				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
-				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
-				ENABLE_RESOURCE_ACCESS_USB = NO;
-				ENABLE_USER_SELECTED_FILES = readonly;
-				EXCLUDED_ARCHS = "";
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = MusiCards;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/../Frameworks",
-				);
-				MACOSX_DEPLOYMENT_TARGET = 26.5;
-				MARKETING_VERSION = 1.3.0;
-				ONLY_ACTIVE_ARCH = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = hu.hildgyorgy.musicards;
-				PRODUCT_NAME = MusiCards;
-				PROVISIONING_PROFILE_SPECIFIER = "";
-				REGISTER_APP_GROUPS = YES;
-				SDKROOT = macosx;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-			};
-			name = Release;
-		};
 		F5E521482F8292AE00D2CEAE /* Debug configuration for PBXProject "MusiCards Release Viewer" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -615,6 +399,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 963B9MS98N;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -634,12 +419,13 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.5;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
-				SDKROOT = iphoneos;
+				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -680,6 +466,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 963B9MS98N;
 				ENABLE_NS_ASSERTIONS = NO;
@@ -693,28 +480,35 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.5;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
-				SDKROOT = iphoneos;
+				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
 		};
-		F5E5214B2F8292AE00D2CEAE /* Debug configuration for PBXNativeTarget "MusiCards Release Viewer" */ = {
+		F5E5214B2F8292AE00D2CEAE /* Debug configuration for PBXNativeTarget "MusiCards" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = MusiCardsMac/MusiCardsMac.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 5;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 963B9MS98N;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "MusiCards Release Viewer-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = MusiCards;
@@ -727,17 +521,18 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-				);
-				MARKETING_VERSION = 1.3.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.4.0;
 				PRODUCT_BUNDLE_IDENTIFIER = hu.hildgyorgy.musicards;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = MusiCards;
 				PROVISIONING_PROFILE_SPECIFIER = "";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SUPPORTS_MACCATALYST = NO;
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
@@ -750,17 +545,23 @@
 			};
 			name = Debug;
 		};
-		F5E5214C2F8292AE00D2CEAE /* Release configuration for PBXNativeTarget "MusiCards Release Viewer" */ = {
+		F5E5214C2F8292AE00D2CEAE /* Release configuration for PBXNativeTarget "MusiCards" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = MusiCardsMac/MusiCardsMac.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 5;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 963B9MS98N;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "MusiCards Release Viewer-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = MusiCards;
@@ -773,17 +574,18 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-				);
-				MARKETING_VERSION = 1.3.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.4.0;
 				PRODUCT_BUNDLE_IDENTIFIER = hu.hildgyorgy.musicards;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = MusiCards;
 				PROVISIONING_PROFILE_SPECIFIER = "";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SUPPORTS_MACCATALYST = NO;
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
@@ -799,14 +601,6 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		F5A09F672FBC746A00E5404B /* Build configuration list for PBXNativeTarget "MusiCardsMac" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				F5A09F652FBC746A00E5404B /* Debug configuration for PBXNativeTarget "MusiCardsMac" */,
-				F5A09F662FBC746A00E5404B /* Release configuration for PBXNativeTarget "MusiCardsMac" */,
-			);
-			defaultConfigurationName = Release;
-		};
 		F5E5213A2F8292AD00D2CEAE /* Build configuration list for PBXProject "MusiCards Release Viewer" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -815,11 +609,11 @@
 			);
 			defaultConfigurationName = Release;
 		};
-		F5E5214A2F8292AE00D2CEAE /* Build configuration list for PBXNativeTarget "MusiCards Release Viewer" */ = {
+		F5E5214A2F8292AE00D2CEAE /* Build configuration list for PBXNativeTarget "MusiCards" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				F5E5214B2F8292AE00D2CEAE /* Debug configuration for PBXNativeTarget "MusiCards Release Viewer" */,
-				F5E5214C2F8292AE00D2CEAE /* Release configuration for PBXNativeTarget "MusiCards Release Viewer" */,
+				F5E5214B2F8292AE00D2CEAE /* Debug configuration for PBXNativeTarget "MusiCards" */,
+				F5E5214C2F8292AE00D2CEAE /* Release configuration for PBXNativeTarget "MusiCards" */,
 			);
 			defaultConfigurationName = Release;
 		};

@@ -404,24 +404,25 @@ private func linkedAlignedDetailRow(
             }
             .buttonStyle(.plain)
         } else {
-            InlineWrapLayout(spacing: 0, lineSpacing: 0) {
+            InlineWrapLayout(spacing: 4, lineSpacing: 0) {
                 ForEach(Array(artists.enumerated()), id: \.element.id) {
                     index,
                     artist in
                     Button {
                         onSelectArtist(artist.id)
                     } label: {
-                        Text(artist.name)
-                            .font(.subheadline)
-                            .foregroundStyle(.tint)
+                        HStack(spacing: 0) {
+                            Text(artist.name)
+                                .foregroundStyle(.tint)
+
+                            if index < artists.count - 1 {
+                                Text(",")
+                                    .foregroundStyle(.primary)
+                            }
+                        }
+                        .font(.subheadline)
                     }
                     .buttonStyle(.plain)
-
-                    if index < artists.count - 1 {
-                        Text(", ")
-                            .font(.subheadline)
-                            .foregroundStyle(.primary)
-                    }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

@@ -5,6 +5,7 @@
 //  Created by Hild György on 2026. 04. 21..
 //
 
+#if os(iOS)
 import SwiftUI
 import VisionKit
 
@@ -76,3 +77,4 @@ struct BarcodeScannerView: UIViewControllerRepresentable {
         }
     }
 }
+#endif
