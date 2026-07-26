@@ -13,7 +13,7 @@ struct ReleaseHeaderView: View {
     let onSelectArtist: (String) -> Void
     
     @Environment(\.colorScheme) private var colorScheme
-    @State private var isHoveringAppleMusic = false
+    @State private var hoveredService: String?
     @Environment(\.openURL) private var openURL
     
     var body: some View {
@@ -61,42 +61,87 @@ struct ReleaseHeaderView: View {
                 )
                 .font(AppStyle.secondaryHeaderFont)
                 
-                if let appleMusicURL = release.appleMusicURL {
+                if [
+                    release.appleMusicURL,
+                    release.spotifyURL,
+                    release.tidalURL,
+                    release.qobuzURL,
+                    release.discogsURL
+                ].contains(where: { $0 != nil }) {
                     HStack(spacing: 12) {
-                        Button {
-                            openURL(appleMusicURL)
-                        } label: {
-                            Image("apple_music_logo")
-                                .renderingMode(.template)
-                                .resizable()
-                                .scaledToFit()
-#if os(iOS)
-                                .frame(width: 20, height: 20)
-#else
-                                .frame(width: 18, height: 18)
-#endif
-                                .foregroundStyle(
-                                    isHoveringAppleMusic ? Color.blue : .primary
-                                )
+                        if let url = release.appleMusicURL {
+                            externalLinkButton(
+                                url: url,
+                                imageName: "apple_music_logo"
+                            )
                         }
-                        .buttonStyle(.plain)
-#if os(macOS)
-                        .onHover { hovering in
-                            isHoveringAppleMusic = hovering
+
+                        if let url = release.spotifyURL {
+                            externalLinkButton(
+                                url: url,
+                                imageName: "spotify_logo"
+                            )
                         }
-#endif
+
+                        if let url = release.tidalURL {
+                            externalLinkButton(
+                                url: url,
+                                imageName: "tidal_logo"
+                            )
+                        }
+
+                        if let url = release.qobuzURL {
+                            externalLinkButton(
+                                url: url,
+                                imageName: "qobuz_logo"
+                            )
+                        }
+
+                        if let url = release.discogsURL {
+                            externalLinkButton(
+                                url: url,
+                                imageName: "discogs_logo"
+                            )
+                        }
                     }
                     .frame(maxWidth: .infinity, alignment: .center)
-#if os(iOS)
+                #if os(iOS)
                     .padding(.top, 6)
                     .padding(.bottom, -10)
-#else
+                #else
                     .padding(.top, 0)
                     .padding(.bottom, -10)
-#endif
+                #endif
                 }
             }
         }
         .fixedSize(horizontal: false, vertical: true)
+    }
+    private func externalLinkButton(
+        url: URL,
+        imageName: String
+    ) -> some View {
+        Button {
+            openURL(url)
+        } label: {
+            Image(imageName)
+                .renderingMode(.template)
+                .resizable()
+                .scaledToFit()
+    #if os(iOS)
+                .frame(width: 20, height: 20)
+    #else
+                .frame(width: 18, height: 18)
+    #endif
+                .foregroundStyle(
+                    hoveredService == imageName ? Color.blue : .primary
+                )
+        }
+        .buttonStyle(.plain)
+    #if os(macOS)
+        .onHover { hovering in
+            hoveredService = hovering ? imageName : nil
+        }
+    #endif
     }
 }

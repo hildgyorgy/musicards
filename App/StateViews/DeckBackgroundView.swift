@@ -89,9 +89,18 @@ struct DeckBackgroundView: View {
                     }
                     #if os(iOS)
                         .font(.footnote)
+                        .padding(.horizontal, 40)
+                        .frame(
+                            maxWidth: UIDevice.current.userInterfaceIdiom == .pad
+                                ? DeckStyle.maximumPadCardWidth
+                                : .infinity,
+                            alignment: .leading
+                        )
                         .padding(
                             .horizontal,
-                            DeckStyle.horizontalInset + 40
+                            UIDevice.current.userInterfaceIdiom == .pad
+                                ? DeckStyle.minimumPadHorizontalMargin
+                                : DeckStyle.horizontalInset
                         )
                     #endif
 
@@ -102,7 +111,9 @@ struct DeckBackgroundView: View {
 
                     .foregroundStyle(.primary)
                     .padding(.top, 32)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    #if os(macOS)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    #endif
                     .multilineTextAlignment(.leading)
                 }
                 #if os(iOS)

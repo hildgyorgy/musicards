@@ -38,10 +38,45 @@ struct MBRelease: Decodable {
 }
 extension MBRelease {
     var appleMusicURL: URL? {
+        externalURL(containingAnyOf: [
+            "music.apple.com",
+            "itunes.apple.com"
+        ])
+    }
+
+    var spotifyURL: URL? {
+        externalURL(containingAnyOf: [
+            "open.spotify.com"
+        ])
+    }
+
+    var tidalURL: URL? {
+        externalURL(containingAnyOf: [
+            "tidal.com",
+            "listen.tidal.com"
+        ])
+    }
+
+    var qobuzURL: URL? {
+        externalURL(containingAnyOf: [
+            "qobuz.com",
+            "open.qobuz.com"
+        ])
+    }
+
+    var discogsURL: URL? {
+        externalURL(containingAnyOf: [
+            "discogs.com"
+        ])
+    }
+
+    private func externalURL(containingAnyOf domainFragments: [String]) -> URL? {
         relations?
             .compactMap { $0.url?.resource }
             .first { resource in
-                resource.localizedCaseInsensitiveContains("music.apple.com")
+                domainFragments.contains { fragment in
+                    resource.localizedCaseInsensitiveContains(fragment)
+                }
             }
             .flatMap(URL.init(string:))
     }

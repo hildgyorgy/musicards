@@ -42,6 +42,24 @@ struct DeckView<ID: Hashable, BackgroundContent: View, HeaderContent: View, Card
 
     var body: some View {
         GeometryReader { proxy in
+            let phoneCardWidth = max(
+                0,
+                proxy.size.width - DeckStyle.horizontalInset * 2
+            )
+
+            let padAvailableWidth = max(
+                0,
+                proxy.size.width
+                    - proxy.safeAreaInsets.leading
+                    - proxy.safeAreaInsets.trailing
+                    - DeckStyle.minimumPadHorizontalMargin * 2
+            )
+
+            let cardWidth =
+                UIDevice.current.userInterfaceIdiom == .pad
+                ? min(padAvailableWidth, DeckStyle.maximumPadCardWidth)
+                : phoneCardWidth
+
             ZStack {
                 backgroundProvider()
                 ForEach(Array(cards.enumerated()), id: \.element.id) { _, card in
@@ -136,7 +154,7 @@ struct DeckView<ID: Hashable, BackgroundContent: View, HeaderContent: View, Card
                         contentProvider(card)
                     }
                     .frame(
-                        width: proxy.size.width - DeckStyle.horizontalInset * 2,
+                        width: cardWidth,
                         height: cardHeight
                     )
                     .offset(

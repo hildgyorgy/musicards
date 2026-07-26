@@ -7,11 +7,14 @@ import SwiftUI
 
 enum DeckStyle {
     
-    // MARK: - Geometry
+    // MARK: - Geometry 
 
     static var horizontalInset: CGFloat {
-            UIDevice.current.userInterfaceIdiom == .pad ? 100 : 8
-        }
+        UIDevice.current.userInterfaceIdiom == .pad ? 100 : 8
+    }
+
+    static let maximumPadCardWidth: CGFloat = 600
+    static let minimumPadHorizontalMargin: CGFloat = 8
 
     static let expandedBottomPadding: CGFloat = 90
 
