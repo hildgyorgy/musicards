@@ -25,6 +25,7 @@ struct CardsApp: App {
             width: MacWindowMetrics.contentSize.width,
             height: MacWindowMetrics.contentSize.height
         )
+        .windowResizability(.contentSize)
         #else
             WindowGroup {
                 ContentView()
