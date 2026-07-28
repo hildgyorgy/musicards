@@ -7,7 +7,8 @@ import SwiftUI
 import UIKit
 
 struct PanHandleView: UIViewRepresentable {
-    var isEnabled: Bool
+    var isTapEnabled: Bool
+    var isPanEnabled: Bool
     var onTap: (() -> Void)? = nil
     var onBegan: (() -> Void)? = nil
     var onChanged: (CGFloat) -> Void
@@ -57,9 +58,9 @@ struct PanHandleView: UIViewRepresentable {
         context.coordinator.onChanged = onChanged
         context.coordinator.onEnded = onEnded
 
-        context.coordinator.tapRecognizer?.isEnabled = isEnabled
-        context.coordinator.panRecognizer?.isEnabled = isEnabled
-        uiView.isUserInteractionEnabled = isEnabled
+        context.coordinator.tapRecognizer?.isEnabled = isTapEnabled
+        context.coordinator.panRecognizer?.isEnabled = isPanEnabled
+        uiView.isUserInteractionEnabled = isTapEnabled || isPanEnabled
     }
 
     final class Coordinator: NSObject, UIGestureRecognizerDelegate {

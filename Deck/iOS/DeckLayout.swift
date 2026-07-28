@@ -7,11 +7,15 @@ import CoreGraphics
 
 enum DeckLayout {
     static func expandedTop(safeAreaTop: CGFloat) -> CGFloat {
-        safeAreaTop + DeckStyle.expandedTopOffset
+        safeAreaTop
+            + DeckStyle.expandedTopOffset
+            - DeckStyle.deckVerticalLift
     }
 
     static func collapsedBottomPadding(safeAreaBottom: CGFloat) -> CGFloat {
-        safeAreaBottom + DeckStyle.collapsedBottomOffset
+        safeAreaBottom
+            + DeckStyle.collapsedBottomOffset
+            + DeckStyle.deckVerticalLift
     }
 
     static func cardHeight(

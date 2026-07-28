@@ -97,7 +97,8 @@ struct DeckCardView<ID: Hashable, HeaderContent: View, CardContent: View>: View 
                 .padding(.top, DeckStyle.cardLabelTopPadding)
 
             PanHandleView(
-                isEnabled: isPanEnabled,
+                isTapEnabled: true,
+                isPanEnabled: isPanEnabled,
                 onTap: onTap,
                 onBegan: onPanBegan,
                 onChanged: onPanChanged,

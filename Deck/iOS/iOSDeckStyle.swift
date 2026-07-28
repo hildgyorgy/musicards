@@ -20,6 +20,7 @@ enum DeckStyle {
 
     static let expandedTopOffset: CGFloat = -28
     static let collapsedBottomOffset: CGFloat = 8
+    static let deckVerticalLift: CGFloat = 12
     static let minimumCardHeight: CGFloat = 180
     
     static let collapsedExtraPeekCount: CGFloat = 2.8

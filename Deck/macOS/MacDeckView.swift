@@ -11,8 +11,16 @@ struct DeckView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
     private var activeSlotIndex: Int {
         selection.activeSlotIndex
     }
+
     private func setActiveSlotIndex(_ newValue: Int) {
-        selection.selectSlot(newValue)
+        if let card = cards.first(where: { $0.slotIndex == newValue }) {
+            selection.selectCard(card)
+        } else {
+            selection = DeckSelection(
+                activeID: nil,
+                activeSlotIndex: newValue
+            )
+        }
     }
     let headerProvider: (DeckCard<ID>) -> HeaderContent
     let contentProvider: (DeckCard<ID>) -> CardContent
@@ -92,10 +100,13 @@ struct DeckView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
 
     private func handleTap(on visualIndex: Int) {
         withAnimation(DeckStyle.animation) {
-            if visualIndex == activeSlotIndex {
-                setActiveSlotIndex(max(activeSlotIndex - 1, 0))
+            let card = cards[visualIndex]
+
+            if card.slotIndex == activeSlotIndex {
+                let previousIndex = max(visualIndex - 1, 0)
+                setActiveSlotIndex(cards[previousIndex].slotIndex)
             } else {
-                selection.selectCard(cards[visualIndex])
+                selection.selectCard(card)
             }
         }
     }

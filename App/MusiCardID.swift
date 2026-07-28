@@ -13,6 +13,7 @@ enum MusiCardID: Int, CaseIterable, Identifiable {
     case release = 2
     case tracks = 3
     case artist = 4
+    case player = 5
 
     var id: Int { rawValue }
     var slotIndex: Int { rawValue }

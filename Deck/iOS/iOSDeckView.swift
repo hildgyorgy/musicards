@@ -13,8 +13,16 @@ struct DeckView<ID: Hashable, BackgroundContent: View, HeaderContent: View, Card
     private var activeSlotIndex: Int {
         selection.activeSlotIndex
     }
+
     private func setActiveSlotIndex(_ newValue: Int) {
-        selection.selectSlot(newValue)
+        if let card = cards.first(where: { $0.slotIndex == newValue }) {
+            selection.selectCard(card)
+        } else {
+            selection = DeckSelection(
+                activeID: nil,
+                activeSlotIndex: newValue
+            )
+        }
     }
     let headerProvider: (DeckCard<ID>) -> HeaderContent
     let contentProvider: (DeckCard<ID>) -> CardContent
@@ -174,13 +182,11 @@ struct DeckView<ID: Hashable, BackgroundContent: View, HeaderContent: View, Card
     private func handleTap(on card: DeckCard<ID>) {
         let index = card.slotIndex
 
-        if index == activeSlotIndex + 1, activeSlotIndex < cards.count {
-            withAnimation(DeckStyle.animation) {
-                selection.selectCard(card)
-            }
-        } else if index == activeSlotIndex, activeSlotIndex > 0 {
-            withAnimation(DeckStyle.animation) {
+        withAnimation(DeckStyle.animation) {
+            if index == activeSlotIndex, activeSlotIndex > 0 {
                 setActiveSlotIndex(activeSlotIndex - 1)
+            } else if index != activeSlotIndex {
+                selection.selectCard(card)
             }
         }
     }
@@ -198,7 +204,7 @@ struct DeckView<ID: Hashable, BackgroundContent: View, HeaderContent: View, Card
     }
     
     private func nudgeOffset(for index: Int) -> CGFloat {
-        guard index == cards.count - 3 else { return 0 }
+        guard index == cards.first?.slotIndex else { return 0 }
         guard dragCardIndex == nil else { return 0 }
         return nudgeOffset
     }

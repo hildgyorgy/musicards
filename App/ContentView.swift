@@ -65,6 +65,13 @@ struct ContentView: View {
                 title: artistTitle,
                 subtitle: artistSubtitle
             ),
+            DeckCard(
+                id: .player,
+                slotIndex: MusiCardID.player.slotIndex,
+                cardLabel: "Player",
+                title: "",
+                subtitle: ""
+            ),
         ])
         return result
     }
@@ -134,6 +141,8 @@ struct ContentView: View {
             ArtistCardHeaderView(
                 artist: appModel.selectedArtist
             )
+        case .player:
+            EmptyView()
         }
     }
 
@@ -234,6 +243,8 @@ struct ContentView: View {
                     }
                 )
             }
+        case .player:
+            EmptyView()
         }
     }
 
