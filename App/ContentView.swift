@@ -143,7 +143,10 @@ struct ContentView: View {
             )
         case .player:
             PlayerCardContentView(
-                controller: appModel.playbackController
+                controller: appModel.playbackController,
+                onSelectLocalFile: { url in
+                    appModel.playLocalFile(url)
+                }
             )
         }
     }

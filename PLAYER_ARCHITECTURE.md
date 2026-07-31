@@ -112,7 +112,8 @@ MusiCards audio player. It is the shared starting point for future player work.
 
 1. Finish and commit the cross-platform fifth Player card/accordion milestone.
 2. Define the shared playback state, queue model and engine protocol.
-3. Play one explicitly selected local file reliably on each platform.
+3. Play one explicitly selected local file reliably, first on macOS and then
+   on iOS behind the same engine boundary.
 4. Add basic transport state and connect it to the Player section.
 5. Add persistent user-approved folders and durable incremental indexing.
 6. Match local files to the release/track currently shown by MusiCards.
@@ -122,22 +123,38 @@ MusiCards audio player. It is the shared starting point for future player work.
 10. Polish the player UI only after the engine and lifecycle behavior are
     reliable.
 
-## Implementation status — 2026-07-31
+## Implementation status — 2026-08-01
 
-- Steps 1 and 2 are implemented.
+- Steps 1 and 2 are implemented, together with the first macOS slice of step
+  3.
 - `PlaybackTrack` keeps MusicBrainz-facing metadata separate from the local
   `PlaybackSource`.
 - `PlaybackController` owns the shared queue and transport state.
 - `PlaybackEngine` is the common platform-engine boundary.
 - `PendingPlaybackEngine` is intentionally silent until native audio loading
-  is implemented; it cannot accidentally pretend that playback succeeded.
+  is implemented on a platform; it cannot accidentally pretend that playback
+  succeeded. It remains the iOS engine for now.
+- `MacSystemPlaybackEngine` can decode one explicitly selected mono or stereo
+  audio file and play it through the current macOS system output.
+- The selected file is currently decoded into a single in-memory interleaved
+  Float32 PCM buffer. This deliberately simple “memory play” implementation is
+  suitable for validating the first signal path; it will later be replaced by
+  bounded decoder/feeder buffering for large files.
+- The realtime Audio Unit callback lives in `MCPPCMRenderer.c`. It performs no
+  allocation, locking, file I/O, decoding, DSP or sample-rate conversion; it
+  only copies prepared PCM into the output buffer and advances atomic state.
+- The current default-output Audio Unit path is the `MAC AUDIO` path. It tries
+  to match the output device's nominal sample rate to the source, but it is not
+  the future direct-DAC path and must not yet be described as guaranteed
+  bit-perfect.
 - The existing iOS Apple Music now-playing observer remains a separate viewer
   feature and is not part of the MusiCards playback engine.
 
 ## Next task
 
-The next implementation task is deliberately narrow:
+The immediate validation task is deliberately narrow:
 
-> Replace the pending engine with the first native implementation and play one
-> explicitly selected local file reliably. Do not add folder indexing, file to
-> MusicBrainz matching, DAC selection or final player UI in the same step.
+> Test one explicitly selected local lossless file through the macOS system
+> output, including play, pause, resume, stop and natural completion. Do not
+> add folder indexing, file-to-MusicBrainz matching, DAC selection or final
+> player UI in the same step.

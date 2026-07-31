@@ -68,7 +68,7 @@ final class MusiCardsAppModel: ObservableObject {
 
     init(playbackEngine: PlaybackEngine? = nil) {
         let service = musicBrainzService
-        let playbackEngine = playbackEngine ?? PendingPlaybackEngine()
+        let playbackEngine = playbackEngine ?? PlaybackEngineFactory.makeDefault()
 
         self.searchViewModel = SearchViewModel(service: service)
         self.trackDetailStore = TrackDetailStore(service: service)
@@ -79,6 +79,28 @@ final class MusiCardsAppModel: ObservableObject {
 #if os(iOS)
         startNowPlayingUpdates()
         #endif
+    }
+
+    func playLocalFile(_ url: URL) {
+        let title = url.deletingPathExtension().lastPathComponent
+        let track = PlaybackTrack(
+            id: url.standardizedFileURL.path,
+            recordingID: nil,
+            releaseID: nil,
+            title: title,
+            artist: "Local audio",
+            albumTitle: "",
+            duration: nil
+        )
+        let item = PlaybackQueueItem(
+            track: track,
+            source: .localFile(url)
+        )
+
+        Task {
+            await playbackController.replaceQueue(with: [item])
+            await playbackController.play()
+        }
     }
 
     var isBlockingNavigationLoad: Bool {

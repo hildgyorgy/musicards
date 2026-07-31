@@ -4,14 +4,22 @@
 //
 
 import SwiftUI
+#if os(macOS)
+import UniformTypeIdentifiers
+#endif
 
 struct PlayerCardContentView: View {
     @ObservedObject var controller: PlaybackController
+    let onSelectLocalFile: (URL) -> Void
+
+    #if os(macOS)
+    @State private var isFileImporterPresented = false
+    #endif
 
     var body: some View {
-        Group {
+        VStack(spacing: 18) {
             if let item = controller.currentItem {
-                VStack(spacing: 8) {
+                VStack(spacing: 6) {
                     Text(item.track.title)
                         .font(.headline)
 
@@ -19,14 +27,89 @@ struct PlayerCardContentView: View {
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 }
+
+                HStack(spacing: 24) {
+                    Button {
+                        Task { await controller.stop() }
+                    } label: {
+                        Image(systemName: "stop.fill")
+                    }
+
+                    Button {
+                        Task { await controller.togglePlayback() }
+                    } label: {
+                        Image(
+                            systemName: controller.status.isPlaying
+                                ? "pause.fill"
+                                : "play.fill"
+                        )
+                    }
+                }
+                .buttonStyle(.plain)
+                .font(.title2)
+
+                Text(playbackStatusText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             } else {
                 EmptyStateView(
                     title: "Playback foundation ready",
-                    subtitle: "Local track selection comes next"
+                    subtitle: "Choose one local lossless track"
                 )
             }
+
+            #if os(macOS)
+                Button(controller.currentItem == nil ? "Choose Audio File" : "Choose Another File") {
+                    isFileImporterPresented = true
+                }
+                .buttonStyle(.bordered)
+            #endif
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        #if os(macOS)
+        .fileImporter(
+            isPresented: $isFileImporterPresented,
+            allowedContentTypes: [.audio],
+            allowsMultipleSelection: false
+        ) { result in
+            guard case .success(let urls) = result,
+                  let url = urls.first else {
+                return
+            }
+            onSelectLocalFile(url)
+        }
+        #endif
+    }
+
+    private var playbackStatusText: String {
+        switch controller.status {
+        case .idle:
+            return "Ready"
+        case .loading:
+            return "Preparing lossless PCM…"
+        case .ready:
+            return "Ready"
+        case .playing:
+            return timeText
+        case .paused:
+            return "Paused · \(timeText)"
+        case .stopped:
+            return "Stopped"
+        case .failed(let failure):
+            return failure.message
+        }
+    }
+
+    private var timeText: String {
+        let elapsed = formatTime(controller.position)
+        guard let duration = controller.preparedDuration else {
+            return elapsed
+        }
+        return "\(elapsed) / \(formatTime(duration))"
+    }
+
+    private func formatTime(_ time: TimeInterval) -> String {
+        let seconds = max(Int(time.rounded(.down)), 0)
+        return String(format: "%d:%02d", seconds / 60, seconds % 60)
     }
 }
-
