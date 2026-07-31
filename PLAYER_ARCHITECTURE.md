@@ -151,10 +151,15 @@ MusiCards audio player. It is the shared starting point for future player work.
   to match the output device's nominal sample rate to the source, but it is not
   the future direct-DAC path and must not yet be described as guaranteed
   bit-perfect.
-- The first iOS slice intentionally does not yet handle audio interruptions,
-  route changes, background playback or expose the negotiated hardware format.
-  Those lifecycle behaviors must be added and tested before the iOS engine is
-  considered production-ready.
+- The iOS engine observes audio-session interruptions and relevant route
+  changes. It preserves position across a temporary interruption and resumes
+  only if playback was active beforehand and iOS explicitly permits it.
+- Disconnecting a DAC or headphones pauses playback instead of allowing an
+  unexpected switch to the iPhone speaker. Connecting a new route rebuilds the
+  RemoteIO output and resumes it only when playback was already active.
+- Background playback and exposure of the negotiated hardware format are not
+  implemented yet. The interruption and route-change behavior also requires
+  physical-device validation before the iOS engine is production-ready.
 - The existing iOS Apple Music now-playing observer remains a separate viewer
   feature and is not part of the MusiCards playback engine.
 
@@ -162,8 +167,7 @@ MusiCards audio player. It is the shared starting point for future player work.
 
 The immediate validation task is deliberately narrow:
 
-> Test one explicitly selected local lossless file on a physical iPhone,
-> initially through its normal output and then through a connected USB-C DAC.
-> Verify play, pause, resume, stop and natural completion. Do not add folder
-> indexing, file-to-MusicBrainz matching, DAC selection or final player UI in
-> the same step.
+> Validate iOS lifecycle behavior on a physical iPhone: interrupt active
+> playback and allow it to end, connect a USB-C DAC while playing, then
+> disconnect it while playing. A disconnect must remain paused on the iPhone
+> speaker; an interruption may resume only when iOS supplies `shouldResume`.
