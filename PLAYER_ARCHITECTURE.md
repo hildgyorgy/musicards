@@ -122,11 +122,22 @@ MusiCards audio player. It is the shared starting point for future player work.
 10. Polish the player UI only after the engine and lifecycle behavior are
     reliable.
 
+## Implementation status — 2026-07-31
+
+- Steps 1 and 2 are implemented.
+- `PlaybackTrack` keeps MusicBrainz-facing metadata separate from the local
+  `PlaybackSource`.
+- `PlaybackController` owns the shared queue and transport state.
+- `PlaybackEngine` is the common platform-engine boundary.
+- `PendingPlaybackEngine` is intentionally silent until native audio loading
+  is implemented; it cannot accidentally pretend that playback succeeded.
+- The existing iOS Apple Music now-playing observer remains a separate viewer
+  feature and is not part of the MusiCards playback engine.
+
 ## Next task
 
 The next implementation task is deliberately narrow:
 
-> Design and build the shared, platform-independent playback state and engine
-> boundary. Preserve the existing Player card/accordion behavior. Do not add
-> Core Audio device selection, persistent library indexing or final player UI
-> in the same step.
+> Replace the pending engine with the first native implementation and play one
+> explicitly selected local file reliably. Do not add folder indexing, file to
+> MusicBrainz matching, DAC selection or final player UI in the same step.

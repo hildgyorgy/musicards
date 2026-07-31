@@ -112,6 +112,11 @@
 			path = Deck;
 			sourceTree = "<group>";
 		};
+		F5C0DE012FD0000000000001 /* Playback */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Playback;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -146,6 +151,7 @@
 				F5E5111A2FC4F35600E797D6 /* Styles */,
 				F5ECDD542F85CEE7006161E3 /* ViewModels */,
 				F5E510E12FC4BDF300E797D6 /* Deck */,
+				F5C0DE012FD0000000000001 /* Playback */,
 				F59F29112F923B1E00A50F8C /* MusiCards.icon */,
 			);
 			sourceTree = "<group>";
@@ -265,6 +271,7 @@
 			fileSystemSynchronizedGroups = (
 				F5A09F5E2FBC746A00E5404B /* MusiCardsMac */,
 				F5E510E12FC4BDF300E797D6 /* Deck */,
+				F5C0DE012FD0000000000001 /* Playback */,
 			);
 			name = MusiCards;
 			productName = MusiCards;

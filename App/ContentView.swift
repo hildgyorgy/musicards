@@ -142,7 +142,9 @@ struct ContentView: View {
                 artist: appModel.selectedArtist
             )
         case .player:
-            EmptyView()
+            PlayerCardContentView(
+                controller: appModel.playbackController
+            )
         }
     }
 

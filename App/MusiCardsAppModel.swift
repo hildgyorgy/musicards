@@ -47,6 +47,7 @@ final class MusiCardsAppModel: ObservableObject {
     let searchViewModel: SearchViewModel
     let trackDetailStore: TrackDetailStore
     let classicalMetadataStore: ClassicalMetadataStore
+    let playbackController: PlaybackController
 
     private let musicBrainzService = MusicBrainzService()
 
@@ -65,12 +66,14 @@ final class MusiCardsAppModel: ObservableObject {
     private var releaseGroupsOffset: Int = 0
     private var currentArtistIDForGroups: String?
 
-    init() {
+    init(playbackEngine: PlaybackEngine? = nil) {
         let service = musicBrainzService
+        let playbackEngine = playbackEngine ?? PendingPlaybackEngine()
 
         self.searchViewModel = SearchViewModel(service: service)
         self.trackDetailStore = TrackDetailStore(service: service)
         self.classicalMetadataStore = ClassicalMetadataStore(service: service)
+        self.playbackController = PlaybackController(engine: playbackEngine)
 
         loadRecents()
 #if os(iOS)
