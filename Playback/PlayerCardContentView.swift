@@ -4,17 +4,13 @@
 //
 
 import SwiftUI
-#if os(macOS)
 import UniformTypeIdentifiers
-#endif
 
 struct PlayerCardContentView: View {
     @ObservedObject var controller: PlaybackController
     let onSelectLocalFile: (URL) -> Void
 
-    #if os(macOS)
     @State private var isFileImporterPresented = false
-    #endif
 
     var body: some View {
         VStack(spacing: 18) {
@@ -58,15 +54,12 @@ struct PlayerCardContentView: View {
                 )
             }
 
-            #if os(macOS)
-                Button(controller.currentItem == nil ? "Choose Audio File" : "Choose Another File") {
-                    isFileImporterPresented = true
-                }
-                .buttonStyle(.bordered)
-            #endif
+            Button(controller.currentItem == nil ? "Choose Audio File" : "Choose Another File") {
+                isFileImporterPresented = true
+            }
+            .buttonStyle(.bordered)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        #if os(macOS)
         .fileImporter(
             isPresented: $isFileImporterPresented,
             allowedContentTypes: [.audio],
@@ -78,7 +71,6 @@ struct PlayerCardContentView: View {
             }
             onSelectLocalFile(url)
         }
-        #endif
     }
 
     private var playbackStatusText: String {

@@ -1,15 +1,15 @@
 //
-//  MacSystemPlaybackEngine.swift
+//  IOSSystemPlaybackEngine.swift
 //  MusiCards
 //
 
-#if os(macOS)
+#if os(iOS)
 import AudioToolbox
-import CoreAudio
+import AVFAudio
 import Foundation
 
 @MainActor
-final class MacSystemPlaybackEngine: PlaybackEngine {
+final class IOSSystemPlaybackEngine: PlaybackEngine {
     var eventHandler: ((PlaybackEngineEvent) -> Void)?
 
     private var outputUnit: AudioUnit?
@@ -30,7 +30,7 @@ final class MacSystemPlaybackEngine: PlaybackEngine {
             try LocalAudioFileDecoder.decode(url: url)
         }.value
 
-        matchDefaultOutputSampleRate(decodedPCM.sampleRate)
+        try configureAudioSession(sourceSampleRate: decodedPCM.sampleRate)
         try configureOutputUnit(for: decodedPCM)
         self.decodedPCM = decodedPCM
         eventHandler?(.prepared(duration: duration(of: decodedPCM)))
@@ -52,7 +52,7 @@ final class MacSystemPlaybackEngine: PlaybackEngine {
             guard status == noErr else {
                 MCPPCMRendererSetPlaying(decodedPCM.renderer, false)
                 throw NativePlaybackEngineError(
-                    "Could not start the Mac audio output",
+                    "Could not start the iPhone audio output",
                     status: status
                 )
             }
@@ -98,10 +98,24 @@ final class MacSystemPlaybackEngine: PlaybackEngine {
         )
     }
 
+    private func configureAudioSession(sourceSampleRate: Double) throws {
+        let session = AVAudioSession.sharedInstance()
+
+        do {
+            try session.setCategory(.playback, mode: .default)
+            try session.setPreferredSampleRate(sourceSampleRate)
+            try session.setActive(true)
+        } catch {
+            throw NativePlaybackEngineError(
+                "Could not configure the iPhone audio route: \(error.localizedDescription)"
+            )
+        }
+    }
+
     private func configureOutputUnit(for decodedPCM: DecodedPCM) throws {
         var description = AudioComponentDescription(
             componentType: kAudioUnitType_Output,
-            componentSubType: kAudioUnitSubType_DefaultOutput,
+            componentSubType: kAudioUnitSubType_RemoteIO,
             componentManufacturer: kAudioUnitManufacturer_Apple,
             componentFlags: 0,
             componentFlagsMask: 0
@@ -109,23 +123,36 @@ final class MacSystemPlaybackEngine: PlaybackEngine {
 
         guard let component = AudioComponentFindNext(nil, &description) else {
             throw NativePlaybackEngineError(
-                "Mac default output Audio Unit is unavailable"
+                "The iPhone RemoteIO Audio Unit is unavailable"
             )
         }
 
         var unit: AudioUnit?
         try check(
             AudioComponentInstanceNew(component, &unit),
-            operation: "Could not create the Mac output Audio Unit"
+            operation: "Could not create the iPhone output Audio Unit"
         )
 
         guard let unit else {
             throw NativePlaybackEngineError(
-                "Mac output Audio Unit creation returned no instance"
+                "iPhone output Audio Unit creation returned no instance"
             )
         }
 
         do {
+            var outputEnabled: UInt32 = 1
+            try check(
+                AudioUnitSetProperty(
+                    unit,
+                    kAudioOutputUnitProperty_EnableIO,
+                    kAudioUnitScope_Output,
+                    0,
+                    &outputEnabled,
+                    UInt32(MemoryLayout<UInt32>.size)
+                ),
+                operation: "Could not enable the iPhone audio output"
+            )
+
             var format = AudioStreamBasicDescription(
                 mSampleRate: decodedPCM.sampleRate,
                 mFormatID: kAudioFormatLinearPCM,
@@ -148,7 +175,7 @@ final class MacSystemPlaybackEngine: PlaybackEngine {
                         pointer,
                         UInt32(MemoryLayout<AudioStreamBasicDescription>.size)
                     ),
-                    operation: "Could not set the PCM format on the Mac output"
+                    operation: "Could not set the PCM format on the iPhone output"
                 )
             }
 
@@ -188,60 +215,13 @@ final class MacSystemPlaybackEngine: PlaybackEngine {
 
             try check(
                 AudioUnitInitialize(unit),
-                operation: "Could not initialize the Mac audio output"
+                operation: "Could not initialize the iPhone audio output"
             )
             outputUnit = unit
         } catch {
             AudioComponentInstanceDispose(unit)
             throw error
         }
-    }
-
-    private func matchDefaultOutputSampleRate(_ sampleRate: Double) {
-        var deviceID = AudioDeviceID(kAudioObjectUnknown)
-        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
-        var defaultDeviceAddress = AudioObjectPropertyAddress(
-            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain
-        )
-
-        guard AudioObjectGetPropertyData(
-            AudioObjectID(kAudioObjectSystemObject),
-            &defaultDeviceAddress,
-            0,
-            nil,
-            &size,
-            &deviceID
-        ) == noErr,
-        deviceID != kAudioObjectUnknown else {
-            return
-        }
-
-        var rateAddress = AudioObjectPropertyAddress(
-            mSelector: kAudioDevicePropertyNominalSampleRate,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain
-        )
-        var isSettable: DarwinBoolean = false
-        guard AudioObjectIsPropertySettable(
-            deviceID,
-            &rateAddress,
-            &isSettable
-        ) == noErr,
-        isSettable.boolValue else {
-            return
-        }
-
-        var requestedRate = sampleRate
-        AudioObjectSetPropertyData(
-            deviceID,
-            &rateAddress,
-            0,
-            nil,
-            UInt32(MemoryLayout<Float64>.size),
-            &requestedRate
-        )
     }
 
     private func startProgressUpdates() {

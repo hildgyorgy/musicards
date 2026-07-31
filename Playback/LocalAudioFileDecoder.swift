@@ -1,13 +1,13 @@
 //
-//  MacAudioFileDecoder.swift
+//  LocalAudioFileDecoder.swift
 //  MusiCards
 //
 
-#if os(macOS)
+#if os(macOS) || os(iOS)
 import AudioToolbox
 import Foundation
 
-struct MacPlaybackEngineError: LocalizedError {
+struct NativePlaybackEngineError: LocalizedError {
     let operation: String
     let status: OSStatus?
 
@@ -45,7 +45,7 @@ nonisolated final class DecodedPCM: @unchecked Sendable {
     }
 }
 
-enum MacAudioFileDecoder {
+enum LocalAudioFileDecoder {
     nonisolated static func decode(url: URL) throws -> DecodedPCM {
         let didAccess = url.startAccessingSecurityScopedResource()
         defer {
@@ -57,7 +57,7 @@ enum MacAudioFileDecoder {
         var file: ExtAudioFileRef?
         let openStatus = ExtAudioFileOpenURL(url as CFURL, &file)
         guard openStatus == noErr, let file else {
-            throw MacPlaybackEngineError(
+            throw NativePlaybackEngineError(
                 "Could not open the selected audio file",
                 status: openStatus
             )
@@ -68,7 +68,7 @@ enum MacAudioFileDecoder {
         guard sourceFormat.mSampleRate > 0,
               sourceFormat.mChannelsPerFrame > 0,
               sourceFormat.mChannelsPerFrame <= 2 else {
-            throw MacPlaybackEngineError(
+            throw NativePlaybackEngineError(
                 "The first player milestone currently supports mono and stereo audio"
             )
         }
@@ -85,7 +85,7 @@ enum MacAudioFileDecoder {
         let frameCapacity = try readFrameCount(from: file)
         guard let renderer = MCPPCMRendererCreate(frameCapacity, channelCount),
               let samples = MCPPCMRendererMutableSamples(renderer) else {
-            throw MacPlaybackEngineError(
+            throw NativePlaybackEngineError(
                 "Not enough memory to prepare the selected audio file"
             )
         }
@@ -123,7 +123,7 @@ enum MacAudioFileDecoder {
             &format
         )
         guard status == noErr else {
-            throw MacPlaybackEngineError(
+            throw NativePlaybackEngineError(
                 "Could not read the source audio format",
                 status: status
             )
@@ -155,7 +155,7 @@ enum MacAudioFileDecoder {
             &format
         )
         guard status == noErr else {
-            throw MacPlaybackEngineError(
+            throw NativePlaybackEngineError(
                 "Could not configure lossless PCM decoding",
                 status: status
             )
@@ -174,7 +174,7 @@ enum MacAudioFileDecoder {
             &frameCount
         )
         guard status == noErr, frameCount > 0 else {
-            throw MacPlaybackEngineError(
+            throw NativePlaybackEngineError(
                 "The selected audio file has no readable PCM frames",
                 status: status
             )
@@ -209,7 +209,7 @@ enum MacAudioFileDecoder {
 
             let status = ExtAudioFileRead(file, &framesToRead, &bufferList)
             guard status == noErr else {
-                throw MacPlaybackEngineError(
+                throw NativePlaybackEngineError(
                     "Lossless PCM decoding failed",
                     status: status
                 )
@@ -222,7 +222,7 @@ enum MacAudioFileDecoder {
         }
 
         guard totalFramesRead > 0 else {
-            throw MacPlaybackEngineError("The selected file decoded to no PCM audio")
+            throw NativePlaybackEngineError("The selected file decoded to no PCM audio")
         }
         return totalFramesRead
     }

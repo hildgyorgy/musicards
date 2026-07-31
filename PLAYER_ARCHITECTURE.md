@@ -125,17 +125,21 @@ MusiCards audio player. It is the shared starting point for future player work.
 
 ## Implementation status — 2026-08-01
 
-- Steps 1 and 2 are implemented, together with the first macOS slice of step
-  3.
+- Steps 1 and 2 are implemented. The macOS slice of step 3 has passed its first
+  real listening test; the matching iOS slice is implemented and awaiting its
+  first on-device test.
 - `PlaybackTrack` keeps MusicBrainz-facing metadata separate from the local
   `PlaybackSource`.
 - `PlaybackController` owns the shared queue and transport state.
 - `PlaybackEngine` is the common platform-engine boundary.
 - `PendingPlaybackEngine` is intentionally silent until native audio loading
   is implemented on a platform; it cannot accidentally pretend that playback
-  succeeded. It remains the iOS engine for now.
+  succeeded. It remains available as the safe fallback implementation.
 - `MacSystemPlaybackEngine` can decode one explicitly selected mono or stereo
   audio file and play it through the current macOS system output.
+- `IOSSystemPlaybackEngine` uses `AVAudioSession` for native iOS route and
+  sample-rate negotiation, then feeds prepared PCM to a RemoteIO Audio Unit.
+  It shares the decoder, renderer and `PlaybackController` with macOS.
 - The selected file is currently decoded into a single in-memory interleaved
   Float32 PCM buffer. This deliberately simple “memory play” implementation is
   suitable for validating the first signal path; it will later be replaced by
@@ -147,6 +151,10 @@ MusiCards audio player. It is the shared starting point for future player work.
   to match the output device's nominal sample rate to the source, but it is not
   the future direct-DAC path and must not yet be described as guaranteed
   bit-perfect.
+- The first iOS slice intentionally does not yet handle audio interruptions,
+  route changes, background playback or expose the negotiated hardware format.
+  Those lifecycle behaviors must be added and tested before the iOS engine is
+  considered production-ready.
 - The existing iOS Apple Music now-playing observer remains a separate viewer
   feature and is not part of the MusiCards playback engine.
 
@@ -154,7 +162,8 @@ MusiCards audio player. It is the shared starting point for future player work.
 
 The immediate validation task is deliberately narrow:
 
-> Test one explicitly selected local lossless file through the macOS system
-> output, including play, pause, resume, stop and natural completion. Do not
-> add folder indexing, file-to-MusicBrainz matching, DAC selection or final
-> player UI in the same step.
+> Test one explicitly selected local lossless file on a physical iPhone,
+> initially through its normal output and then through a connected USB-C DAC.
+> Verify play, pause, resume, stop and natural completion. Do not add folder
+> indexing, file-to-MusicBrainz matching, DAC selection or final player UI in
+> the same step.
