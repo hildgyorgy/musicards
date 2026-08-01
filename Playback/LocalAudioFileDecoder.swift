@@ -28,46 +28,188 @@ nonisolated final class DecodedPCM: @unchecked Sendable {
     let channelCount: UInt32
     let frameCount: UInt64
 
+    private let file: ExtAudioFileRef
+    private let feederQueue = DispatchQueue(
+        label: "com.hildgyorgy.MusiCards.audio-feeder",
+        qos: .userInitiated
+    )
+    private let feederTimer: DispatchSourceTimer
+    private let decodeBuffer: UnsafeMutablePointer<Float>
+    private let decodeChunkFrames: UInt32
+    private let bytesPerFrame: UInt32
+    private let didAccessSecurityScope: Bool
+    private let sourceURL: URL
+    private let errorLock = NSLock()
+    private var feederError: Error?
+    private var didReachEndOfStream = false
+
     init(
         renderer: OpaquePointer,
         sampleRate: Double,
         channelCount: UInt32,
-        frameCount: UInt64
+        frameCount: UInt64,
+        file: ExtAudioFileRef,
+        decodeBuffer: UnsafeMutablePointer<Float>,
+        decodeChunkFrames: UInt32,
+        didAccessSecurityScope: Bool,
+        sourceURL: URL
     ) {
         self.renderer = renderer
         self.sampleRate = sampleRate
         self.channelCount = channelCount
         self.frameCount = frameCount
+        self.file = file
+        self.decodeBuffer = decodeBuffer
+        self.decodeChunkFrames = decodeChunkFrames
+        self.bytesPerFrame = channelCount * UInt32(MemoryLayout<Float>.size)
+        self.didAccessSecurityScope = didAccessSecurityScope
+        self.sourceURL = sourceURL
+        self.feederTimer = DispatchSource.makeTimerSource(queue: feederQueue)
+
+        feederTimer.setEventHandler { [weak self] in
+            self?.fillAvailableSpace()
+        }
+        feederTimer.schedule(deadline: .now(), repeating: .milliseconds(10))
+        feederTimer.resume()
     }
 
     deinit {
+        feederTimer.cancel()
+        feederQueue.sync {}
+        ExtAudioFileDispose(file)
+        decodeBuffer.deallocate()
         MCPPCMRendererDestroy(renderer)
+        if didAccessSecurityScope {
+            sourceURL.stopAccessingSecurityScopedResource()
+        }
+    }
+
+    func prime() throws {
+        feederQueue.sync {
+            while !didReachEndOfStream,
+                  MCPPCMRendererWritableFrames(renderer) >= decodeChunkFrames {
+                fillOnce()
+                if currentFeederError() != nil { break }
+            }
+        }
+        if let error = currentFeederError() {
+            throw error
+        }
+    }
+
+    func seek(to frame: UInt64) throws {
+        let boundedFrame = min(frame, frameCount)
+        try feederQueue.sync {
+            let status = ExtAudioFileSeek(file, Int64(boundedFrame))
+            guard status == noErr else {
+                throw NativePlaybackEngineError(
+                    "Could not seek in the selected audio file",
+                    status: status
+                )
+            }
+            errorLock.withLock { feederError = nil }
+            didReachEndOfStream = false
+            MCPPCMRendererReset(renderer, boundedFrame)
+            fillAvailableSpace()
+        }
+    }
+
+    func takeFeederError() -> Error? {
+        errorLock.withLock {
+            defer { feederError = nil }
+            return feederError
+        }
+    }
+
+    private func fillAvailableSpace() {
+        while !didReachEndOfStream,
+              MCPPCMRendererWritableFrames(renderer) >= decodeChunkFrames {
+            fillOnce()
+            if currentFeederError() != nil { return }
+        }
+    }
+
+    private func fillOnce() {
+        var framesToRead = min(
+            decodeChunkFrames,
+            MCPPCMRendererWritableFrames(renderer)
+        )
+        guard framesToRead > 0 else { return }
+
+        var bufferList = AudioBufferList(
+            mNumberBuffers: 1,
+            mBuffers: AudioBuffer(
+                mNumberChannels: channelCount,
+                mDataByteSize: framesToRead * bytesPerFrame,
+                mData: decodeBuffer
+            )
+        )
+        let status = ExtAudioFileRead(file, &framesToRead, &bufferList)
+        guard status == noErr else {
+            didReachEndOfStream = true
+            setFeederError(
+                NativePlaybackEngineError("PCM decoding failed", status: status)
+            )
+            MCPPCMRendererMarkEndOfStream(renderer)
+            return
+        }
+        guard framesToRead > 0 else {
+            didReachEndOfStream = true
+            MCPPCMRendererMarkEndOfStream(renderer)
+            return
+        }
+
+        let writtenFrames = MCPPCMRendererWrite(
+            renderer,
+            decodeBuffer,
+            framesToRead
+        )
+        if writtenFrames != framesToRead {
+            didReachEndOfStream = true
+            setFeederError(
+                NativePlaybackEngineError("The PCM feeder could not keep its buffer state")
+            )
+            MCPPCMRendererMarkEndOfStream(renderer)
+        }
+    }
+
+    private func setFeederError(_ error: Error) {
+        errorLock.withLock { feederError = error }
+    }
+
+    private func currentFeederError() -> Error? {
+        errorLock.withLock { feederError }
     }
 }
 
 enum LocalAudioFileDecoder {
     nonisolated static func decode(url: URL) throws -> DecodedPCM {
         let didAccess = url.startAccessingSecurityScopedResource()
-        defer {
-            if didAccess {
-                url.stopAccessingSecurityScopedResource()
-            }
-        }
 
         var file: ExtAudioFileRef?
         let openStatus = ExtAudioFileOpenURL(url as CFURL, &file)
         guard openStatus == noErr, let file else {
+            if didAccess {
+                url.stopAccessingSecurityScopedResource()
+            }
             throw NativePlaybackEngineError(
                 "Could not open the selected audio file",
                 status: openStatus
             )
         }
-        defer { ExtAudioFileDispose(file) }
-
-        let sourceFormat = try readSourceFormat(from: file)
+        let sourceFormat: AudioStreamBasicDescription
+        do {
+            sourceFormat = try readSourceFormat(from: file)
+        } catch {
+            ExtAudioFileDispose(file)
+            if didAccess { url.stopAccessingSecurityScopedResource() }
+            throw error
+        }
         guard sourceFormat.mSampleRate > 0,
               sourceFormat.mChannelsPerFrame > 0,
               sourceFormat.mChannelsPerFrame <= 2 else {
+            ExtAudioFileDispose(file)
+            if didAccess { url.stopAccessingSecurityScopedResource() }
             throw NativePlaybackEngineError(
                 "The first player milestone currently supports mono and stereo audio"
             )
@@ -75,38 +217,49 @@ enum LocalAudioFileDecoder {
 
         let channelCount = sourceFormat.mChannelsPerFrame
         let bytesPerFrame = channelCount * UInt32(MemoryLayout<Float>.size)
-        try setClientFormat(
-            on: file,
-            sampleRate: sourceFormat.mSampleRate,
-            channelCount: channelCount,
-            bytesPerFrame: bytesPerFrame
-        )
-
-        let frameCapacity = try readFrameCount(from: file)
-        guard let renderer = MCPPCMRendererCreate(frameCapacity, channelCount),
-              let samples = MCPPCMRendererMutableSamples(renderer) else {
-            throw NativePlaybackEngineError(
-                "Not enough memory to prepare the selected audio file"
-            )
-        }
-
+        let frameCount: UInt64
         do {
-            let decodedFrames = try decodeFrames(
-                from: file,
-                into: samples,
-                frameCapacity: frameCapacity,
+            try setClientFormat(
+                on: file,
+                sampleRate: sourceFormat.mSampleRate,
                 channelCount: channelCount,
                 bytesPerFrame: bytesPerFrame
             )
-            MCPPCMRendererSetFrameCount(renderer, decodedFrames)
-            return DecodedPCM(
-                renderer: renderer,
-                sampleRate: sourceFormat.mSampleRate,
-                channelCount: channelCount,
-                frameCount: decodedFrames
-            )
+            frameCount = try readFrameCount(from: file)
         } catch {
-            MCPPCMRendererDestroy(renderer)
+            ExtAudioFileDispose(file)
+            if didAccess { url.stopAccessingSecurityScopedResource() }
+            throw error
+        }
+
+        let bufferDuration: Double = 8
+        let frameCapacity = UInt64(ceil(sourceFormat.mSampleRate * bufferDuration))
+        let decodeChunkFrames = UInt32(min(frameCapacity, 32_768))
+        guard let renderer = MCPPCMRendererCreate(frameCapacity, channelCount) else {
+            ExtAudioFileDispose(file)
+            if didAccess { url.stopAccessingSecurityScopedResource() }
+            throw NativePlaybackEngineError(
+                "Not enough memory to create the bounded playback buffer"
+            )
+        }
+
+        let sampleCapacity = Int(decodeChunkFrames) * Int(channelCount)
+        let decodeBuffer = UnsafeMutablePointer<Float>.allocate(capacity: sampleCapacity)
+        let decodedPCM = DecodedPCM(
+            renderer: renderer,
+            sampleRate: sourceFormat.mSampleRate,
+            channelCount: channelCount,
+            frameCount: frameCount,
+            file: file,
+            decodeBuffer: decodeBuffer,
+            decodeChunkFrames: decodeChunkFrames,
+            didAccessSecurityScope: didAccess,
+            sourceURL: url
+        )
+        do {
+            try decodedPCM.prime()
+            return decodedPCM
+        } catch {
             throw error
         }
     }
@@ -156,7 +309,7 @@ enum LocalAudioFileDecoder {
         )
         guard status == noErr else {
             throw NativePlaybackEngineError(
-                "Could not configure lossless PCM decoding",
+                "Could not configure PCM decoding",
                 status: status
             )
         }
@@ -180,51 +333,6 @@ enum LocalAudioFileDecoder {
             )
         }
         return UInt64(frameCount)
-    }
-
-    nonisolated private static func decodeFrames(
-        from file: ExtAudioFileRef,
-        into samples: UnsafeMutablePointer<Float>,
-        frameCapacity: UInt64,
-        channelCount: UInt32,
-        bytesPerFrame: UInt32
-    ) throws -> UInt64 {
-        var totalFramesRead: UInt64 = 0
-        let decodeChunkFrames: UInt64 = 32_768
-
-        while totalFramesRead < frameCapacity {
-            let remaining = frameCapacity - totalFramesRead
-            var framesToRead = UInt32(min(remaining, decodeChunkFrames))
-            let destination = samples.advanced(
-                by: Int(totalFramesRead) * Int(channelCount)
-            )
-            var bufferList = AudioBufferList(
-                mNumberBuffers: 1,
-                mBuffers: AudioBuffer(
-                    mNumberChannels: channelCount,
-                    mDataByteSize: framesToRead * bytesPerFrame,
-                    mData: destination
-                )
-            )
-
-            let status = ExtAudioFileRead(file, &framesToRead, &bufferList)
-            guard status == noErr else {
-                throw NativePlaybackEngineError(
-                    "Lossless PCM decoding failed",
-                    status: status
-                )
-            }
-
-            if framesToRead == 0 {
-                break
-            }
-            totalFramesRead += UInt64(framesToRead)
-        }
-
-        guard totalFramesRead > 0 else {
-            throw NativePlaybackEngineError("The selected file decoded to no PCM audio")
-        }
-        return totalFramesRead
     }
 }
 #endif

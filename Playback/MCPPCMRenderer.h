@@ -14,25 +14,27 @@ MCPPCMRenderer *MCPPCMRendererCreate(
 
 void MCPPCMRendererDestroy(MCPPCMRenderer *renderer);
 
-float *MCPPCMRendererMutableSamples(MCPPCMRenderer *renderer);
+uint32_t MCPPCMRendererWritableFrames(const MCPPCMRenderer *renderer);
 
-void MCPPCMRendererSetFrameCount(
+uint32_t MCPPCMRendererWrite(
     MCPPCMRenderer *renderer,
-    uint64_t frameCount
+    const float *samples,
+    uint32_t frameCount
 );
+
+void MCPPCMRendererMarkEndOfStream(MCPPCMRenderer *renderer);
 
 void MCPPCMRendererSetPlaying(
     MCPPCMRenderer *renderer,
     bool isPlaying
 );
 
-void MCPPCMRendererSeek(
+void MCPPCMRendererReset(
     MCPPCMRenderer *renderer,
     uint64_t frame
 );
 
 uint64_t MCPPCMRendererCurrentFrame(const MCPPCMRenderer *renderer);
-uint64_t MCPPCMRendererFrameCount(const MCPPCMRenderer *renderer);
 bool MCPPCMRendererDidFinish(const MCPPCMRenderer *renderer);
 
 OSStatus MCPPCMRenderCallback(
@@ -45,4 +47,3 @@ OSStatus MCPPCMRenderCallback(
 );
 
 #endif
-

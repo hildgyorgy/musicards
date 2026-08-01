@@ -42,7 +42,7 @@ final class MacSystemPlaybackEngine: PlaybackEngine {
         }
 
         if MCPPCMRendererDidFinish(decodedPCM.renderer) {
-            MCPPCMRendererSeek(decodedPCM.renderer, 0)
+            try await seekDecoder(decodedPCM, to: 0)
         }
 
         MCPPCMRendererSetPlaying(decodedPCM.renderer, true)
@@ -75,12 +75,14 @@ final class MacSystemPlaybackEngine: PlaybackEngine {
     func stop() async {
         if let decodedPCM {
             MCPPCMRendererSetPlaying(decodedPCM.renderer, false)
-            MCPPCMRendererSeek(decodedPCM.renderer, 0)
         }
 
         stopOutputUnit()
         progressTask?.cancel()
         progressTask = nil
+        if let decodedPCM {
+            try? await seekDecoder(decodedPCM, to: 0)
+        }
     }
 
     func seek(to position: TimeInterval) async throws {
@@ -92,7 +94,13 @@ final class MacSystemPlaybackEngine: PlaybackEngine {
         let boundedFrame = UInt64(
             min(max(requestedFrame, 0), Double(decodedPCM.frameCount))
         )
-        MCPPCMRendererSeek(decodedPCM.renderer, boundedFrame)
+        let wasPlaying = isOutputRunning
+        MCPPCMRendererSetPlaying(decodedPCM.renderer, false)
+        stopOutputUnit()
+        try await seekDecoder(decodedPCM, to: boundedFrame)
+        if wasPlaying {
+            try await play()
+        }
         eventHandler?(
             .positionChanged(Double(boundedFrame) / decodedPCM.sampleRate)
         )
@@ -253,6 +261,12 @@ final class MacSystemPlaybackEngine: PlaybackEngine {
                     return
                 }
 
+                if let error = decodedPCM.takeFeederError() {
+                    self.stopOutputUnit()
+                    self.eventHandler?(.failed(PlaybackFailure(error)))
+                    return
+                }
+
                 let frame = MCPPCMRendererCurrentFrame(decodedPCM.renderer)
                 self.eventHandler?(
                     .positionChanged(Double(frame) / decodedPCM.sampleRate)
@@ -284,6 +298,15 @@ final class MacSystemPlaybackEngine: PlaybackEngine {
 
     private func duration(of decodedPCM: DecodedPCM) -> TimeInterval {
         Double(decodedPCM.frameCount) / decodedPCM.sampleRate
+    }
+
+    private func seekDecoder(
+        _ decodedPCM: DecodedPCM,
+        to frame: UInt64
+    ) async throws {
+        try await Task.detached(priority: .userInitiated) {
+            try decodedPCM.seek(to: frame)
+        }.value
     }
 
     private func check(_ status: OSStatus, operation: String) throws {

@@ -140,10 +140,16 @@ MusiCards audio player. It is the shared starting point for future player work.
 - `IOSSystemPlaybackEngine` uses `AVAudioSession` for native iOS route and
   sample-rate negotiation, then feeds prepared PCM to a RemoteIO Audio Unit.
   It shares the decoder, renderer and `PlaybackController` with macOS.
-- The selected file is currently decoded into a single in-memory interleaved
-  Float32 PCM buffer. This deliberately simple “memory play” implementation is
-  suitable for validating the first signal path; it will later be replaced by
-  bounded decoder/feeder buffering for large files.
+- Local files are decoded incrementally into a bounded, approximately
+  eight-second interleaved Float32 ring buffer. File duration therefore no
+  longer determines playback memory use; this remains bounded for long and
+  high-sample-rate ALAC, FLAC and AAC files.
+- A serial feeder owns the Core Audio decoder and keeps file I/O and decoding
+  away from the realtime thread. Seeking stops the output, seeks the decoder,
+  resets and primes the ring buffer, then resumes only if playback was active.
+- The ring buffer is the source-neutral boundary for future playback sources.
+  A later Navidrome or Dropbox adapter may add network download, retry and
+  caching behavior while feeding the same renderer with decoded PCM.
 - The realtime Audio Unit callback lives in `MCPPCMRenderer.c`. It performs no
   allocation, locking, file I/O, decoding, DSP or sample-rate conversion; it
   only copies prepared PCM into the output buffer and advances atomic state.
@@ -170,8 +176,8 @@ MusiCards audio player. It is the shared starting point for future player work.
   queue, skip, rating and playback-rate commands remain disabled.
 - macOS uses the same Now Playing coordinator and additionally publishes the
   explicit system playback state required by MediaPlayer on macOS.
-- Background playback and system controls still require physical-device
-  validation before this slice is considered complete.
+- Background playback, system controls and embedded Now Playing artwork have
+  passed physical-device validation on both platforms.
 - For explicitly selected files, Now Playing artwork uses embedded audio-file
   cover metadata when available. MusicBrainz/Cover Art Archive fallback remains
   deferred until local files are matched to MusiCards releases.
@@ -182,6 +188,7 @@ MusiCards audio player. It is the shared starting point for future player work.
 
 The immediate validation task is deliberately narrow:
 
-> Select a local file with embedded cover art and verify the image in iOS and
-> macOS Now Playing surfaces. A file without embedded artwork is expected to
-> remain image-free until MusicBrainz release matching is implemented.
+> Verify ordinary play/pause, seeking, end-of-track behavior and iOS route
+> interruption recovery with the new bounded feeder, using ALAC/FLAC/AAC and
+> at least one high-sample-rate file. A file without embedded artwork is still
+> expected to remain image-free until MusicBrainz release matching exists.

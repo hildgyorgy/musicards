@@ -8,9 +8,11 @@ struct MCPPCMRenderer {
     float *samples;
     uint64_t frameCapacity;
     uint32_t channelCount;
-    _Atomic uint64_t frameCount;
+    _Atomic uint64_t readCursor;
+    _Atomic uint64_t writeCursor;
     _Atomic uint64_t currentFrame;
     _Atomic bool isPlaying;
+    _Atomic bool reachedEndOfStream;
     _Atomic bool didFinish;
 };
 
@@ -44,9 +46,11 @@ MCPPCMRenderer *MCPPCMRendererCreate(
 
     renderer->frameCapacity = frameCapacity;
     renderer->channelCount = channelCount;
-    atomic_init(&renderer->frameCount, 0);
+    atomic_init(&renderer->readCursor, 0);
+    atomic_init(&renderer->writeCursor, 0);
     atomic_init(&renderer->currentFrame, 0);
     atomic_init(&renderer->isPlaying, false);
+    atomic_init(&renderer->reachedEndOfStream, false);
     atomic_init(&renderer->didFinish, false);
     return renderer;
 }
@@ -60,24 +64,84 @@ void MCPPCMRendererDestroy(MCPPCMRenderer *renderer) {
     free(renderer);
 }
 
-float *MCPPCMRendererMutableSamples(MCPPCMRenderer *renderer) {
-    return renderer == NULL ? NULL : renderer->samples;
+uint32_t MCPPCMRendererWritableFrames(const MCPPCMRenderer *renderer) {
+    if (renderer == NULL) {
+        return 0;
+    }
+
+    uint64_t readCursor = atomic_load_explicit(
+        &renderer->readCursor,
+        memory_order_acquire
+    );
+    uint64_t writeCursor = atomic_load_explicit(
+        &renderer->writeCursor,
+        memory_order_acquire
+    );
+    uint64_t bufferedFrames = writeCursor - readCursor;
+    return bufferedFrames < renderer->frameCapacity
+        ? (uint32_t)(renderer->frameCapacity - bufferedFrames)
+        : 0;
 }
 
-void MCPPCMRendererSetFrameCount(
+uint32_t MCPPCMRendererWrite(
     MCPPCMRenderer *renderer,
-    uint64_t frameCount
+    const float *samples,
+    uint32_t frameCount
 ) {
+    if (renderer == NULL || samples == NULL || frameCount == 0) {
+        return 0;
+    }
+
+    uint32_t writableFrames = MCPPCMRendererWritableFrames(renderer);
+    uint32_t framesToWrite = frameCount < writableFrames
+        ? frameCount
+        : writableFrames;
+    if (framesToWrite == 0) {
+        return 0;
+    }
+
+    uint64_t writeCursor = atomic_load_explicit(
+        &renderer->writeCursor,
+        memory_order_relaxed
+    );
+    uint64_t writeOffset = writeCursor % renderer->frameCapacity;
+    uint32_t firstFrames = framesToWrite;
+    uint64_t framesBeforeWrap = renderer->frameCapacity - writeOffset;
+    if (framesBeforeWrap < firstFrames) {
+        firstFrames = (uint32_t)framesBeforeWrap;
+    }
+
+    size_t bytesPerFrame = renderer->channelCount * sizeof(float);
+    memcpy(
+        renderer->samples + writeOffset * renderer->channelCount,
+        samples,
+        (size_t)firstFrames * bytesPerFrame
+    );
+
+    uint32_t secondFrames = framesToWrite - firstFrames;
+    if (secondFrames > 0) {
+        memcpy(
+            renderer->samples,
+            samples + (size_t)firstFrames * renderer->channelCount,
+            (size_t)secondFrames * bytesPerFrame
+        );
+    }
+
+    atomic_store_explicit(
+        &renderer->writeCursor,
+        writeCursor + framesToWrite,
+        memory_order_release
+    );
+    return framesToWrite;
+}
+
+void MCPPCMRendererMarkEndOfStream(MCPPCMRenderer *renderer) {
     if (renderer == NULL) {
         return;
     }
-
-    uint64_t boundedFrameCount = frameCount < renderer->frameCapacity
-        ? frameCount
-        : renderer->frameCapacity;
     atomic_store_explicit(
-        &renderer->frameCount,
-        boundedFrameCount,
+        &renderer->reachedEndOfStream,
+        true,
         memory_order_release
     );
 }
@@ -105,7 +169,7 @@ void MCPPCMRendererSetPlaying(
     }
 }
 
-void MCPPCMRendererSeek(
+void MCPPCMRendererReset(
     MCPPCMRenderer *renderer,
     uint64_t frame
 ) {
@@ -113,14 +177,16 @@ void MCPPCMRendererSeek(
         return;
     }
 
-    uint64_t frameCount = atomic_load_explicit(
-        &renderer->frameCount,
-        memory_order_acquire
-    );
-    uint64_t boundedFrame = frame < frameCount ? frame : frameCount;
+    atomic_store_explicit(&renderer->readCursor, 0, memory_order_release);
+    atomic_store_explicit(&renderer->writeCursor, 0, memory_order_release);
     atomic_store_explicit(
         &renderer->currentFrame,
-        boundedFrame,
+        frame,
+        memory_order_release
+    );
+    atomic_store_explicit(
+        &renderer->reachedEndOfStream,
+        false,
         memory_order_release
     );
     atomic_store_explicit(
@@ -135,15 +201,6 @@ uint64_t MCPPCMRendererCurrentFrame(const MCPPCMRenderer *renderer) {
         ? 0
         : atomic_load_explicit(
             &renderer->currentFrame,
-            memory_order_acquire
-        );
-}
-
-uint64_t MCPPCMRendererFrameCount(const MCPPCMRenderer *renderer) {
-    return renderer == NULL
-        ? 0
-        : atomic_load_explicit(
-            &renderer->frameCount,
             memory_order_acquire
         );
 }
@@ -192,19 +249,17 @@ OSStatus MCPPCMRenderCallback(
         return noErr;
     }
 
-    uint64_t currentFrame = atomic_load_explicit(
-        &renderer->currentFrame,
+    uint64_t readCursor = atomic_load_explicit(
+        &renderer->readCursor,
         memory_order_relaxed
     );
-    uint64_t frameCount = atomic_load_explicit(
-        &renderer->frameCount,
+    uint64_t writeCursor = atomic_load_explicit(
+        &renderer->writeCursor,
         memory_order_acquire
     );
-    uint64_t remainingFrames = currentFrame < frameCount
-        ? frameCount - currentFrame
-        : 0;
-    UInt32 framesToCopy = remainingFrames < inNumberFrames
-        ? (UInt32)remainingFrames
+    uint64_t bufferedFrames = writeCursor - readCursor;
+    UInt32 framesToCopy = bufferedFrames < inNumberFrames
+        ? (UInt32)bufferedFrames
         : inNumberFrames;
 
     AudioBuffer *output = &ioData->mBuffers[0];
@@ -216,19 +271,43 @@ OSStatus MCPPCMRenderCallback(
         return kAudio_ParamError;
     }
 
-    memcpy(
-        output->mData,
-        renderer->samples + currentFrame * renderer->channelCount,
-        bytesToCopy
-    );
+    uint64_t readOffset = readCursor % renderer->frameCapacity;
+    UInt32 firstFrames = framesToCopy;
+    uint64_t framesBeforeWrap = renderer->frameCapacity - readOffset;
+    if (framesBeforeWrap < firstFrames) {
+        firstFrames = (UInt32)framesBeforeWrap;
+    }
+    memcpy(output->mData,
+           renderer->samples + readOffset * renderer->channelCount,
+           (size_t)firstFrames * bytesPerFrame);
+
+    UInt32 secondFrames = framesToCopy - firstFrames;
+    if (secondFrames > 0) {
+        memcpy((uint8_t *)output->mData + (size_t)firstFrames * bytesPerFrame,
+               renderer->samples,
+               (size_t)secondFrames * bytesPerFrame);
+    }
     memset((uint8_t *)output->mData + bytesToCopy, 0, requestedBytes - bytesToCopy);
+    atomic_store_explicit(
+        &renderer->readCursor,
+        readCursor + framesToCopy,
+        memory_order_release
+    );
+    uint64_t currentFrame = atomic_load_explicit(
+        &renderer->currentFrame,
+        memory_order_relaxed
+    );
     atomic_store_explicit(
         &renderer->currentFrame,
         currentFrame + framesToCopy,
         memory_order_release
     );
 
-    if (framesToCopy < inNumberFrames) {
+    bool reachedEndOfStream = atomic_load_explicit(
+        &renderer->reachedEndOfStream,
+        memory_order_acquire
+    );
+    if (reachedEndOfStream && framesToCopy < inNumberFrames) {
         atomic_store_explicit(
             &renderer->isPlaying,
             false,
@@ -243,4 +322,3 @@ OSStatus MCPPCMRenderCallback(
 
     return noErr;
 }
-
