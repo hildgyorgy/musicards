@@ -49,6 +49,9 @@ final class MusiCardsAppModel: ObservableObject {
     let classicalMetadataStore: ClassicalMetadataStore
     let playbackController: PlaybackController
 
+    private var localPlaybackNowPlayingCoordinator:
+        PlatformNowPlayingCoordinator?
+
     private let musicBrainzService = MusicBrainzService()
 
     private let recentArtistsKey = "recentArtists"
@@ -74,6 +77,8 @@ final class MusiCardsAppModel: ObservableObject {
         self.trackDetailStore = TrackDetailStore(service: service)
         self.classicalMetadataStore = ClassicalMetadataStore(service: service)
         self.playbackController = PlaybackController(engine: playbackEngine)
+        self.localPlaybackNowPlayingCoordinator =
+            PlatformNowPlayingCoordinator(controller: self.playbackController)
 
         loadRecents()
 #if os(iOS)
@@ -82,22 +87,25 @@ final class MusiCardsAppModel: ObservableObject {
     }
 
     func playLocalFile(_ url: URL) {
-        let title = url.deletingPathExtension().lastPathComponent
-        let track = PlaybackTrack(
-            id: url.standardizedFileURL.path,
-            recordingID: nil,
-            releaseID: nil,
-            title: title,
-            artist: "Local audio",
-            albumTitle: "",
-            duration: nil
-        )
-        let item = PlaybackQueueItem(
-            track: track,
-            source: .localFile(url)
-        )
-
         Task {
+            let artworkData = await LocalAudioMetadataLoader.artworkData(
+                from: url
+            )
+            let track = PlaybackTrack(
+                id: url.standardizedFileURL.path,
+                recordingID: nil,
+                releaseID: nil,
+                title: url.deletingPathExtension().lastPathComponent,
+                artist: "Local audio",
+                albumTitle: "",
+                duration: nil,
+                artworkData: artworkData
+            )
+            let item = PlaybackQueueItem(
+                track: track,
+                source: .localFile(url)
+            )
+
             await playbackController.replaceQueue(with: [item])
             await playbackController.play()
         }

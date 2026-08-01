@@ -157,9 +157,24 @@ MusiCards audio player. It is the shared starting point for future player work.
 - Disconnecting a DAC or headphones pauses playback instead of allowing an
   unexpected switch to the iPhone speaker. Connecting a new route rebuilds the
   RemoteIO output and resumes it only when playback was already active.
-- Background playback and exposure of the negotiated hardware format are not
-  implemented yet. The interruption and route-change behavior also requires
-  physical-device validation before the iOS engine is production-ready.
+- Interruption and route-change behavior has passed its first physical-device
+  validation. Exposure of the negotiated hardware format remains deferred.
+- The app declares the iOS Audio background mode in its source Info.plist. A
+  dedicated `PlatformNowPlayingCoordinator` publishes the local MusiCards
+  track, elapsed time,
+  duration and playback rate to `MPNowPlayingInfoCenter` without coupling
+  MediaPlayer APIs to the realtime engine. Local listening is explicitly
+  excluded from system content and journaling suggestions.
+- Control Center and lock-screen play, pause, toggle, stop and position-change
+  commands are forwarded to the shared `PlaybackController`. Unsupported
+  queue, skip, rating and playback-rate commands remain disabled.
+- macOS uses the same Now Playing coordinator and additionally publishes the
+  explicit system playback state required by MediaPlayer on macOS.
+- Background playback and system controls still require physical-device
+  validation before this slice is considered complete.
+- For explicitly selected files, Now Playing artwork uses embedded audio-file
+  cover metadata when available. MusicBrainz/Cover Art Archive fallback remains
+  deferred until local files are matched to MusiCards releases.
 - The existing iOS Apple Music now-playing observer remains a separate viewer
   feature and is not part of the MusiCards playback engine.
 
@@ -167,7 +182,6 @@ MusiCards audio player. It is the shared starting point for future player work.
 
 The immediate validation task is deliberately narrow:
 
-> Validate iOS lifecycle behavior on a physical iPhone: interrupt active
-> playback and allow it to end, connect a USB-C DAC while playing, then
-> disconnect it while playing. A disconnect must remain paused on the iPhone
-> speaker; an interruption may resume only when iOS supplies `shouldResume`.
+> Select a local file with embedded cover art and verify the image in iOS and
+> macOS Now Playing surfaces. A file without embedded artwork is expected to
+> remain image-free until MusicBrainz release matching is implemented.

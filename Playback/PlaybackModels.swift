@@ -16,6 +16,7 @@ struct PlaybackTrack: Identifiable, Equatable {
     let artist: String
     let albumTitle: String
     let duration: TimeInterval?
+    let artworkData: Data?
 }
 
 /// A concrete asset the playback engine can open.
@@ -72,4 +73,3 @@ enum PlaybackStatus: Equatable {
         self == .playing
     }
 }
-
