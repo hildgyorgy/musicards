@@ -11,11 +11,11 @@ struct TracksCardContentView: View {
     let release: MBRelease?
     let onSelectArtist: (String) -> Void
     @ObservedObject var localLibrary: LocalLibraryStore
-    let onPlayTrack: (String?) -> Void
+    let onPlayTrack: (String?, String?) -> Void
     @ObservedObject var detailStore: TrackDetailStore
 
-    @State private var expandedRecordingID: String?
-    @State private var selectedPageByRecordingID: [String: Int] = [:]
+    @State private var expandedTrackID: String?
+    @State private var selectedPageByTrackID: [String: Int] = [:]
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -129,10 +129,18 @@ struct TracksCardContentView: View {
                         case .workHeader(let title):
                             classicalWorkHeaderRow(title)
 
-                        case .track(let position, let title, let length, let recordingID, let isMovement):
+                        case .track(
+                            let releaseTrackID,
+                            let position,
+                            let title,
+                            let length,
+                            let recordingID,
+                            let isMovement
+                        ):
                             // Reconstruct the TrackRow that the shared row
                             // renderer expects, sourcing from the original track.
                             let trackRow = TrackRow(
+                                releaseTrackID: releaseTrackID,
                                 recordingID: recordingID,
                                 number: position,
                                 title: title,
@@ -195,9 +203,9 @@ struct TracksCardContentView: View {
                 .buttonStyle(.plain)
                 .frame(maxWidth: .infinity)
 
-                if isTrackPlayable(row.recordingID) {
+                if isTrackPlayable(row) {
                     Button {
-                        onPlayTrack(row.recordingID)
+                        onPlayTrack(row.releaseTrackID, row.recordingID)
                     } label: {
                         Image(systemName: "play.fill")
                             .font(.caption)
@@ -217,7 +225,7 @@ struct TracksCardContentView: View {
                         .padding()
                 } else {
                     TrackDetailPagerView(
-                        selectedPage: bindingForSelectedPage(recordingID: row.recordingID),
+                        selectedPage: bindingForSelectedPage(trackID: row.id),
                         recordingID: row.recordingID,
                         detailStore: detailStore,
                         onSelectArtist: onSelectArtist
@@ -239,14 +247,12 @@ struct TracksCardContentView: View {
         )
     }
 
-    private func isTrackPlayable(_ recordingID: String?) -> Bool {
-        guard let releaseID = release?.id,
-              let recordingID else {
-            return false
-        }
-        return localLibrary.containsRecording(
+    private func isTrackPlayable(_ row: TrackRow) -> Bool {
+        guard let releaseID = release?.id else { return false }
+        return localLibrary.containsTrack(
             releaseID: releaseID,
-            recordingID: recordingID
+            releaseTrackID: row.releaseTrackID,
+            recordingID: row.recordingID
         )
     }
     
@@ -413,14 +419,14 @@ struct TracksCardContentView: View {
     // MARK: - Expand / collapse
 
     private func isExpanded(_ row: TrackRow) -> Bool {
-        expandedRecordingID == row.recordingID
+        expandedTrackID == row.id
     }
 
     private func toggleExpanded(for row: TrackRow) {
-        if expandedRecordingID == row.recordingID {
-            expandedRecordingID = nil
+        if expandedTrackID == row.id {
+            expandedTrackID = nil
         } else {
-            expandedRecordingID = row.recordingID
+            expandedTrackID = row.id
 
             if let id = row.recordingID {
                 detailStore.fetchIfNeeded(recordingID: id)
@@ -428,12 +434,10 @@ struct TracksCardContentView: View {
         }
     }
 
-    private func bindingForSelectedPage(recordingID: String?) -> Binding<Int> {
-        let key = recordingID ?? "no-recording-id"
-
+    private func bindingForSelectedPage(trackID: String) -> Binding<Int> {
         return Binding(
-            get: { selectedPageByRecordingID[key] ?? 1 },
-            set: { selectedPageByRecordingID[key] = $0 }
+            get: { selectedPageByTrackID[trackID] ?? 1 },
+            set: { selectedPageByTrackID[trackID] = $0 }
         )
     }
 
@@ -447,6 +451,7 @@ struct TracksCardContentView: View {
 
             let rows: [TrackRow] = tracks.map { track in
                 TrackRow(
+                    releaseTrackID: track.id,
                     recordingID: track.recording?.id,
                     number: track.position,
                     title: track.title,
@@ -508,6 +513,7 @@ struct TracksCardContentView: View {
 // MARK: - Private models
 
 private struct TrackRow: Identifiable {
+    let releaseTrackID: String?
     let recordingID: String?
     let number: Int?
     let title: String
@@ -516,6 +522,9 @@ private struct TrackRow: Identifiable {
     var isMovement: Bool = false
 
     var id: String {
+        if let releaseTrackID {
+            return releaseTrackID
+        }
         if let recordingID {
             return recordingID
         } else {

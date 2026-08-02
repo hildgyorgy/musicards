@@ -20,6 +20,7 @@ final class LocalLibraryStore: ObservableObject {
     private var rootURLs: [String: URL] = [:]
     private var accessedRootIDs = Set<String>()
     private var tracksByReleaseID: [String: [LocalAudioFileSnapshot]] = [:]
+    private var tracksByReleaseTrackKey: [String: LocalAudioFileSnapshot] = [:]
     private var tracksByRecordingKey: [String: LocalAudioFileSnapshot] = [:]
 
     init() {
@@ -159,17 +160,32 @@ final class LocalLibraryStore: ObservableObject {
         tracksByReleaseID[normalizedMBID(releaseID)]?.isEmpty == false
     }
 
-    func containsRecording(
+    func containsTrack(
         releaseID: String,
+        releaseTrackID: String?,
         recordingID: String?
     ) -> Bool {
-        audioFile(releaseID: releaseID, recordingID: recordingID) != nil
+        audioFile(
+            releaseID: releaseID,
+            releaseTrackID: releaseTrackID,
+            recordingID: recordingID
+        ) != nil
     }
 
     func audioFile(
         releaseID: String,
+        releaseTrackID: String?,
         recordingID: String?
     ) -> LocalAudioFileSnapshot? {
+        if let releaseTrackID,
+           let exactMatch = tracksByReleaseTrackKey[
+               releaseTrackKey(
+                   releaseID: releaseID,
+                   releaseTrackID: releaseTrackID
+               )
+           ] {
+            return exactMatch
+        }
         guard let recordingID else { return nil }
         return tracksByRecordingKey[
             recordingKey(releaseID: releaseID, recordingID: recordingID)
@@ -395,7 +411,10 @@ final class LocalLibraryStore: ObservableObject {
                     .standardizedFileURL
                 snapshotsByFileURL[fileURL.path] = LocalAudioFileSnapshot(record)
             }
-            let snapshots = Array(snapshotsByFileURL.values)
+            let snapshots = snapshotsByFileURL.values.sorted {
+                $0.relativePath.localizedStandardCompare($1.relativePath)
+                    == .orderedAscending
+            }
 
             tracksByReleaseID = Dictionary(
                 grouping: snapshots.compactMap { file -> (String, LocalAudioFileSnapshot)? in
@@ -405,18 +424,27 @@ final class LocalLibraryStore: ObservableObject {
                 by: { $0.0 }
             ).mapValues { $0.map(\.1) }
 
+            tracksByReleaseTrackKey = [:]
             tracksByRecordingKey = [:]
             for file in snapshots {
-                guard let releaseID = file.releaseMBID,
-                      let recordingID = file.recordingMBID else {
-                    continue
+                guard let releaseID = file.releaseMBID else { continue }
+                if let releaseTrackID = file.releaseTrackMBID {
+                    let key = releaseTrackKey(
+                        releaseID: releaseID,
+                        releaseTrackID: releaseTrackID
+                    )
+                    if tracksByReleaseTrackKey[key] == nil {
+                        tracksByReleaseTrackKey[key] = file
+                    }
                 }
-                let key = recordingKey(
-                    releaseID: releaseID,
-                    recordingID: recordingID
-                )
-                if tracksByRecordingKey[key] == nil {
-                    tracksByRecordingKey[key] = file
+                if let recordingID = file.recordingMBID {
+                    let key = recordingKey(
+                        releaseID: releaseID,
+                        recordingID: recordingID
+                    )
+                    if tracksByRecordingKey[key] == nil {
+                        tracksByRecordingKey[key] = file
+                    }
                 }
             }
 
@@ -440,6 +468,13 @@ final class LocalLibraryStore: ObservableObject {
 
     private func recordingKey(releaseID: String, recordingID: String) -> String {
         "\(normalizedMBID(releaseID))::\(normalizedMBID(recordingID))"
+    }
+
+    private func releaseTrackKey(
+        releaseID: String,
+        releaseTrackID: String
+    ) -> String {
+        "\(normalizedMBID(releaseID))::\(normalizedMBID(releaseTrackID))"
     }
 
     private func makeBookmark(for url: URL) throws -> Data {

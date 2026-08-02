@@ -30,7 +30,14 @@ private struct PreparedTrackTitle {
 enum TrackDisplayRow: Hashable {
     case composerHeader(String)
     case workHeader(String)
-    case track(position: Int?, title: String, length: String?, recordingID: String?, isMovement: Bool)
+    case track(
+        releaseTrackID: String?,
+        position: Int?,
+        title: String,
+        length: String?,
+        recordingID: String?,
+        isMovement: Bool
+    )
 }
 
 enum ClassicalTrackFormatter {
@@ -86,6 +93,7 @@ enum ClassicalTrackFormatter {
 
             rows.append(
                 .track(
+                    releaseTrackID: item.track.id,
                     position: item.track.position,
                     title: visibleTitle,
                     length: formatTrackLength(item.track.length),

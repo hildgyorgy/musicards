@@ -233,8 +233,11 @@ struct ContentView: View {
                     appModel.selectArtist(id: artistID)
                 },
                 localLibrary: appModel.localLibrary,
-                onPlayTrack: { recordingID in
-                    appModel.playIndexedTrack(recordingID: recordingID)
+                onPlayTrack: { releaseTrackID, recordingID in
+                    appModel.playIndexedTrack(
+                        releaseTrackID: releaseTrackID,
+                        recordingID: recordingID
+                    )
                 },
                 detailStore: appModel.trackDetailStore,
                 classicalMetadataStore: appModel.classicalMetadataStore

@@ -129,11 +129,14 @@ final class MusiCardsAppModel: ObservableObject {
         Task { await localLibrary.refreshAll() }
     }
 
-    func playIndexedTrack(recordingID: String?) {
+    func playIndexedTrack(
+        releaseTrackID: String?,
+        recordingID: String?
+    ) {
         guard let release = selectedRelease,
-              let recordingID,
               let selectedFile = localLibrary.audioFile(
                 releaseID: release.id,
+                releaseTrackID: releaseTrackID,
                 recordingID: recordingID
               ),
               let selectedURL = localLibrary.url(for: selectedFile) else {
@@ -156,12 +159,17 @@ final class MusiCardsAppModel: ObservableObject {
                 for track in medium.tracks ?? [] {
                     guard let file = localLibrary.audioFile(
                         releaseID: release.id,
+                        releaseTrackID: track.id,
                         recordingID: track.recording?.id
                     ), let url = localLibrary.url(for: file) else {
                         continue
                     }
 
-                    if track.recording?.id == recordingID {
+                    if trackMatchesSelection(
+                        track,
+                        releaseTrackID: releaseTrackID,
+                        recordingID: recordingID
+                    ) {
                         selectedIndex = items.count
                     }
                     let playbackTrack = PlaybackTrack(
@@ -205,6 +213,17 @@ final class MusiCardsAppModel: ObservableObject {
             ) else { return }
             await playbackController.play()
         }
+    }
+
+    private func trackMatchesSelection(
+        _ track: MBTrack,
+        releaseTrackID: String?,
+        recordingID: String?
+    ) -> Bool {
+        if let releaseTrackID {
+            return track.id == releaseTrackID
+        }
+        return track.recording?.id == recordingID
     }
 
     var isBlockingNavigationLoad: Bool {

@@ -168,12 +168,14 @@ struct MBMedium: Decodable {
 }
 
 struct MBTrack: Decodable {
+    let id: String?
     let position: Int?
     let title: String
     let length: Int?
     let recording: MBRecording?
 
     enum CodingKeys: String, CodingKey {
+        case id
         case position
         case title
         case length
@@ -181,11 +183,13 @@ struct MBTrack: Decodable {
     }
 
     init(
+        id: String? = nil,
         position: Int? = nil,
         title: String,
         length: Int? = nil,
         recording: MBRecording? = nil
     ) {
+        self.id = id
         self.position = position
         self.title = title
         self.length = length

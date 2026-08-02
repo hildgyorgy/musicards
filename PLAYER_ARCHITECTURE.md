@@ -99,8 +99,11 @@ MusiCards audio player. It is the shared starting point for future player work.
   - MusicBrainz releases and tracks provide the canonical viewer context;
   - matching connects the two without destructively rewriting either.
 - Search results expose local availability by exact release MBID. Once such a
-  release is loaded, its MusicBrainz tracks match local files by recording
-  MBID (Picard's `MUSICBRAINZ_TRACKID`) and become directly playable.
+  release is loaded, its MusicBrainz tracks match local files first by release
+  track MBID (Picard's `MUSICBRAINZ_RELEASETRACKID`). This distinguishes repeated
+  appearances of the same recording inside one release. Older or incomplete
+  indexes fall back deterministically to recording MBID
+  (`MUSICBRAINZ_TRACKID`).
 
 ## Metadata behavior
 
