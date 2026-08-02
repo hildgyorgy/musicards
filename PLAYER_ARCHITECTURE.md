@@ -77,10 +77,21 @@ MusiCards audio player. It is the shared starting point for future player work.
   permanently installed native app.
 - The native app remembers one user-selected music root and restores access
   across launches using the appropriate persistent permission/security
-  bookmark. Selecting the same root refreshes it; selecting a different root
-  replaces the former index.
-- The index should be durable and incrementally refreshed rather than rebuilt
-  from scratch whenever the app starts.
+  bookmark. **Connect Music Folder** reads the root's `library.json`; selecting
+  the same root reloads it, while selecting a different root replaces the former
+  index.
+- One web-compatible manifest format is shared by every platform:
+  - Windows and command-line users generate it with the dependency-free
+    `Tools/generate_library.py` utility;
+  - MusiCards for Mac can generate or incrementally update it natively after a
+    user selects an offline music folder;
+  - iOS never generates it and only connects to an existing manifest.
+- Both native platforms import the manifest into the same durable SwiftData
+  lookup. The macOS generator writes the same relative paths and MusicBrainz
+  identifiers as the Python tool, then connects the generated index
+  automatically.
+- iOS never walks the connected folder or downloads the collection to build an
+  index. Remote audio content is accessed only when its track is played.
 - Folder access remains user-controlled. MusiCards must not silently scan the
   entire computer.
 - File identity and MusicBrainz identity must remain distinct:
@@ -119,7 +130,8 @@ MusiCards audio player. It is the shared starting point for future player work.
 3. Play one explicitly selected local file reliably, first on macOS and then
    on iOS behind the same engine boundary.
 4. Add basic transport state and connect it to the Player section.
-5. Add a persistent user-selected music root and durable incremental indexing.
+5. Add a persistent user-selected music root and import the shared
+   `library.json` into a durable lookup.
 6. Match local files to the release/track currently shown by MusiCards.
 7. Implement macOS output discovery, system-output routing and USB DAC routing.
 8. Verify sample-rate switching and document the exact bit-perfect conditions.
@@ -204,7 +216,8 @@ MusiCards audio player. It is the shared starting point for future player work.
 
 The immediate validation task is deliberately narrow:
 
-> Select a Picard-tagged music folder, verify persistent restoration after an
-> app restart, search for one indexed release, and confirm its availability
-> indicator and track-level playback on macOS and iOS. Then add one album and
-> verify that Refresh Library indexes only the new files.
+> Generate `library.json` from a Picard-tagged offline folder, connect that root
+> on macOS and iOS, verify persistent restoration after restart, search for one
+> indexed release, and confirm its availability indicator and track playback.
+> Then add one album, regenerate the manifest and verify that Reload Index
+> imports the updated index.

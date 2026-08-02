@@ -15,6 +15,7 @@ struct PlayerCardContentView: View {
 
     @State private var isFileImporterPresented = false
     @State private var isFolderImporterPresented = false
+    @State private var folderSelectionPurpose = FolderSelectionPurpose.connect
 
     var body: some View {
         VStack(spacing: 18) {
@@ -64,18 +65,28 @@ struct PlayerCardContentView: View {
             .buttonStyle(.bordered)
 
             HStack(spacing: 10) {
-                Button("Select Music Folder") {
+                Button("Connect Music Folder") {
+                    folderSelectionPurpose = .connect
                     isFolderImporterPresented = true
                 }
                 .buttonStyle(.bordered)
                 .disabled(localLibrary.isScanning)
 
-                Button("Refresh Library") {
+                Button("Reload Index") {
                     onRefreshLibrary()
                 }
                 .buttonStyle(.bordered)
                 .disabled(localLibrary.summary.folderCount == 0 || localLibrary.isScanning)
             }
+
+            #if os(macOS)
+            Button("Create / Update Library Index") {
+                folderSelectionPurpose = .createOrUpdateIndex
+                isFolderImporterPresented = true
+            }
+            .buttonStyle(.bordered)
+            .disabled(localLibrary.isScanning)
+            #endif
 
             Text(libraryStatusText)
                 .font(.caption)
@@ -102,7 +113,14 @@ struct PlayerCardContentView: View {
                   let url = urls.first else {
                 return
             }
-            onSelectMusicFolder(url)
+            switch folderSelectionPurpose {
+            case .connect:
+                onSelectMusicFolder(url)
+            case .createOrUpdateIndex:
+                #if os(macOS)
+                localLibrary.createOrUpdateLibraryIndex(in: url)
+                #endif
+            }
         }
     }
 
@@ -110,6 +128,9 @@ struct PlayerCardContentView: View {
         if localLibrary.isScanning {
             return localLibrary.statusMessage?.uppercased()
                 ?? "SCANNING MUSIC LIBRARY…"
+        }
+        if let error = localLibrary.connectionErrorMessage {
+            return error.uppercased()
         }
         if localLibrary.summary.folderCount == 0 {
             return localLibrary.statusMessage?.uppercased()
@@ -150,4 +171,9 @@ struct PlayerCardContentView: View {
         let seconds = max(Int(time.rounded(.down)), 0)
         return String(format: "%d:%02d", seconds / 60, seconds % 60)
     }
+}
+
+private enum FolderSelectionPurpose {
+    case connect
+    case createOrUpdateIndex
 }

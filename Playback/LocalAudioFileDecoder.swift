@@ -187,7 +187,25 @@ enum LocalAudioFileDecoder {
         let didAccess = url.startAccessingSecurityScopedResource()
 
         var file: ExtAudioFileRef?
-        let openStatus = ExtAudioFileOpenURL(url as CFURL, &file)
+        var openStatus: OSStatus = kAudioFileUnspecifiedError
+        var coordinationError: NSError?
+        let coordinator = NSFileCoordinator()
+        coordinator.coordinate(
+            readingItemAt: url,
+            options: [],
+            error: &coordinationError
+        ) { coordinatedURL in
+            openStatus = ExtAudioFileOpenURL(coordinatedURL as CFURL, &file)
+        }
+        if let coordinationError {
+            if didAccess {
+                url.stopAccessingSecurityScopedResource()
+            }
+            throw NativePlaybackEngineError(
+                "Could not download the selected audio file: "
+                    + coordinationError.localizedDescription
+            )
+        }
         guard openStatus == noErr, let file else {
             if didAccess {
                 url.stopAccessingSecurityScopedResource()

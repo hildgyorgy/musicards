@@ -107,11 +107,6 @@
 			path = MusiCardsMac;
 			sourceTree = "<group>";
 		};
-		F5E510E12FC4BDF300E797D6 /* Deck */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = Deck;
-			sourceTree = "<group>";
-		};
 		F5C0DE012FD0000000000001 /* Playback */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = Playback;
@@ -120,6 +115,11 @@
 		F5C0DE022FD0000000000002 /* LocalLibrary */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = LocalLibrary;
+			sourceTree = "<group>";
+		};
+		F5E510E12FC4BDF300E797D6 /* Deck */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Deck;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -276,9 +276,9 @@
 			);
 			fileSystemSynchronizedGroups = (
 				F5A09F5E2FBC746A00E5404B /* MusiCardsMac */,
-				F5E510E12FC4BDF300E797D6 /* Deck */,
 				F5C0DE012FD0000000000001 /* Playback */,
 				F5C0DE022FD0000000000002 /* LocalLibrary */,
+				F5E510E12FC4BDF300E797D6 /* Deck */,
 			);
 			name = MusiCards;
 			productName = MusiCards;
@@ -522,7 +522,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
-				ENABLE_USER_SELECTED_FILES = readonly;
+				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "MusiCards Release Viewer-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = MusiCards;
@@ -576,7 +576,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
-				ENABLE_USER_SELECTED_FILES = readonly;
+				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "MusiCards Release Viewer-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = MusiCards;

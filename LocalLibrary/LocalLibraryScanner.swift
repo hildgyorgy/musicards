@@ -24,6 +24,10 @@ nonisolated struct ScannedAudioFile: Sendable {
     let releaseMBID: String?
     let recordingMBID: String?
     let releaseTrackMBID: String?
+    let releaseYear: String?
+    let country: String?
+    let label: String?
+    let mediaFormat: String?
     let codec: String
     let bitDepth: Int?
     let sampleRate: Double
@@ -125,6 +129,7 @@ enum LocalLibraryScanner {
             let tags = await textTags(from: metadata)
 
             let fallbackTitle = candidate.url.deletingPathExtension().lastPathComponent
+            let releaseDate = firstValue(in: tags, matching: ["day", "date"])
             return ScannedAudioFile(
                 relativePath: candidate.relativePath,
                 fileSize: candidate.fileSize,
@@ -135,6 +140,13 @@ enum LocalLibraryScanner {
                 releaseMBID: musicBrainzValue(in: tags, exactName: "musicbrainzalbumid"),
                 recordingMBID: musicBrainzValue(in: tags, exactName: "musicbrainztrackid"),
                 releaseTrackMBID: musicBrainzValue(in: tags, exactName: "musicbrainzreleasetrackid"),
+                releaseYear: releaseDate.map { String($0.prefix(4)) },
+                country: firstValue(
+                    in: tags,
+                    matching: ["musicbrainzalbumreleasecountry", "releasecountry"]
+                ),
+                label: firstValue(in: tags, matching: ["organization", "label"]),
+                mediaFormat: firstValue(in: tags, matching: ["media"]),
                 codec: format.codec,
                 bitDepth: format.bitDepth,
                 sampleRate: format.sampleRate,

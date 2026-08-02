@@ -13,6 +13,7 @@ final class LocalLibraryStore: ObservableObject {
     @Published private(set) var folderNames: [String] = []
     @Published private(set) var isScanning = false
     @Published private(set) var statusMessage: String?
+    @Published private(set) var connectionErrorMessage: String?
 
     private let container: ModelContainer
     private let context: ModelContext
@@ -66,92 +67,92 @@ final class LocalLibraryStore: ObservableObject {
     }
 
     func selectMusicFolder(_ url: URL) {
+        guard !isScanning else { return }
         // A document picker grants access only for the duration of its callback.
         // Claim that access synchronously, before this method starts any Task.
         let didAccess = url.startAccessingSecurityScopedResource()
 
         do {
             let bookmark = try makeBookmark(for: url)
-            let existingRoots = try context.fetch(
-                FetchDescriptor<LocalLibraryRootRecord>()
-            )
-            let existingFiles = try context.fetch(
-                FetchDescriptor<LocalAudioFileRecord>()
-            )
-
-            if let existing = existingRoots.first(where: {
-                rootURLs[$0.id]?.standardizedFileURL == url.standardizedFileURL
-            }) {
-                guard didAccess || accessedRootIDs.contains(existing.id) else {
-                    throw NativePlaybackEngineError(
-                        "The selected music folder could not be accessed."
-                    )
-                }
-
-                existing.displayName = url.lastPathComponent
-                existing.bookmarkData = bookmark
-                let obsoleteRoots = existingRoots.filter { $0.id != existing.id }
-                let obsoleteRootIDs = Set(obsoleteRoots.map(\.id))
-                for file in existingFiles where obsoleteRootIDs.contains(file.rootID) {
-                    context.delete(file)
-                }
-                for root in obsoleteRoots { context.delete(root) }
-                try context.save()
-                releaseAccess(for: obsoleteRoots)
-
-                if accessedRootIDs.contains(existing.id) {
-                    if didAccess {
-                        url.stopAccessingSecurityScopedResource()
-                    }
-                } else {
-                    retain(url: url, for: existing.id, didAccess: didAccess)
-                }
-                rebuildLookup()
-                Task { await refresh(rootID: existing.id) }
-                return
+            isScanning = true
+            connectionErrorMessage = nil
+            statusMessage = "Connecting music folder…"
+            Task {
+                await connectMusicFolder(
+                    url,
+                    bookmark: bookmark,
+                    didAccess: didAccess
+                )
             }
+        } catch {
+            if didAccess {
+                url.stopAccessingSecurityScopedResource()
+            }
+            connectionErrorMessage = error.localizedDescription
+        }
+    }
 
+    #if os(macOS)
+    func createOrUpdateLibraryIndex(in url: URL) {
+        guard !isScanning else { return }
+        let didAccess = url.startAccessingSecurityScopedResource()
+
+        do {
             guard didAccess else {
                 throw NativePlaybackEngineError(
                     "The selected music folder could not be accessed."
                 )
             }
+            let bookmark = try makeBookmark(for: url)
+            isScanning = true
+            connectionErrorMessage = nil
+            statusMessage = "Preparing library index…"
 
-            let root = LocalLibraryRootRecord(
-                displayName: url.lastPathComponent,
-                bookmarkData: bookmark
-            )
-            context.insert(root)
-            for file in existingFiles { context.delete(file) }
-            for existingRoot in existingRoots { context.delete(existingRoot) }
-            try context.save()
-            releaseAccess(for: existingRoots)
-            retain(url: url, for: root.id, didAccess: didAccess)
-            rebuildLookup()
-            Task { await refresh(rootID: root.id) }
-        } catch {
-            context.rollback()
-            if didAccess {
-                url.stopAccessingSecurityScopedResource()
+            Task {
+                do {
+                    try await LocalLibraryManifestGenerator.generate(
+                        in: url,
+                        progress: { [weak self] message in
+                            self?.statusMessage = message
+                        }
+                    )
+                    statusMessage = "Connecting generated index…"
+                    await connectMusicFolder(
+                        url,
+                        bookmark: bookmark,
+                        didAccess: didAccess
+                    )
+                } catch {
+                    isScanning = false
+                    url.stopAccessingSecurityScopedResource()
+                    connectionErrorMessage = "Could not create library.json: \(error.localizedDescription)"
+                }
             }
-            statusMessage = error.localizedDescription
+        } catch {
+            if didAccess { url.stopAccessingSecurityScopedResource() }
+            connectionErrorMessage = error.localizedDescription
         }
     }
+    #endif
 
     func refreshAll() async {
         guard !isScanning else { return }
         isScanning = true
-        statusMessage = "Scanning music folder…"
+        connectionErrorMessage = nil
+        statusMessage = "Reading library.json…"
         defer { isScanning = false }
 
         let rootIDs = Array(rootURLs.keys)
+        var succeeded = true
         for rootID in rootIDs {
-            await refreshRoot(rootID: rootID)
+            if !(await refreshRoot(rootID: rootID)) { succeeded = false }
         }
         rebuildLookup()
-        statusMessage = summary.trackCount == 0
-            ? "No Picard-tagged playable releases found"
-            : "Library updated"
+        if succeeded {
+            statusMessage = summary.trackCount == 0
+                ? "No Picard-tagged playable releases found"
+                : "Library index updated"
+        }
     }
 
     func containsRelease(_ releaseID: String) -> Bool {
@@ -181,58 +182,33 @@ final class LocalLibraryStore: ObservableObject {
 
     private func refresh(rootID: String) async {
         guard !isScanning else {
-            await refreshRoot(rootID: rootID)
+            _ = await refreshRoot(rootID: rootID)
             rebuildLookup()
             return
         }
         isScanning = true
-        statusMessage = "Scanning music folder…"
+        connectionErrorMessage = nil
+        statusMessage = "Reading library.json…"
         defer { isScanning = false }
-        await refreshRoot(rootID: rootID)
+        let succeeded = await refreshRoot(rootID: rootID)
         rebuildLookup()
-        statusMessage = "Library updated"
+        if succeeded { statusMessage = "Library index updated" }
     }
 
-    private func refreshRoot(rootID: String) async {
-        guard let rootURL = rootURLs[rootID] else { return }
+    private func refreshRoot(rootID: String) async -> Bool {
+        guard let rootURL = rootURLs[rootID] else { return false }
 
         do {
-            statusMessage = "Finding audio files…"
-            let candidates = try await Task.detached(priority: .utility) {
-                try LocalLibraryScanner.enumerateAudioFiles(in: rootURL)
-            }.value
+            statusMessage = "Reading library.json…"
+            let scannedFiles = try await LocalLibraryManifestLoader.load(
+                from: rootURL
+            )
 
             let allRecords = try context.fetch(
                 FetchDescriptor<LocalAudioFileRecord>()
             )
             let existing = allRecords.filter { $0.rootID == rootID }
-            let existingByPath = Dictionary(
-                uniqueKeysWithValues: existing.map { ($0.relativePath, $0) }
-            )
-            let candidatePaths = Set(candidates.map(\.relativePath))
-
-            for record in existing where !candidatePaths.contains(record.relativePath) {
-                context.delete(record)
-            }
-
-            let changed = candidates.filter { candidate in
-                guard let record = existingByPath[candidate.relativePath] else {
-                    return true
-                }
-                return record.fileSize != candidate.fileSize
-                    || record.modificationDate != candidate.modificationDate
-            }
-            let scannedFiles = await scanMetadata(for: changed)
-
-            for scanned in scannedFiles {
-                if let record = existingByPath[scanned.relativePath] {
-                    record.update(from: scanned)
-                } else {
-                    context.insert(
-                        LocalAudioFileRecord(rootID: rootID, scanned: scanned)
-                    )
-                }
-            }
+            apply(scannedFiles, to: rootID, replacing: existing)
 
             if let root = try context.fetch(
                 FetchDescriptor<LocalLibraryRootRecord>()
@@ -240,42 +216,126 @@ final class LocalLibraryStore: ObservableObject {
                 root.lastScanDate = Date()
             }
             try context.save()
+            return true
         } catch {
-            statusMessage = error.localizedDescription
+            context.rollback()
+            connectionErrorMessage = manifestErrorMessage(error)
+            return false
         }
     }
 
-    private func scanMetadata(
-        for candidates: [LocalAudioFileCandidate]
-    ) async -> [ScannedAudioFile] {
-        let maxConcurrent = 4
-        var iterator = candidates.makeIterator()
-        var scanned: [ScannedAudioFile] = []
-        var completed = 0
+    private func connectMusicFolder(
+        _ url: URL,
+        bookmark: Data,
+        didAccess: Bool
+    ) async {
+        defer { isScanning = false }
 
-        guard !candidates.isEmpty else { return [] }
-        statusMessage = "Reading metadata 0 / \(candidates.count)…"
+        do {
+            let scannedFiles = try await LocalLibraryManifestLoader.load(
+                from: url
+            )
+            let existingRoots = try context.fetch(
+                FetchDescriptor<LocalLibraryRootRecord>()
+            )
+            let existingFiles = try context.fetch(
+                FetchDescriptor<LocalAudioFileRecord>()
+            )
 
-        await withTaskGroup(of: ScannedAudioFile?.self) { group in
-            for _ in 0..<min(maxConcurrent, candidates.count) {
-                guard let candidate = iterator.next() else { break }
-                group.addTask {
-                    try? await LocalLibraryScanner.readMetadata(from: candidate)
+            if let existing = existingRoots.first(where: {
+                rootURLs[$0.id]?.standardizedFileURL == url.standardizedFileURL
+            }) {
+                guard didAccess || accessedRootIDs.contains(existing.id) else {
+                    throw NativePlaybackEngineError(
+                        "The selected music folder could not be accessed."
+                    )
                 }
+
+                existing.displayName = url.lastPathComponent
+                existing.bookmarkData = bookmark
+                let obsoleteRoots = existingRoots.filter { $0.id != existing.id }
+                let obsoleteRootIDs = Set(obsoleteRoots.map(\.id))
+                for file in existingFiles where obsoleteRootIDs.contains(file.rootID) {
+                    context.delete(file)
+                }
+                for root in obsoleteRoots { context.delete(root) }
+
+                let currentFiles = existingFiles.filter { $0.rootID == existing.id }
+                apply(scannedFiles, to: existing.id, replacing: currentFiles)
+                existing.lastScanDate = Date()
+                try context.save()
+                releaseAccess(for: obsoleteRoots)
+
+                if accessedRootIDs.contains(existing.id) {
+                    if didAccess { url.stopAccessingSecurityScopedResource() }
+                } else {
+                    retain(url: url, for: existing.id, didAccess: didAccess)
+                }
+            } else {
+                guard didAccess else {
+                    throw NativePlaybackEngineError(
+                        "The selected music folder could not be accessed."
+                    )
+                }
+
+                let root = LocalLibraryRootRecord(
+                    displayName: url.lastPathComponent,
+                    bookmarkData: bookmark,
+                    lastScanDate: Date()
+                )
+                context.insert(root)
+                for file in existingFiles { context.delete(file) }
+                for existingRoot in existingRoots { context.delete(existingRoot) }
+                apply(scannedFiles, to: root.id, replacing: [])
+                try context.save()
+                releaseAccess(for: existingRoots)
+                retain(url: url, for: root.id, didAccess: didAccess)
             }
 
-            while let result = await group.next() {
-                completed += 1
-                if let result { scanned.append(result) }
-                statusMessage = "Reading metadata \(completed) / \(candidates.count)…"
-                if let candidate = iterator.next() {
-                    group.addTask {
-                        try? await LocalLibraryScanner.readMetadata(from: candidate)
-                    }
-                }
+            rebuildLookup()
+            statusMessage = "Library index connected"
+        } catch {
+            context.rollback()
+            if didAccess { url.stopAccessingSecurityScopedResource() }
+            connectionErrorMessage = manifestErrorMessage(error)
+        }
+    }
+
+    private func apply(
+        _ scannedFiles: [ScannedAudioFile],
+        to rootID: String,
+        replacing existingFiles: [LocalAudioFileRecord]
+    ) {
+        let existingByPath = Dictionary(
+            uniqueKeysWithValues: existingFiles.map { ($0.relativePath, $0) }
+        )
+        let importedPaths = Set(scannedFiles.map(\.relativePath))
+
+        for record in existingFiles where !importedPaths.contains(record.relativePath) {
+            context.delete(record)
+        }
+        for scanned in scannedFiles {
+            if let record = existingByPath[scanned.relativePath] {
+                record.update(from: scanned)
+            } else {
+                context.insert(
+                    LocalAudioFileRecord(rootID: rootID, scanned: scanned)
+                )
             }
         }
-        return scanned
+    }
+
+    private func manifestErrorMessage(_ error: Error) -> String {
+        let message = error.localizedDescription
+        if (error as NSError).domain == NSCocoaErrorDomain,
+           (error as NSError).code == NSFileReadNoSuchFileError {
+            #if os(macOS)
+            return "No library.json found. Create it in MusiCards or run the Python indexer."
+            #else
+            return "No library.json found. Create it with MusiCards for Mac or the Python indexer."
+            #endif
+        }
+        return "Could not connect library.json: \(message)"
     }
 
     private func restoreRoots() {
