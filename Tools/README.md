@@ -29,6 +29,8 @@ python3 generate_library.py "/path/to/Music" --output "/path/to/library.json"
 The first run reads the metadata of every supported file. Later runs reuse
 unchanged album entries by comparing filename, file size and modification time.
 Writing is atomic, so an interrupted run does not damage the previous index.
+Folders without a MusicBrainz Release MBID are omitted and summarized when the
+run finishes.
 
 Supported containers:
 

@@ -6,11 +6,23 @@
 #if os(macOS)
 import Foundation
 
+nonisolated struct LocalLibraryManifestGenerationSummary: Sendable {
+    let indexedAlbumCount: Int
+    let indexedTrackCount: Int
+    let skippedFolderCount: Int
+
+    var warningMessage: String? {
+        guard skippedFolderCount > 0 else { return nil }
+        let noun = skippedFolderCount == 1 ? "folder" : "folders"
+        return "\(skippedFolderCount) \(noun) skipped · missing Release MBID"
+    }
+}
+
 enum LocalLibraryManifestGenerator {
     nonisolated static func generate(
         in rootURL: URL,
         progress: @escaping @MainActor @Sendable (String) -> Void
-    ) async throws {
+    ) async throws -> LocalLibraryManifestGenerationSummary {
         await progress("Finding audio files…")
         let candidates = try await Task.detached(priority: .utility) {
             try LocalLibraryScanner.enumerateAudioFiles(in: rootURL)
@@ -23,6 +35,7 @@ enum LocalLibraryManifestGenerator {
         let groupedCandidates = Dictionary(grouping: candidates, by: folderPath)
         let folders = groupedCandidates.keys.sorted()
         var albums: [LocalLibraryManifestAlbum] = []
+        var skippedFolderCount = 0
 
         for (index, folder) in folders.enumerated() {
             let folderCandidates = (groupedCandidates[folder] ?? [])
@@ -40,6 +53,8 @@ enum LocalLibraryManifestGenerator {
                 candidates: folderCandidates
             ) {
                 albums.append(album)
+            } else {
+                skippedFolderCount += 1
             }
         }
 
@@ -50,6 +65,11 @@ enum LocalLibraryManifestGenerator {
         try data.write(
             to: rootURL.appendingPathComponent(LocalLibraryManifestLoader.fileName),
             options: .atomic
+        )
+        return LocalLibraryManifestGenerationSummary(
+            indexedAlbumCount: albums.count,
+            indexedTrackCount: albums.reduce(0) { $0 + $1.tracks.count },
+            skippedFolderCount: skippedFolderCount
         )
     }
 

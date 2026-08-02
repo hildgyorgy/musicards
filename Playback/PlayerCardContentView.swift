@@ -138,7 +138,11 @@ struct PlayerCardContentView: View {
                 ?? "NO MUSIC FOLDER"
         }
         let summary = localLibrary.summary
-        return "\(summary.releaseCount) RELEASES · \(summary.trackCount) TRACKS"
+        let counts = "\(summary.releaseCount) RELEASES · \(summary.trackCount) TRACKS"
+        if let warning = localLibrary.indexWarningMessage {
+            return "\(counts) · \(warning.uppercased())"
+        }
+        return counts
     }
 
     private var playbackStatusText: String {

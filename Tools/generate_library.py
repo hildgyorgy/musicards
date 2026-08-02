@@ -384,6 +384,7 @@ def main():
     started_at = time.perf_counter()
     print(f"🎵 Music library indexing started: {music_dir}")
     library = []
+    skipped_missing_release_mbid = 0
     existing_library = load_existing_library(output_path)
 
     for root, dirs, files in os.walk(music_dir):
@@ -456,6 +457,7 @@ def main():
             continue
         if not album_meta["album_mbid"]:
             print(f"⚠️ Skipped (Release MBID is missing): {root}")
+            skipped_missing_release_mbid += 1
             continue
 
         album_name = album_meta["album_name"] or os.path.basename(root)
@@ -494,6 +496,12 @@ def main():
 
     elapsed_seconds = time.perf_counter() - started_at
     print(f"\n🎉 SUCCESS! The library index has been created: {output_path}")
+    if skipped_missing_release_mbid:
+        noun = "folder" if skipped_missing_release_mbid == 1 else "folders"
+        print(
+            f"⚠️ {skipped_missing_release_mbid} {noun} skipped "
+            "because Release MBID is missing."
+        )
     print(f"⏱️ Indexing completed in {elapsed_seconds:.2f} seconds.")
 
 

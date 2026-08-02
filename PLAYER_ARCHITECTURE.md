@@ -90,6 +90,9 @@ MusiCards audio player. It is the shared starting point for future player work.
   lookup. The macOS generator writes the same relative paths and MusicBrainz
   identifiers as the Python tool, then connects the generated index
   automatically.
+- The macOS generator and Python utility both report how many audio folders
+  were omitted because a MusicBrainz Release MBID was missing. Omission remains
+  intentional, but is no longer silent.
 - iOS never walks the connected folder or downloads the collection to build an
   index. Remote audio content is accessed only when its track is played.
 - Folder access remains user-controlled. MusiCards must not silently scan the

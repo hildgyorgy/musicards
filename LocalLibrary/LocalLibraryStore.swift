@@ -14,6 +14,7 @@ final class LocalLibraryStore: ObservableObject {
     @Published private(set) var isScanning = false
     @Published private(set) var statusMessage: String?
     @Published private(set) var connectionErrorMessage: String?
+    @Published private(set) var indexWarningMessage: String?
 
     private let container: ModelContainer
     private let context: ModelContext
@@ -77,6 +78,7 @@ final class LocalLibraryStore: ObservableObject {
             let bookmark = try makeBookmark(for: url)
             isScanning = true
             connectionErrorMessage = nil
+            indexWarningMessage = nil
             statusMessage = "Connecting music folder…"
             Task {
                 await connectMusicFolder(
@@ -107,11 +109,12 @@ final class LocalLibraryStore: ObservableObject {
             let bookmark = try makeBookmark(for: url)
             isScanning = true
             connectionErrorMessage = nil
+            indexWarningMessage = nil
             statusMessage = "Preparing library index…"
 
             Task {
                 do {
-                    try await LocalLibraryManifestGenerator.generate(
+                    let generationSummary = try await LocalLibraryManifestGenerator.generate(
                         in: url,
                         progress: { [weak self] message in
                             self?.statusMessage = message
@@ -123,6 +126,9 @@ final class LocalLibraryStore: ObservableObject {
                         bookmark: bookmark,
                         didAccess: didAccess
                     )
+                    if connectionErrorMessage == nil {
+                        indexWarningMessage = generationSummary.warningMessage
+                    }
                 } catch {
                     isScanning = false
                     url.stopAccessingSecurityScopedResource()
