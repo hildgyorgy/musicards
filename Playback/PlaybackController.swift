@@ -6,6 +6,10 @@
 import Combine
 import Foundation
 
+struct PlaybackQueueRequest: Equatable, Sendable {
+    fileprivate let generation: UInt64
+}
+
 @MainActor
 final class PlaybackController: ObservableObject {
     @Published private(set) var queue: [PlaybackQueueItem] = []
@@ -16,6 +20,7 @@ final class PlaybackController: ObservableObject {
 
     private let engine: PlaybackEngine
     private var preparedItemID: PlaybackQueueItem.ID?
+    private var playbackGeneration: UInt64 = 0
 
     init(engine: PlaybackEngine) {
         self.engine = engine
@@ -41,11 +46,46 @@ final class PlaybackController: ObservableObject {
         return currentIndex < queue.index(before: queue.endIndex)
     }
 
+    func beginQueueRequest() -> PlaybackQueueRequest {
+        let generation = advancePlaybackGeneration()
+        status = .loading
+        return PlaybackQueueRequest(generation: generation)
+    }
+
+    @discardableResult
+    func prepareForQueueReplacement(
+        _ request: PlaybackQueueRequest
+    ) async -> Bool {
+        guard isCurrent(request) else { return false }
+        await engine.stop()
+        guard isCurrent(request) else { return false }
+        preparedItemID = nil
+        position = 0
+        preparedDuration = nil
+        return true
+    }
+
+    func abandonQueueRequest(_ request: PlaybackQueueRequest) {
+        guard isCurrent(request) else { return }
+        status = queue.isEmpty ? .idle : .stopped
+    }
+
+    @discardableResult
     func replaceQueue(
         with items: [PlaybackQueueItem],
-        startingAt requestedIndex: Int = 0
-    ) async {
+        startingAt requestedIndex: Int = 0,
+        request: PlaybackQueueRequest? = nil
+    ) async -> Bool {
+        let generation: UInt64
+        if let request {
+            guard isCurrent(request) else { return false }
+            generation = request.generation
+        } else {
+            generation = advancePlaybackGeneration()
+        }
+
         await engine.stop()
+        guard generation == playbackGeneration else { return false }
 
         queue = items
         preparedItemID = nil
@@ -55,11 +95,12 @@ final class PlaybackController: ObservableObject {
         guard !items.isEmpty else {
             currentIndex = nil
             status = .idle
-            return
+            return true
         }
 
         currentIndex = min(max(requestedIndex, 0), items.count - 1)
         status = .idle
+        return true
     }
 
     func clearQueue() async {
@@ -67,21 +108,37 @@ final class PlaybackController: ObservableObject {
     }
 
     func play() async {
-        guard let currentItem else { return }
+        guard status != .loading, let currentItem else { return }
+        let generation = playbackGeneration
+        let itemID = currentItem.id
 
         do {
-            if preparedItemID != currentItem.id {
+            if preparedItemID != itemID {
                 status = .loading
                 position = 0
                 preparedDuration = currentItem.track.duration
                 try await engine.prepare(currentItem)
-                preparedItemID = currentItem.id
+                guard isCurrent(generation: generation, itemID: itemID),
+                      !Task.isCancelled else {
+                    await engine.stop()
+                    return
+                }
+                preparedItemID = itemID
                 status = .ready
             }
 
             try await engine.play()
+            guard isCurrent(generation: generation, itemID: itemID),
+                  !Task.isCancelled else {
+                await engine.stop()
+                return
+            }
             status = .playing
         } catch {
+            guard isCurrent(generation: generation, itemID: itemID),
+                  !(error is CancellationError) else {
+                return
+            }
             fail(with: error)
         }
     }
@@ -93,6 +150,7 @@ final class PlaybackController: ObservableObject {
     }
 
     func togglePlayback() async {
+        guard status != .loading else { return }
         if status.isPlaying {
             await pause()
         } else {
@@ -101,9 +159,10 @@ final class PlaybackController: ObservableObject {
     }
 
     func stop() async {
-        await engine.stop()
+        _ = advancePlaybackGeneration()
         position = 0
         status = queue.isEmpty ? .idle : .stopped
+        await engine.stop()
     }
 
     func seek(to requestedPosition: TimeInterval) async {
@@ -122,8 +181,10 @@ final class PlaybackController: ObservableObject {
 
     func selectItem(at index: Int, autoplay: Bool = false) async {
         guard queue.indices.contains(index) else { return }
+        let generation = advancePlaybackGeneration()
 
         await engine.stop()
+        guard generation == playbackGeneration else { return }
         currentIndex = index
         preparedItemID = nil
         position = 0
@@ -151,7 +212,6 @@ final class PlaybackController: ObservableObject {
         switch event {
         case .prepared(let duration):
             preparedDuration = duration ?? currentItem?.track.duration
-            status = .ready
         case .started:
             status = .playing
         case .paused:
@@ -173,5 +233,22 @@ final class PlaybackController: ObservableObject {
 
     private func fail(with error: Error) {
         status = .failed(PlaybackFailure(error))
+    }
+
+    @discardableResult
+    private func advancePlaybackGeneration() -> UInt64 {
+        playbackGeneration &+= 1
+        return playbackGeneration
+    }
+
+    private func isCurrent(_ request: PlaybackQueueRequest) -> Bool {
+        request.generation == playbackGeneration
+    }
+
+    private func isCurrent(
+        generation: UInt64,
+        itemID: PlaybackQueueItem.ID
+    ) -> Bool {
+        generation == playbackGeneration && currentItem?.id == itemID
     }
 }

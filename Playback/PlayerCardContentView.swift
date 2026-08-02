@@ -45,6 +45,7 @@ struct PlayerCardContentView: View {
                                 : "play.fill"
                         )
                     }
+                    .disabled(controller.status == .loading)
                 }
                 .buttonStyle(.plain)
                 .font(.title2)

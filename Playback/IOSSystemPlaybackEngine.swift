@@ -21,6 +21,7 @@ final class IOSSystemPlaybackEngine: NSObject, PlaybackEngine {
     private var shouldResumeAfterInterruption = false
     private var needsOutputRebuildAfterInterruption = false
     private var resumeBlockedByRouteDisconnect = false
+    private var preparationGeneration: UInt64 = 0
 
     override init() {
         super.init()
@@ -50,13 +51,21 @@ final class IOSSystemPlaybackEngine: NSObject, PlaybackEngine {
             throw NativePlaybackEngineError("Unsupported audio source")
         }
 
-        await stop()
+        preparationGeneration &+= 1
+        let generation = preparationGeneration
+        await stopPlayback()
+        guard generation == preparationGeneration else {
+            throw CancellationError()
+        }
         disposeOutputUnit()
         decodedPCM = nil
 
         let decodedPCM = try await Task.detached(priority: .userInitiated) {
             try LocalAudioFileDecoder.decode(url: url)
         }.value
+        guard generation == preparationGeneration, !Task.isCancelled else {
+            throw CancellationError()
+        }
 
         try configureAudioSession(sourceSampleRate: decodedPCM.sampleRate)
         try configureOutputUnit(for: decodedPCM)
@@ -68,6 +77,7 @@ final class IOSSystemPlaybackEngine: NSObject, PlaybackEngine {
         guard let decodedPCM else {
             throw NativePlaybackEngineError("No decoded track is ready")
         }
+        let generation = preparationGeneration
 
         if isInterrupted, isRouteDisconnectInterruption {
             try recoverFromRouteDisconnectInterruption()
@@ -85,6 +95,9 @@ final class IOSSystemPlaybackEngine: NSObject, PlaybackEngine {
 
         if MCPPCMRendererDidFinish(decodedPCM.renderer) {
             try await seekDecoder(decodedPCM, to: 0)
+        }
+        guard isCurrent(decodedPCM, generation: generation) else {
+            throw CancellationError()
         }
 
         MCPPCMRendererSetPlaying(decodedPCM.renderer, true)
@@ -116,6 +129,11 @@ final class IOSSystemPlaybackEngine: NSObject, PlaybackEngine {
     }
 
     func stop() async {
+        preparationGeneration &+= 1
+        await stopPlayback()
+    }
+
+    private func stopPlayback() async {
         shouldResumeAfterInterruption = false
         resumeBlockedByRouteDisconnect = false
 
@@ -135,6 +153,7 @@ final class IOSSystemPlaybackEngine: NSObject, PlaybackEngine {
         guard let decodedPCM else {
             throw NativePlaybackEngineError("No decoded track is ready")
         }
+        let generation = preparationGeneration
 
         let requestedFrame = position * decodedPCM.sampleRate
         let boundedFrame = UInt64(
@@ -144,6 +163,9 @@ final class IOSSystemPlaybackEngine: NSObject, PlaybackEngine {
         MCPPCMRendererSetPlaying(decodedPCM.renderer, false)
         stopOutputUnit()
         try await seekDecoder(decodedPCM, to: boundedFrame)
+        guard isCurrent(decodedPCM, generation: generation) else {
+            throw CancellationError()
+        }
         if wasPlaying {
             try await play()
         }
@@ -516,6 +538,13 @@ final class IOSSystemPlaybackEngine: NSObject, PlaybackEngine {
 
     private func duration(of decodedPCM: DecodedPCM) -> TimeInterval {
         Double(decodedPCM.frameCount) / decodedPCM.sampleRate
+    }
+
+    private func isCurrent(
+        _ decodedPCM: DecodedPCM,
+        generation: UInt64
+    ) -> Bool {
+        generation == preparationGeneration && self.decodedPCM === decodedPCM
     }
 
     private func seekDecoder(

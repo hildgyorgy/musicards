@@ -16,19 +16,28 @@ final class MacSystemPlaybackEngine: PlaybackEngine {
     private var decodedPCM: DecodedPCM?
     private var progressTask: Task<Void, Never>?
     private var isOutputRunning = false
+    private var preparationGeneration: UInt64 = 0
 
     func prepare(_ item: PlaybackQueueItem) async throws {
         guard case .localFile(let url) = item.source else {
             throw NativePlaybackEngineError("Unsupported audio source")
         }
 
-        await stop()
+        preparationGeneration &+= 1
+        let generation = preparationGeneration
+        await stopPlayback()
+        guard generation == preparationGeneration else {
+            throw CancellationError()
+        }
         disposeOutputUnit()
         decodedPCM = nil
 
         let decodedPCM = try await Task.detached(priority: .userInitiated) {
             try LocalAudioFileDecoder.decode(url: url)
         }.value
+        guard generation == preparationGeneration, !Task.isCancelled else {
+            throw CancellationError()
+        }
 
         matchDefaultOutputSampleRate(decodedPCM.sampleRate)
         try configureOutputUnit(for: decodedPCM)
@@ -37,12 +46,17 @@ final class MacSystemPlaybackEngine: PlaybackEngine {
     }
 
     func play() async throws {
-        guard let decodedPCM, let outputUnit else {
+        guard let decodedPCM else {
             throw NativePlaybackEngineError("No decoded track is ready")
         }
+        let generation = preparationGeneration
 
         if MCPPCMRendererDidFinish(decodedPCM.renderer) {
             try await seekDecoder(decodedPCM, to: 0)
+        }
+        guard isCurrent(decodedPCM, generation: generation),
+              let outputUnit else {
+            throw CancellationError()
         }
 
         MCPPCMRendererSetPlaying(decodedPCM.renderer, true)
@@ -73,6 +87,11 @@ final class MacSystemPlaybackEngine: PlaybackEngine {
     }
 
     func stop() async {
+        preparationGeneration &+= 1
+        await stopPlayback()
+    }
+
+    private func stopPlayback() async {
         if let decodedPCM {
             MCPPCMRendererSetPlaying(decodedPCM.renderer, false)
         }
@@ -89,6 +108,7 @@ final class MacSystemPlaybackEngine: PlaybackEngine {
         guard let decodedPCM else {
             throw NativePlaybackEngineError("No decoded track is ready")
         }
+        let generation = preparationGeneration
 
         let requestedFrame = position * decodedPCM.sampleRate
         let boundedFrame = UInt64(
@@ -98,6 +118,9 @@ final class MacSystemPlaybackEngine: PlaybackEngine {
         MCPPCMRendererSetPlaying(decodedPCM.renderer, false)
         stopOutputUnit()
         try await seekDecoder(decodedPCM, to: boundedFrame)
+        guard isCurrent(decodedPCM, generation: generation) else {
+            throw CancellationError()
+        }
         if wasPlaying {
             try await play()
         }
@@ -298,6 +321,13 @@ final class MacSystemPlaybackEngine: PlaybackEngine {
 
     private func duration(of decodedPCM: DecodedPCM) -> TimeInterval {
         Double(decodedPCM.frameCount) / decodedPCM.sampleRate
+    }
+
+    private func isCurrent(
+        _ decodedPCM: DecodedPCM,
+        generation: UInt64
+    ) -> Bool {
+        generation == preparationGeneration && self.decodedPCM === decodedPCM
     }
 
     private func seekDecoder(

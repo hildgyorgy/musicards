@@ -90,10 +90,14 @@ final class MusiCardsAppModel: ObservableObject {
     }
 
     func playLocalFile(_ url: URL) {
+        let request = playbackController.beginQueueRequest()
         Task {
+            guard await playbackController.prepareForQueueReplacement(request)
+            else { return }
             let artworkData = await LocalAudioMetadataLoader.artworkData(
                 from: url
             )
+            guard !Task.isCancelled else { return }
             let track = PlaybackTrack(
                 id: url.standardizedFileURL.path,
                 recordingID: nil,
@@ -109,7 +113,10 @@ final class MusiCardsAppModel: ObservableObject {
                 source: .localFile(url)
             )
 
-            await playbackController.replaceQueue(with: [item])
+            guard await playbackController.replaceQueue(
+                with: [item],
+                request: request
+            ) else { return }
             await playbackController.play()
         }
     }
@@ -133,10 +140,14 @@ final class MusiCardsAppModel: ObservableObject {
             return
         }
 
+        let request = playbackController.beginQueueRequest()
         Task {
+            guard await playbackController.prepareForQueueReplacement(request)
+            else { return }
             let artworkData = await LocalAudioMetadataLoader.artworkData(
                 from: selectedURL
             )
+            guard !Task.isCancelled else { return }
             let artist = MBTextFormatter.artistLine(from: release.artistCredit)
             var items: [PlaybackQueueItem] = []
             var selectedIndex = 0
@@ -183,11 +194,15 @@ final class MusiCardsAppModel: ObservableObject {
                 }
             }
 
-            guard !items.isEmpty else { return }
-            await playbackController.replaceQueue(
+            guard !items.isEmpty else {
+                playbackController.abandonQueueRequest(request)
+                return
+            }
+            guard await playbackController.replaceQueue(
                 with: items,
-                startingAt: selectedIndex
-            )
+                startingAt: selectedIndex,
+                request: request
+            ) else { return }
             await playbackController.play()
         }
     }
