@@ -48,6 +48,7 @@ final class MusiCardsAppModel: ObservableObject {
     let trackDetailStore: TrackDetailStore
     let classicalMetadataStore: ClassicalMetadataStore
     let playbackController: PlaybackController
+    let localLibrary: LocalLibraryStore
 
     private var localPlaybackNowPlayingCoordinator:
         PlatformNowPlayingCoordinator?
@@ -77,6 +78,7 @@ final class MusiCardsAppModel: ObservableObject {
         self.trackDetailStore = TrackDetailStore(service: service)
         self.classicalMetadataStore = ClassicalMetadataStore(service: service)
         self.playbackController = PlaybackController(engine: playbackEngine)
+        self.localLibrary = LocalLibraryStore()
         self.localPlaybackNowPlayingCoordinator =
             PlatformNowPlayingCoordinator(controller: self.playbackController)
 
@@ -84,6 +86,7 @@ final class MusiCardsAppModel: ObservableObject {
 #if os(iOS)
         startNowPlayingUpdates()
         #endif
+        localLibrary.startAutomaticRefresh()
     }
 
     func playLocalFile(_ url: URL) {
@@ -107,6 +110,84 @@ final class MusiCardsAppModel: ObservableObject {
             )
 
             await playbackController.replaceQueue(with: [item])
+            await playbackController.play()
+        }
+    }
+
+    func selectMusicFolder(_ url: URL) {
+        localLibrary.selectMusicFolder(url)
+    }
+
+    func refreshLocalLibrary() {
+        Task { await localLibrary.refreshAll() }
+    }
+
+    func playIndexedTrack(recordingID: String?) {
+        guard let release = selectedRelease,
+              let recordingID,
+              let selectedFile = localLibrary.audioFile(
+                releaseID: release.id,
+                recordingID: recordingID
+              ),
+              let selectedURL = localLibrary.url(for: selectedFile) else {
+            return
+        }
+
+        Task {
+            let artworkData = await LocalAudioMetadataLoader.artworkData(
+                from: selectedURL
+            )
+            let artist = MBTextFormatter.artistLine(from: release.artistCredit)
+            var items: [PlaybackQueueItem] = []
+            var selectedIndex = 0
+
+            for (mediumIndex, medium) in (release.media ?? []).enumerated() {
+                for track in medium.tracks ?? [] {
+                    guard let file = localLibrary.audioFile(
+                        releaseID: release.id,
+                        recordingID: track.recording?.id
+                    ), let url = localLibrary.url(for: file) else {
+                        continue
+                    }
+
+                    if track.recording?.id == recordingID {
+                        selectedIndex = items.count
+                    }
+                    let playbackTrack = PlaybackTrack(
+                        id: file.id,
+                        recordingID: file.recordingMBID,
+                        releaseID: file.releaseMBID,
+                        title: track.title,
+                        artist: artist.isEmpty ? file.artist : artist,
+                        albumTitle: release.title,
+                        duration: file.duration ?? track.length.map {
+                            Double($0) / 1_000
+                        },
+                        artworkData: artworkData,
+                        discNumber: medium.position ?? mediumIndex + 1,
+                        trackNumber: track.position,
+                        audioFormat: PlaybackAudioFormat(
+                            codec: file.codec,
+                            bitDepth: file.bitDepth,
+                            sampleRate: file.sampleRate,
+                            bitrate: file.bitrate,
+                            channelCount: file.channelCount
+                        )
+                    )
+                    items.append(
+                        PlaybackQueueItem(
+                            track: playbackTrack,
+                            source: .localFile(url)
+                        )
+                    )
+                }
+            }
+
+            guard !items.isEmpty else { return }
+            await playbackController.replaceQueue(
+                with: items,
+                startingAt: selectedIndex
+            )
             await playbackController.play()
         }
     }

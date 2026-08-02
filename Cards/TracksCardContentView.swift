@@ -10,6 +10,8 @@ import SwiftUI
 struct TracksCardContentView: View {
     let release: MBRelease?
     let onSelectArtist: (String) -> Void
+    @ObservedObject var localLibrary: LocalLibraryStore
+    let onPlayTrack: (String?) -> Void
     @ObservedObject var detailStore: TrackDetailStore
 
     @State private var expandedRecordingID: String?
@@ -182,14 +184,31 @@ struct TracksCardContentView: View {
     @ViewBuilder
     private func expandableTrackRow(_ row: TrackRow) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Button {
-                withAnimation(AppStyle.animation) {
-                    toggleExpanded(for: row)
+            HStack(spacing: 2) {
+                Button {
+                    withAnimation(AppStyle.animation) {
+                        toggleExpanded(for: row)
+                    }
+                } label: {
+                    trackRowView(row)
                 }
-            } label: {
-                trackRowView(row)
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity)
+
+                if isTrackPlayable(row.recordingID) {
+                    Button {
+                        onPlayTrack(row.recordingID)
+                    } label: {
+                        Image(systemName: "play.fill")
+                            .font(.caption)
+                            .frame(width: 28, height: 32)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Color.blue)
+                    .accessibilityLabel("Play local track")
+                }
             }
-            .buttonStyle(.plain)
             .zIndex(isExpanded(row) ? 10 : 0)
 
             if isExpanded(row) {
@@ -217,6 +236,17 @@ struct TracksCardContentView: View {
         TrackRowVisualView(
             row: row,
             isExpanded: isExpanded(row)
+        )
+    }
+
+    private func isTrackPlayable(_ recordingID: String?) -> Bool {
+        guard let releaseID = release?.id,
+              let recordingID else {
+            return false
+        }
+        return localLibrary.containsRecording(
+            releaseID: releaseID,
+            recordingID: recordingID
         )
     }
     

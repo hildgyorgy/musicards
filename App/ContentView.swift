@@ -79,6 +79,7 @@ struct ContentView: View {
     @StateObject private var appModel = MusiCardsAppModel()
 
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.scenePhase) private var scenePhase
 
     var boxBackground: Color {
         colorScheme == .dark
@@ -144,8 +145,15 @@ struct ContentView: View {
         case .player:
             PlayerCardContentView(
                 controller: appModel.playbackController,
+                localLibrary: appModel.localLibrary,
                 onSelectLocalFile: { url in
                     appModel.playLocalFile(url)
+                },
+                onSelectMusicFolder: { url in
+                    appModel.selectMusicFolder(url)
+                },
+                onRefreshLibrary: {
+                    appModel.refreshLocalLibrary()
                 }
             )
         }
@@ -160,6 +168,7 @@ struct ContentView: View {
         case .search:
             SearchCardContentView(
                 viewModel: appModel.searchViewModel,
+                localLibrary: appModel.localLibrary,
                 recentArtists: appModel.recentArtists,
                 recentReleases: appModel.recentReleases,
                 nowPlayingRelease: appModel.nowPlayingRelease,
@@ -222,6 +231,10 @@ struct ContentView: View {
                 release: appModel.selectedRelease,
                 onSelectArtist: { artistID in
                     appModel.selectArtist(id: artistID)
+                },
+                localLibrary: appModel.localLibrary,
+                onPlayTrack: { recordingID in
+                    appModel.playIndexedTrack(recordingID: recordingID)
                 },
                 detailStore: appModel.trackDetailStore,
                 classicalMetadataStore: appModel.classicalMetadataStore
@@ -295,5 +308,10 @@ struct ContentView: View {
             .easeInOut(duration: 0.15),
             value: appModel.isBlockingNavigationLoad
         )
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                appModel.localLibrary.refreshIfNeeded()
+            }
+        }
     }
 }

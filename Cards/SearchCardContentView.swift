@@ -9,6 +9,7 @@ import SwiftUI
 
 struct SearchCardContentView: View {
     @ObservedObject var viewModel: SearchViewModel
+    @ObservedObject var localLibrary: LocalLibraryStore
 
     let recentArtists: [SearchArtistRow]
     let recentReleases: [SearchReleaseRow]
@@ -212,6 +213,13 @@ struct SearchCardContentView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
 
             Spacer(minLength: 0)
+
+            if localLibrary.containsRelease(release.id) {
+                Image(systemName: "play.fill")
+                    .font(.caption2)
+                    .foregroundStyle(Color.blue)
+                    .accessibilityLabel("Available in local library")
+            }
         }
     }
 

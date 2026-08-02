@@ -8,9 +8,13 @@ import UniformTypeIdentifiers
 
 struct PlayerCardContentView: View {
     @ObservedObject var controller: PlaybackController
+    @ObservedObject var localLibrary: LocalLibraryStore
     let onSelectLocalFile: (URL) -> Void
+    let onSelectMusicFolder: (URL) -> Void
+    let onRefreshLibrary: () -> Void
 
     @State private var isFileImporterPresented = false
+    @State private var isFolderImporterPresented = false
 
     var body: some View {
         VStack(spacing: 18) {
@@ -58,6 +62,24 @@ struct PlayerCardContentView: View {
                 isFileImporterPresented = true
             }
             .buttonStyle(.bordered)
+
+            HStack(spacing: 10) {
+                Button("Select Music Folder") {
+                    isFolderImporterPresented = true
+                }
+                .buttonStyle(.bordered)
+                .disabled(localLibrary.isScanning)
+
+                Button("Refresh Library") {
+                    onRefreshLibrary()
+                }
+                .buttonStyle(.bordered)
+                .disabled(localLibrary.summary.folderCount == 0 || localLibrary.isScanning)
+            }
+
+            Text(libraryStatusText)
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .fileImporter(
@@ -71,6 +93,30 @@ struct PlayerCardContentView: View {
             }
             onSelectLocalFile(url)
         }
+        .fileImporter(
+            isPresented: $isFolderImporterPresented,
+            allowedContentTypes: [.folder],
+            allowsMultipleSelection: false
+        ) { result in
+            guard case .success(let urls) = result,
+                  let url = urls.first else {
+                return
+            }
+            onSelectMusicFolder(url)
+        }
+    }
+
+    private var libraryStatusText: String {
+        if localLibrary.isScanning {
+            return localLibrary.statusMessage?.uppercased()
+                ?? "SCANNING MUSIC LIBRARY…"
+        }
+        if localLibrary.summary.folderCount == 0 {
+            return localLibrary.statusMessage?.uppercased()
+                ?? "NO MUSIC FOLDER"
+        }
+        let summary = localLibrary.summary
+        return "\(summary.releaseCount) RELEASES · \(summary.trackCount) TRACKS"
     }
 
     private var playbackStatusText: String {

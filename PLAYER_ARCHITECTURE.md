@@ -75,9 +75,10 @@ MusiCards audio player. It is the shared starting point for future player work.
 
 - The web player’s temporary browser indexing model is not sufficient for a
   permanently installed native app.
-- The native app should remember user-approved music folders and restore
-  access across launches using the appropriate persistent permissions/security
-  bookmarks.
+- The native app remembers one user-selected music root and restores access
+  across launches using the appropriate persistent permission/security
+  bookmark. Selecting the same root refreshes it; selecting a different root
+  replaces the former index.
 - The index should be durable and incrementally refreshed rather than rebuilt
   from scratch whenever the app starts.
 - Folder access remains user-controlled. MusiCards must not silently scan the
@@ -86,6 +87,9 @@ MusiCards audio player. It is the shared starting point for future player work.
   - local files are the playable assets;
   - MusicBrainz releases and tracks provide the canonical viewer context;
   - matching connects the two without destructively rewriting either.
+- Search results expose local availability by exact release MBID. Once such a
+  release is loaded, its MusicBrainz tracks match local files by recording
+  MBID (Picard's `MUSICBRAINZ_TRACKID`) and become directly playable.
 
 ## Metadata behavior
 
@@ -115,7 +119,7 @@ MusiCards audio player. It is the shared starting point for future player work.
 3. Play one explicitly selected local file reliably, first on macOS and then
    on iOS behind the same engine boundary.
 4. Add basic transport state and connect it to the Player section.
-5. Add persistent user-approved folders and durable incremental indexing.
+5. Add a persistent user-selected music root and durable incremental indexing.
 6. Match local files to the release/track currently shown by MusiCards.
 7. Implement macOS output discovery, system-output routing and USB DAC routing.
 8. Verify sample-rate switching and document the exact bit-perfect conditions.
@@ -178,6 +182,18 @@ MusiCards audio player. It is the shared starting point for future player work.
   explicit system playback state required by MediaPlayer on macOS.
 - Background playback, system controls and embedded Now Playing artwork have
   passed physical-device validation on both platforms.
+- A persistent SwiftData local-library index is now connected on both
+  platforms. User-selected roots are retained as security-scoped bookmarks;
+  the app stores file fingerprints, MusicBrainz identities, display metadata
+  and technical audio properties rather than copying audio content.
+- Refresh is incremental: every supported path is enumerated, but unchanged
+  files are recognized by relative path, size and modification date. Only new
+  or changed ALAC/FLAC/AAC files have their metadata read again, and missing
+  paths are removed from the index.
+- MusicBrainz search rows show a small play indicator for locally indexed
+  release MBIDs. The Tracks card shows a play control only where the selected
+  release and recording MBIDs resolve to a local file; starting one builds a
+  queue from every locally available track of that release.
 - For explicitly selected files, Now Playing artwork uses embedded audio-file
   cover metadata when available. MusicBrainz/Cover Art Archive fallback remains
   deferred until local files are matched to MusiCards releases.
@@ -188,7 +204,7 @@ MusiCards audio player. It is the shared starting point for future player work.
 
 The immediate validation task is deliberately narrow:
 
-> Verify ordinary play/pause, seeking, end-of-track behavior and iOS route
-> interruption recovery with the new bounded feeder, using ALAC/FLAC/AAC and
-> at least one high-sample-rate file. A file without embedded artwork is still
-> expected to remain image-free until MusicBrainz release matching exists.
+> Select a Picard-tagged music folder, verify persistent restoration after an
+> app restart, search for one indexed release, and confirm its availability
+> indicator and track-level playback on macOS and iOS. Then add one album and
+> verify that Refresh Library indexes only the new files.

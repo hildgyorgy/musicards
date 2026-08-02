@@ -5,6 +5,14 @@
 
 import Foundation
 
+struct PlaybackAudioFormat: Equatable {
+    let codec: String
+    let bitDepth: Int?
+    let sampleRate: Double
+    let bitrate: Double?
+    let channelCount: Int
+}
+
 /// MusicBrainz-facing identity and display metadata for one playable track.
 /// The audio file remains a separate value so viewer data and local files do
 /// not become the same source of truth.
@@ -17,6 +25,35 @@ struct PlaybackTrack: Identifiable, Equatable {
     let albumTitle: String
     let duration: TimeInterval?
     let artworkData: Data?
+    let discNumber: Int?
+    let trackNumber: Int?
+    let audioFormat: PlaybackAudioFormat?
+
+    init(
+        id: String,
+        recordingID: String?,
+        releaseID: String?,
+        title: String,
+        artist: String,
+        albumTitle: String,
+        duration: TimeInterval?,
+        artworkData: Data?,
+        discNumber: Int? = nil,
+        trackNumber: Int? = nil,
+        audioFormat: PlaybackAudioFormat? = nil
+    ) {
+        self.id = id
+        self.recordingID = recordingID
+        self.releaseID = releaseID
+        self.title = title
+        self.artist = artist
+        self.albumTitle = albumTitle
+        self.duration = duration
+        self.artworkData = artworkData
+        self.discNumber = discNumber
+        self.trackNumber = trackNumber
+        self.audioFormat = audioFormat
+    }
 }
 
 /// A concrete asset the playback engine can open.
