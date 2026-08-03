@@ -15,7 +15,6 @@ enum DeckLayout {
     }
 
     static func cardHeight(
-        totalCards: Int,
         top: CGFloat,
         bottom: CGFloat
     ) -> CGFloat {
