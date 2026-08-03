@@ -7,29 +7,19 @@ import CoreGraphics
 
 enum DeckLayout {
     static func expandedTop(safeAreaTop: CGFloat) -> CGFloat {
-        safeAreaTop
-            + DeckStyle.expandedTopOffset
-            - DeckStyle.deckVerticalLift
+        safeAreaTop + DeckStyle.expandedTopInset
     }
 
-    static func collapsedBottomPadding(safeAreaBottom: CGFloat) -> CGFloat {
-        safeAreaBottom
-            + DeckStyle.collapsedBottomOffset
-            + DeckStyle.deckVerticalLift
+    static func cardBottom(containerHeight: CGFloat) -> CGFloat {
+        containerHeight - DeckStyle.cardBottomInset
     }
 
     static func cardHeight(
         totalCards: Int,
-        containerHeight: CGFloat,
-        safeAreaTop: CGFloat
+        top: CGFloat,
+        bottom: CGFloat
     ) -> CGFloat {
-        max(
-            DeckStyle.minimumCardHeight,
-            containerHeight
-            - expandedTop(safeAreaTop: safeAreaTop)
-            - DeckStyle.expandedBottomPadding
-            - CGFloat(totalCards - 1) * DeckStyle.peek
-        )
+        max(1, bottom - top)
     }
 
     static func yPosition(
@@ -37,16 +27,15 @@ enum DeckLayout {
         activeSlotIndex: Int,
         totalCards: Int,
         containerHeight: CGFloat,
-        safeAreaTop: CGFloat,
-        safeAreaBottom: CGFloat
+        safeAreaTop: CGFloat
     ) -> CGFloat {
         if index <= activeSlotIndex {
             return expandedTop(safeAreaTop: safeAreaTop) + CGFloat(index - 1) * DeckStyle.peek
         } else {
             let collapsedBaseY =
-                containerHeight
-                - collapsedBottomPadding(safeAreaBottom: safeAreaBottom)
-                - (CGFloat(totalCards) + DeckStyle.collapsedExtraPeekCount) * DeckStyle.peek
+                cardBottom(containerHeight: containerHeight)
+                - DeckStyle.collapsedPlayerHeight
+                - CGFloat(totalCards - 1) * DeckStyle.peek
 
             return collapsedBaseY + CGFloat(index - 1) * DeckStyle.peek
         }

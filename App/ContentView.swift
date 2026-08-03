@@ -300,29 +300,33 @@ struct ContentView: View {
                     }
                 )
             #else
-                DeckView(
-                    cards: cards,
-                    selection: $appModel.deckSelection,
-                    showsCollapsedHeader: { card in
-                        card.id == .player && appModel.hasCurrentPlaybackItem
-                    },
-                    collapsedHeaderProvider: { card in
-                        collapsedHeaderContent(card)
-                    },
-                    headerProvider: { card in
-                        headerContent(card)
-                    },
-                    contentProvider: { card in
-                        cardContent(card)
-                    },
-                    background: {
-                        ZStack {
-                            boxBackground
-                            DeckBackgroundView()
+                GeometryReader { viewportProxy in
+                    DeckView(
+                        cards: cards,
+                        viewportSafeAreaTop: viewportProxy.safeAreaInsets.top,
+                        viewportSafeAreaBottom: viewportProxy.safeAreaInsets.bottom,
+                        selection: $appModel.deckSelection,
+                        showsCollapsedHeader: { card in
+                            card.id == .player && appModel.hasCurrentPlaybackItem
+                        },
+                        collapsedHeaderProvider: { card in
+                            collapsedHeaderContent(card)
+                        },
+                        headerProvider: { card in
+                            headerContent(card)
+                        },
+                        contentProvider: { card in
+                            cardContent(card)
+                        },
+                        background: {
+                            ZStack {
+                                boxBackground
+                                DeckBackgroundView()
+                            }
                         }
-                    }
-                )
-                .ignoresSafeArea()
+                    )
+                    .ignoresSafeArea()
+                }
             #endif
 
             #if os(iOS)

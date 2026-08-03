@@ -37,6 +37,7 @@ struct CollapsedPlayerBar: View {
             ) {
                 await controller.selectNext()
             }
+            .padding(.trailing, 14)
 
             VStack(spacing: 4) {
                 HStack(spacing: 8) {
@@ -114,7 +115,7 @@ struct CollapsedPlayerBar: View {
     private let timeFont: Font = .caption
     #else
     private let platformSpacing: CGFloat = 0
-    private let horizontalPadding: CGFloat = 6
+    private let horizontalPadding: CGFloat = 0
     private let buttonSize: CGFloat = 44
     private let controlFont: Font = .title3
     private let titleFont: Font = .subheadline.weight(.medium)

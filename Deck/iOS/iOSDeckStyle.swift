@@ -16,20 +16,37 @@ enum DeckStyle {
     static let maximumPadCardWidth: CGFloat = 600
     static let minimumPadHorizontalMargin: CGFloat = 8
 
-    static let expandedBottomPadding: CGFloat = 90
-
-    static let expandedTopOffset: CGFloat = -28
-    static let collapsedBottomOffset: CGFloat = 8
-    static let deckVerticalLift: CGFloat = 12
-    static let minimumCardHeight: CGFloat = 180
-    
-    static let collapsedExtraPeekCount: CGFloat = 2.8
+    static let expandedTopInset: CGFloat = 0
+    static let cardBottomInset: CGFloat = 8
 
     static let peek: CGFloat = 40
 
     // MARK: - Card shape
 
-    static let cornerRadius: CGFloat = 35
+    static let topCornerRadius: CGFloat = 35
+
+    static func bottomCornerRadius(
+        viewportWidth: CGFloat,
+        viewportSafeAreaTop: CGFloat,
+        viewportSafeAreaBottom: CGFloat
+    ) -> CGFloat {
+        guard UIDevice.current.userInterfaceIdiom == .phone else {
+            return topCornerRadius
+        }
+
+        let cardInset = max(horizontalInset, cardBottomInset)
+        let estimatedViewportRadius: CGFloat
+
+        if viewportSafeAreaTop > 30 {
+            estimatedViewportRadius = viewportSafeAreaTop
+        } else if viewportSafeAreaBottom > 0 {
+            estimatedViewportRadius = viewportWidth * 0.148
+        } else {
+            estimatedViewportRadius = topCornerRadius + cardInset
+        }
+
+        return max(topCornerRadius, estimatedViewportRadius - cardInset)
+    }
 
     // MARK: - Card border
 
@@ -50,7 +67,7 @@ enum DeckStyle {
     static let cardLabelTopPadding: CGFloat = 12
     static let cardLabelColor: Color = .secondary
     static let cardLabelHitHeight: CGFloat = 56
-    static let collapsedPlayerHeight: CGFloat = 76
+    static let collapsedPlayerHeight: CGFloat = 92
     
     // MARK: - Header
 

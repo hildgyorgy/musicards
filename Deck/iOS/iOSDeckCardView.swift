@@ -7,6 +7,9 @@ import SwiftUI
 
 struct DeckCardView<ID: Hashable, CollapsedHeaderContent: View, HeaderContent: View, CardContent: View>: View {
     let card: DeckCard<ID>
+    let cardWidth: CGFloat
+    let cardHeight: CGFloat
+    let bottomCornerRadius: CGFloat
     let isActive: Bool
     let showsCollapsedHeader: Bool
     let onTap: () -> Void
@@ -21,6 +24,9 @@ struct DeckCardView<ID: Hashable, CollapsedHeaderContent: View, HeaderContent: V
 
     init(
         card: DeckCard<ID>,
+        cardWidth: CGFloat,
+        cardHeight: CGFloat,
+        bottomCornerRadius: CGFloat,
         isActive: Bool,
         showsCollapsedHeader: Bool,
         onTap: @escaping () -> Void,
@@ -33,6 +39,9 @@ struct DeckCardView<ID: Hashable, CollapsedHeaderContent: View, HeaderContent: V
         @ViewBuilder content: () -> CardContent
     ) {
         self.card = card
+        self.cardWidth = cardWidth
+        self.cardHeight = cardHeight
+        self.bottomCornerRadius = bottomCornerRadius
         self.isActive = isActive
         self.showsCollapsedHeader = showsCollapsedHeader
         self.onTap = onTap
@@ -59,19 +68,31 @@ struct DeckCardView<ID: Hashable, CollapsedHeaderContent: View, HeaderContent: V
             : DeckStyle.strokeLight
     }
 
+    private var cardShape: UnevenRoundedRectangle {
+        UnevenRoundedRectangle(
+            topLeadingRadius: DeckStyle.topCornerRadius,
+            bottomLeadingRadius: bottomCornerRadius,
+            bottomTrailingRadius: bottomCornerRadius,
+            topTrailingRadius: DeckStyle.topCornerRadius,
+            style: .continuous
+        )
+    }
+
     var body: some View {
         ZStack(alignment: .top) {
             cardContent
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(cardBackground)
-        .clipShape(
-            RoundedRectangle(cornerRadius: DeckStyle.cornerRadius, style: .continuous)
+        .frame(
+            width: cardWidth,
+            height: cardHeight,
+            alignment: .top
         )
+        .background(cardBackground)
+        .clipShape(cardShape)
         .overlay(
-            RoundedRectangle(cornerRadius: DeckStyle.cornerRadius, style: .continuous)
-                .strokeBorder(strokeColor, lineWidth: DeckStyle.strokeWidth)
+            cardShape
+                .stroke(strokeColor, lineWidth: DeckStyle.strokeWidth)
         )
         .shadow(
             color: DeckStyle.shadowColor,
@@ -111,6 +132,11 @@ struct DeckCardView<ID: Hashable, CollapsedHeaderContent: View, HeaderContent: V
 
             if isShowingCollapsedHeader {
                 collapsedHeader
+                    .frame(
+                        maxWidth: .infinity,
+                        minHeight: DeckStyle.topCornerRadius * 2,
+                        maxHeight: DeckStyle.topCornerRadius * 2
+                    )
                     .transition(.opacity)
             } else {
                 Text(card.cardLabel)

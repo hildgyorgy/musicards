@@ -8,6 +8,8 @@ import SwiftUI
 struct DeckView<ID: Hashable, BackgroundContent: View, CollapsedHeaderContent: View, HeaderContent: View, CardContent: View>: View {
     let backgroundProvider: () -> BackgroundContent
     let cards: [DeckCard<ID>]
+    let viewportSafeAreaTop: CGFloat
+    let viewportSafeAreaBottom: CGFloat
     @Binding var selection: DeckSelection<ID>
 
     private var activeSlotIndex: Int {
@@ -38,6 +40,8 @@ struct DeckView<ID: Hashable, BackgroundContent: View, CollapsedHeaderContent: V
 
     init(
         cards: [DeckCard<ID>],
+        viewportSafeAreaTop: CGFloat,
+        viewportSafeAreaBottom: CGFloat,
         selection: Binding<DeckSelection<ID>>,
         showsCollapsedHeader: @escaping (DeckCard<ID>) -> Bool,
         @ViewBuilder collapsedHeaderProvider: @escaping (DeckCard<ID>) -> CollapsedHeaderContent,
@@ -46,6 +50,8 @@ struct DeckView<ID: Hashable, BackgroundContent: View, CollapsedHeaderContent: V
         @ViewBuilder background: @escaping () -> BackgroundContent,
     ) {
         self.cards = cards
+        self.viewportSafeAreaTop = viewportSafeAreaTop
+        self.viewportSafeAreaBottom = viewportSafeAreaBottom
         self._selection = selection
         self.showsCollapsedHeader = showsCollapsedHeader
         self.collapsedHeaderProvider = collapsedHeaderProvider
@@ -74,27 +80,55 @@ struct DeckView<ID: Hashable, BackgroundContent: View, CollapsedHeaderContent: V
                 ? min(padAvailableWidth, DeckStyle.maximumPadCardWidth)
                 : phoneCardWidth
 
-            ZStack {
+            let bottomCornerRadius = DeckStyle.bottomCornerRadius(
+                viewportWidth: proxy.size.width,
+                viewportSafeAreaTop: viewportSafeAreaTop,
+                viewportSafeAreaBottom: viewportSafeAreaBottom
+            )
+
+            ZStack(alignment: .topLeading) {
+                Color.clear
+                    .frame(
+                        width: proxy.size.width,
+                        height: proxy.size.height
+                    )
+
                 backgroundProvider()
+                    .frame(
+                        width: proxy.size.width,
+                        height: proxy.size.height
+                    )
+
                 ForEach(Array(cards.enumerated()), id: \.element.id) { _, card in
                     let index = card.slotIndex
-
-                    let cardHeight = DeckLayout.cardHeight(
-                        totalCards: cards.count,
-                        containerHeight: proxy.size.height,
-                        safeAreaTop: proxy.safeAreaInsets.top
-                    )
 
                     let y = DeckLayout.yPosition(
                         index: index,
                         activeSlotIndex: activeSlotIndex,
                         totalCards: cards.count,
                         containerHeight: proxy.size.height,
-                        safeAreaTop: proxy.safeAreaInsets.top,
-                        safeAreaBottom: proxy.safeAreaInsets.bottom
+                        safeAreaTop: viewportSafeAreaTop
                     )
+
+                    let cardTop =
+                        y
+                        + interactiveOffset(for: index)
+                        + nudgeOffset(for: index)
+
+                    let cardBottom = DeckLayout.cardBottom(
+                        containerHeight: proxy.size.height
+                    )
+
+                    let cardHeight = DeckLayout.cardHeight(
+                        top: cardTop,
+                        bottom: cardBottom
+                    )
+
                     DeckCardView(
                         card: card,
+                        cardWidth: cardWidth,
+                        cardHeight: cardHeight,
+                        bottomCornerRadius: bottomCornerRadius,
                         isActive: index == activeSlotIndex,
                         showsCollapsedHeader: showsCollapsedHeader(card),
                         onTap: {
@@ -174,12 +208,9 @@ struct DeckView<ID: Hashable, BackgroundContent: View, CollapsedHeaderContent: V
                             contentProvider(card)
                         }
                     )
-                    .frame(
-                        width: cardWidth,
-                        height: cardHeight
-                    )
                     .offset(
-                        y: y + interactiveOffset(for: index) + nudgeOffset(for: index)
+                        x: (proxy.size.width - cardWidth) / 2,
+                        y: cardTop
                     )
                     .zIndex(DeckLayout.zIndex(for: index))
                 }
@@ -187,7 +218,11 @@ struct DeckView<ID: Hashable, BackgroundContent: View, CollapsedHeaderContent: V
             .onAppear {
                 scheduleInitialNudge()
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(
+                width: proxy.size.width,
+                height: proxy.size.height,
+                alignment: .topLeading
+            )
             .clipped()
         }
     }
