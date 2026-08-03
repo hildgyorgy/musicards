@@ -18,6 +18,7 @@ struct PlaybackAudioFormat: Equatable {
 /// not become the same source of truth.
 struct PlaybackTrack: Identifiable, Equatable {
     let id: String
+    let releaseTrackID: String?
     let recordingID: String?
     let releaseID: String?
     let title: String
@@ -31,6 +32,7 @@ struct PlaybackTrack: Identifiable, Equatable {
 
     init(
         id: String,
+        releaseTrackID: String?,
         recordingID: String?,
         releaseID: String?,
         title: String,
@@ -43,6 +45,7 @@ struct PlaybackTrack: Identifiable, Equatable {
         audioFormat: PlaybackAudioFormat? = nil
     ) {
         self.id = id
+        self.releaseTrackID = releaseTrackID
         self.recordingID = recordingID
         self.releaseID = releaseID
         self.title = title

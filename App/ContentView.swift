@@ -233,6 +233,7 @@ struct ContentView: View {
                     appModel.selectArtist(id: artistID)
                 },
                 localLibrary: appModel.localLibrary,
+                playbackController: appModel.playbackController,
                 onPlayTrack: { releaseTrackID, recordingID in
                     appModel.playIndexedTrack(
                         releaseTrackID: releaseTrackID,
@@ -269,31 +270,58 @@ struct ContentView: View {
         }
     }
 
+    @ViewBuilder private func collapsedHeaderContent(
+        _ card: DeckCard<MusiCardID>
+    ) -> some View {
+        if card.id == .player {
+            CollapsedPlayerBar(controller: appModel.playbackController)
+        } else {
+            EmptyView()
+        }
+    }
+
     var body: some View {
         ZStack {
             #if os(macOS)
                 DeckView(
                     cards: cards,
-                    selection: $appModel.deckSelection
-                ) { card in
-                    headerContent(card)
-                } contentProvider: { card in
-                    cardContent(card)
-                }
+                    selection: $appModel.deckSelection,
+                    showsCollapsedHeader: { card in
+                        card.id == .player && appModel.hasCurrentPlaybackItem
+                    },
+                    collapsedHeaderProvider: { card in
+                        collapsedHeaderContent(card)
+                    },
+                    headerProvider: { card in
+                        headerContent(card)
+                    },
+                    contentProvider: { card in
+                        cardContent(card)
+                    }
+                )
             #else
                 DeckView(
                     cards: cards,
-                    selection: $appModel.deckSelection
-                ) { card in
-                    headerContent(card)
-                } contentProvider: { card in
-                    cardContent(card)
-                } background: {
-                    ZStack {
-                        boxBackground
-                        DeckBackgroundView()
+                    selection: $appModel.deckSelection,
+                    showsCollapsedHeader: { card in
+                        card.id == .player && appModel.hasCurrentPlaybackItem
+                    },
+                    collapsedHeaderProvider: { card in
+                        collapsedHeaderContent(card)
+                    },
+                    headerProvider: { card in
+                        headerContent(card)
+                    },
+                    contentProvider: { card in
+                        cardContent(card)
+                    },
+                    background: {
+                        ZStack {
+                            boxBackground
+                            DeckBackgroundView()
+                        }
                     }
-                }
+                )
                 .ignoresSafeArea()
             #endif
 

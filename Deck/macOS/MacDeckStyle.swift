@@ -25,6 +25,7 @@ enum DeckStyle {
         }
     }
     static let collapsedCardHeight: CGFloat = 45
+    static let collapsedPlayerHeight: CGFloat = 58
 
     // MARK: - Glass surface
 

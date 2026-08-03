@@ -77,6 +77,8 @@ final class PlatformNowPlayingCoordinator {
             updateRemoteCommandAvailability(
                 hasItem: false,
                 canSeek: false,
+                hasPrevious: false,
+                hasNext: false,
                 status: status
             )
             return
@@ -97,6 +99,8 @@ final class PlatformNowPlayingCoordinator {
         updateRemoteCommandAvailability(
             hasItem: true,
             canSeek: duration != nil,
+            hasPrevious: currentIndex > queue.startIndex,
+            hasNext: currentIndex < queue.index(before: queue.endIndex),
             status: status
         )
         guard snapshot != lastPublishedSnapshot else { return }
@@ -110,6 +114,8 @@ final class PlatformNowPlayingCoordinator {
             MPNowPlayingInfoPropertyDefaultPlaybackRate: 1.0,
             MPNowPlayingInfoPropertyMediaType:
                 MPNowPlayingInfoMediaType.audio.rawValue,
+            MPNowPlayingInfoPropertyPlaybackQueueIndex: currentIndex,
+            MPNowPlayingInfoPropertyPlaybackQueueCount: queue.count,
             MPNowPlayingInfoPropertyIsLiveStream: false,
             MPNowPlayingInfoPropertyExcludeFromSuggestions: true
         ]
@@ -162,6 +168,14 @@ final class PlatformNowPlayingCoordinator {
             guard let controller = self?.controller else { return }
             await controller.stop()
         }
+        addTarget(to: commandCenter.previousTrackCommand) { [weak self] in
+            guard let controller = self?.controller else { return }
+            await controller.selectPrevious()
+        }
+        addTarget(to: commandCenter.nextTrackCommand) { [weak self] in
+            guard let controller = self?.controller else { return }
+            await controller.selectNext()
+        }
 
         let positionTarget = commandCenter.changePlaybackPositionCommand
             .addTarget { [weak self] event in
@@ -183,8 +197,6 @@ final class PlatformNowPlayingCoordinator {
             positionTarget
         ))
 
-        commandCenter.nextTrackCommand.isEnabled = false
-        commandCenter.previousTrackCommand.isEnabled = false
         commandCenter.skipForwardCommand.isEnabled = false
         commandCenter.skipBackwardCommand.isEnabled = false
         commandCenter.changePlaybackRateCommand.isEnabled = false
@@ -195,6 +207,8 @@ final class PlatformNowPlayingCoordinator {
         updateRemoteCommandAvailability(
             hasItem: false,
             canSeek: false,
+            hasPrevious: false,
+            hasNext: false,
             status: .idle
         )
     }
@@ -243,6 +257,8 @@ final class PlatformNowPlayingCoordinator {
     private func updateRemoteCommandAvailability(
         hasItem: Bool,
         canSeek: Bool,
+        hasPrevious: Bool,
+        hasNext: Bool,
         status: PlaybackStatus
     ) {
         let commandCenter = MPRemoteCommandCenter.shared()
@@ -253,6 +269,8 @@ final class PlatformNowPlayingCoordinator {
         commandCenter.pauseCommand.isEnabled = status.isPlaying
         commandCenter.togglePlayPauseCommand.isEnabled = hasItem && !isLoading
         commandCenter.stopCommand.isEnabled = hasItem
+        commandCenter.previousTrackCommand.isEnabled = hasItem && hasPrevious
+        commandCenter.nextTrackCommand.isEnabled = hasItem && hasNext
         commandCenter.changePlaybackPositionCommand.isEnabled = hasItem
             && canSeek
     }

@@ -5,23 +5,29 @@
 #if os(macOS)
 import SwiftUI
 
-struct DeckCardView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
+struct DeckCardView<ID: Hashable, CollapsedHeaderContent: View, HeaderContent: View, CardContent: View>: View {
     let card: DeckCard<ID>
     let isActive: Bool
+    let showsCollapsedHeader: Bool
     let onTap: () -> Void
+    let collapsedHeader: CollapsedHeaderContent
     let header: HeaderContent
     let content: CardContent
 
     init(
         card: DeckCard<ID>,
         isActive: Bool,
+        showsCollapsedHeader: Bool,
         onTap: @escaping () -> Void,
+        @ViewBuilder collapsedHeader: () -> CollapsedHeaderContent,
         @ViewBuilder header: () -> HeaderContent,
         @ViewBuilder content: () -> CardContent
     ) {
         self.card = card
         self.isActive = isActive
+        self.showsCollapsedHeader = showsCollapsedHeader
         self.onTap = onTap
+        self.collapsedHeader = collapsedHeader()
         self.header = header()
         self.content = content()
     }
@@ -62,17 +68,6 @@ struct DeckCardView<ID: Hashable, HeaderContent: View, CardContent: View>: View 
     
     private var cardHeader: some View {
         ZStack {
-            Text(card.cardLabel.uppercased())
-                .font(.system(size: DeckStyle.cardLabelFontSize, weight: DeckStyle.cardLabelFontWeight))
-                .tracking(DeckStyle.cardLabelTracking)
-                .foregroundStyle(
-                    isHoveringLabel
-                           ? .blue
-                           : (isActive ? .primary : DeckStyle.cardLabelColor)
-                )
-                .animation(.easeOut(duration: 0.12), value: isHoveringLabel)
-                .frame(maxWidth: .infinity, alignment: .center)
-
             PanHandleView(
                 isEnabled: true,
                 onTap: onTap,
@@ -84,8 +79,35 @@ struct DeckCardView<ID: Hashable, HeaderContent: View, CardContent: View>: View 
             .onHover { hovering in
                 isHoveringLabel = hovering
             }
+
+            if isShowingCollapsedHeader {
+                collapsedHeader
+                    .transition(.opacity)
+            } else {
+                Text(card.cardLabel.uppercased())
+                    .font(.system(size: DeckStyle.cardLabelFontSize, weight: DeckStyle.cardLabelFontWeight))
+                    .tracking(DeckStyle.cardLabelTracking)
+                    .foregroundStyle(
+                        isHoveringLabel
+                               ? .blue
+                               : (isActive ? .primary : DeckStyle.cardLabelColor)
+                    )
+                    .animation(.easeOut(duration: 0.12), value: isHoveringLabel)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .allowsHitTesting(false)
+            }
         }
-        .frame(height: DeckStyle.cardLabelHitHeight)
+        .frame(height: cardHeaderHeight)
+    }
+
+    private var isShowingCollapsedHeader: Bool {
+        !isActive && showsCollapsedHeader
+    }
+
+    private var cardHeaderHeight: CGFloat {
+        isShowingCollapsedHeader
+            ? DeckStyle.collapsedPlayerHeight
+            : DeckStyle.cardLabelHitHeight
     }
 
     private var cardExpandedContent: some View {

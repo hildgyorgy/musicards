@@ -11,6 +11,7 @@ struct TracksCardContentView: View {
     let release: MBRelease?
     let onSelectArtist: (String) -> Void
     @ObservedObject var localLibrary: LocalLibraryStore
+    @ObservedObject var playbackController: PlaybackController
     let onPlayTrack: (String?, String?) -> Void
     @ObservedObject var detailStore: TrackDetailStore
 
@@ -204,17 +205,29 @@ struct TracksCardContentView: View {
                 .frame(maxWidth: .infinity)
 
                 if isTrackPlayable(row) {
-                    Button {
-                        onPlayTrack(row.releaseTrackID, row.recordingID)
-                    } label: {
-                        Image(systemName: "play.fill")
-                            .font(.caption)
-                            .frame(width: 28, height: 32)
-                            .contentShape(Rectangle())
+                    if isCurrentTrack(row) {
+                        NowPlayingIndicator(
+                            isAnimating: playbackController.status.isPlaying
+                        )
+                        .frame(width: 28, height: 32)
+                        .accessibilityLabel(
+                            playbackController.status.isPlaying
+                                ? "Now playing"
+                                : "Current track"
+                        )
+                    } else {
+                        Button {
+                            onPlayTrack(row.releaseTrackID, row.recordingID)
+                        } label: {
+                            Image(systemName: "play.fill")
+                                .font(.caption)
+                                .frame(width: 28, height: 32)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(Color.blue)
+                        .accessibilityLabel("Play local track")
                     }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(Color.blue)
-                    .accessibilityLabel("Play local track")
                 }
             }
             .zIndex(isExpanded(row) ? 10 : 0)
@@ -254,6 +267,26 @@ struct TracksCardContentView: View {
             releaseTrackID: row.releaseTrackID,
             recordingID: row.recordingID
         )
+    }
+
+    private func isCurrentTrack(_ row: TrackRow) -> Bool {
+        guard let releaseID = release?.id,
+              let currentTrack = playbackController.currentItem?.track,
+              identifiersMatch(currentTrack.releaseID, releaseID) else {
+            return false
+        }
+
+        if let releaseTrackID = row.releaseTrackID,
+           let currentReleaseTrackID = currentTrack.releaseTrackID {
+            return identifiersMatch(currentReleaseTrackID, releaseTrackID)
+        }
+
+        return identifiersMatch(currentTrack.recordingID, row.recordingID)
+    }
+
+    private func identifiersMatch(_ lhs: String?, _ rhs: String?) -> Bool {
+        guard let lhs, let rhs else { return false }
+        return lhs.caseInsensitiveCompare(rhs) == .orderedSame
     }
     
     // MARK: - Release-level liner notes

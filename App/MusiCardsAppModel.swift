@@ -36,6 +36,7 @@ final class MusiCardsAppModel: ObservableObject {
     @Published var recentArtists: [SearchArtistRow] = []
     @Published var recentReleases: [SearchReleaseRow] = []
     @Published var nowPlayingRelease: SearchReleaseRow?
+    @Published private(set) var hasCurrentPlaybackItem = false
     
     @Published var isShazamListening: Bool = false
     @Published var shazamStatusMessage: String?
@@ -52,6 +53,7 @@ final class MusiCardsAppModel: ObservableObject {
 
     private var localPlaybackNowPlayingCoordinator:
         PlatformNowPlayingCoordinator?
+    private var playbackItemObservation: AnyCancellable?
 
     private let musicBrainzService = MusicBrainzService()
 
@@ -81,6 +83,12 @@ final class MusiCardsAppModel: ObservableObject {
         self.localLibrary = LocalLibraryStore()
         self.localPlaybackNowPlayingCoordinator =
             PlatformNowPlayingCoordinator(controller: self.playbackController)
+        self.playbackItemObservation = self.playbackController.$currentIndex
+            .map { $0 != nil }
+            .removeDuplicates()
+            .sink { [weak self] hasCurrentItem in
+                self?.hasCurrentPlaybackItem = hasCurrentItem
+            }
 
         loadRecents()
 #if os(iOS)
@@ -100,6 +108,7 @@ final class MusiCardsAppModel: ObservableObject {
             guard !Task.isCancelled else { return }
             let track = PlaybackTrack(
                 id: url.standardizedFileURL.path,
+                releaseTrackID: nil,
                 recordingID: nil,
                 releaseID: nil,
                 title: url.deletingPathExtension().lastPathComponent,
@@ -174,6 +183,7 @@ final class MusiCardsAppModel: ObservableObject {
                     }
                     let playbackTrack = PlaybackTrack(
                         id: file.id,
+                        releaseTrackID: file.releaseTrackMBID ?? track.id,
                         recordingID: file.recordingMBID,
                         releaseID: file.releaseMBID,
                         title: track.title,

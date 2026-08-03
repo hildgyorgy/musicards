@@ -50,6 +50,7 @@ enum DeckStyle {
     static let cardLabelTopPadding: CGFloat = 12
     static let cardLabelColor: Color = .secondary
     static let cardLabelHitHeight: CGFloat = 56
+    static let collapsedPlayerHeight: CGFloat = 76
     
     // MARK: - Header
 

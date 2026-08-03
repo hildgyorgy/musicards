@@ -5,7 +5,7 @@
 #if os(iOS)
 import SwiftUI
 
-struct DeckView<ID: Hashable, BackgroundContent: View, HeaderContent: View, CardContent: View>: View {
+struct DeckView<ID: Hashable, BackgroundContent: View, CollapsedHeaderContent: View, HeaderContent: View, CardContent: View>: View {
     let backgroundProvider: () -> BackgroundContent
     let cards: [DeckCard<ID>]
     @Binding var selection: DeckSelection<ID>
@@ -26,6 +26,8 @@ struct DeckView<ID: Hashable, BackgroundContent: View, HeaderContent: View, Card
     }
     let headerProvider: (DeckCard<ID>) -> HeaderContent
     let contentProvider: (DeckCard<ID>) -> CardContent
+    let collapsedHeaderProvider: (DeckCard<ID>) -> CollapsedHeaderContent
+    let showsCollapsedHeader: (DeckCard<ID>) -> Bool
 
     @State private var dragCardIndex: Int? = nil
     @State private var dragOffset: CGFloat = 0
@@ -37,12 +39,16 @@ struct DeckView<ID: Hashable, BackgroundContent: View, HeaderContent: View, Card
     init(
         cards: [DeckCard<ID>],
         selection: Binding<DeckSelection<ID>>,
+        showsCollapsedHeader: @escaping (DeckCard<ID>) -> Bool,
+        @ViewBuilder collapsedHeaderProvider: @escaping (DeckCard<ID>) -> CollapsedHeaderContent,
         @ViewBuilder headerProvider: @escaping (DeckCard<ID>) -> HeaderContent,
         @ViewBuilder contentProvider: @escaping (DeckCard<ID>) -> CardContent,
         @ViewBuilder background: @escaping () -> BackgroundContent,
     ) {
         self.cards = cards
         self._selection = selection
+        self.showsCollapsedHeader = showsCollapsedHeader
+        self.collapsedHeaderProvider = collapsedHeaderProvider
         self.headerProvider = headerProvider
         self.contentProvider = contentProvider
         self.backgroundProvider = background
@@ -89,6 +95,8 @@ struct DeckView<ID: Hashable, BackgroundContent: View, HeaderContent: View, Card
                     )
                     DeckCardView(
                         card: card,
+                        isActive: index == activeSlotIndex,
+                        showsCollapsedHeader: showsCollapsedHeader(card),
                         onTap: {
                             handleTap(on: card)
                         },
@@ -155,12 +163,17 @@ struct DeckView<ID: Hashable, BackgroundContent: View, HeaderContent: View, Card
                                     dragCardIndex = nil
                                 }
                             }
+                        },
+                        collapsedHeader: {
+                            collapsedHeaderProvider(card)
+                        },
+                        header: {
+                            headerProvider(card)
+                        },
+                        content: {
+                            contentProvider(card)
                         }
-                    ) {
-                        headerProvider(card)
-                    } content: {
-                        contentProvider(card)
-                    }
+                    )
                     .frame(
                         width: cardWidth,
                         height: cardHeight

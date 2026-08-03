@@ -5,7 +5,7 @@
 #if os(macOS)
 import SwiftUI
 
-struct DeckView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
+struct DeckView<ID: Hashable, CollapsedHeaderContent: View, HeaderContent: View, CardContent: View>: View {
     let cards: [DeckCard<ID>]
     @Binding var selection: DeckSelection<ID>
     private var activeSlotIndex: Int {
@@ -24,29 +24,38 @@ struct DeckView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
     }
     let headerProvider: (DeckCard<ID>) -> HeaderContent
     let contentProvider: (DeckCard<ID>) -> CardContent
+    let collapsedHeaderProvider: (DeckCard<ID>) -> CollapsedHeaderContent
+    let showsCollapsedHeader: (DeckCard<ID>) -> Bool
 
     @AppStorage("glassTransparent") private var glassTransparent = false
 
     init(
         cards: [DeckCard<ID>],
         selection: Binding<DeckSelection<ID>>,
+        showsCollapsedHeader: @escaping (DeckCard<ID>) -> Bool,
+        @ViewBuilder collapsedHeaderProvider: @escaping (DeckCard<ID>) -> CollapsedHeaderContent,
         @ViewBuilder headerProvider: @escaping (DeckCard<ID>) -> HeaderContent,
         @ViewBuilder contentProvider: @escaping (DeckCard<ID>) -> CardContent
     ) {
         self.cards = cards
         self._selection = selection
+        self.showsCollapsedHeader = showsCollapsedHeader
+        self.collapsedHeaderProvider = collapsedHeaderProvider
         self.headerProvider = headerProvider
         self.contentProvider = contentProvider
     }
 
     var body: some View {
         GeometryReader { proxy in
-            let collapsedHeight = DeckStyle.collapsedCardHeight
             let titlebarOverlap: CGFloat = 65
             let availableHeight = proxy.size.height - DeckStyle.topInset * 2 + titlebarOverlap
+            let collapsedHeightTotal = cards.reduce(CGFloat.zero) { result, card in
+                guard card.slotIndex != activeSlotIndex else { return result }
+                return result + collapsedHeight(for: card)
+            }
             let expandedHeight = max(
-                collapsedHeight,
-                availableHeight - collapsedHeight * CGFloat(cards.count - 1)
+                DeckStyle.collapsedCardHeight,
+                availableHeight - collapsedHeightTotal
             )
 
             VStack(spacing: 0) {
@@ -56,11 +65,17 @@ struct DeckView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
                     DeckCardView(
                         card: card,
                         isActive: isActive,
+                        showsCollapsedHeader: showsCollapsedHeader(card),
                         onTap: { handleTap(on: visualIndex) },
+                        collapsedHeader: { collapsedHeaderProvider(card) },
                         header: { headerProvider(card) },
                         content: { contentProvider(card) }
                     )
-                    .frame(height: isActive ? expandedHeight : collapsedHeight)
+                    .frame(
+                        height: isActive
+                            ? expandedHeight
+                            : collapsedHeight(for: card)
+                    )
                     .clipped()
                 }
             }
@@ -95,7 +110,14 @@ struct DeckView<ID: Hashable, HeaderContent: View, CardContent: View>: View {
             .padding(.horizontal, DeckStyle.horizontalInset)
             .padding(.top, DeckStyle.topInset - titlebarOverlap)
             .animation(DeckStyle.animation, value: activeSlotIndex)
+            .animation(DeckStyle.animation, value: collapsedHeightTotal)
         }
+    }
+
+    private func collapsedHeight(for card: DeckCard<ID>) -> CGFloat {
+        showsCollapsedHeader(card)
+            ? DeckStyle.collapsedPlayerHeight
+            : DeckStyle.collapsedCardHeight
     }
 
     private func handleTap(on visualIndex: Int) {
