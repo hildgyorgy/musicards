@@ -193,6 +193,7 @@ final class MusiCardsAppModel: ObservableObject {
                             Double($0) / 1_000
                         },
                         artworkData: artworkData,
+                        mediumFormat: medium.format,
                         discNumber: medium.position ?? mediumIndex + 1,
                         trackNumber: track.position,
                         audioFormat: PlaybackAudioFormat(

@@ -14,7 +14,7 @@ struct ReleaseCardContentView: View {
     var body: some View {
         if let release {
             ScrollView {
-                VStack(alignment: .leading, spacing: 5) {
+                VStack(alignment: .leading, spacing: 3) {
                     metaRow("Date", MBTextFormatter.displayDate(from: release.date))
                     metaRow("Country", release.country ?? "")
                     metaRow("Label", labelText(from: release))
@@ -29,11 +29,11 @@ struct ReleaseCardContentView: View {
                             .foregroundStyle(.blue)
                     }
                     .buttonStyle(.plain)
-                    .padding(.top, 8)
+                    .padding(.top, 4)
                     .padding(.leading, 92)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.bottom, 24)
+                .padding(.bottom, 28)
             }
         } else {
             EmptyStateView.release

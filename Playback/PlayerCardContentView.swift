@@ -6,61 +6,200 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+#if os(iOS)
+import AVFAudio
+#elseif os(macOS)
+import CoreAudio
+#endif
+
 struct PlayerCardContentView: View {
     @ObservedObject var controller: PlaybackController
     @ObservedObject var localLibrary: LocalLibraryStore
     let onSelectLocalFile: (URL) -> Void
     let onSelectMusicFolder: (URL) -> Void
     let onRefreshLibrary: () -> Void
+    @ObservedObject var detailStore: TrackDetailStore
+    let onSelectArtist: (String) -> Void
 
     @State private var isFileImporterPresented = false
     @State private var isFolderImporterPresented = false
     @State private var folderSelectionPurpose = FolderSelectionPurpose.connect
+    @State private var selectedDetailPage = 1
 
     var body: some View {
-        VStack(spacing: 18) {
+        Group {
             if let item = controller.currentItem {
-                VStack(spacing: 6) {
-                    Text(item.track.title)
-                        .font(.headline)
+                expandedPlayer(item)
+            } else {
+                libraryControls
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .task(id: controller.currentItem?.track.recordingID) {
+            selectedDetailPage = 1
+            if let recordingID = controller.currentItem?.track.recordingID {
+                detailStore.fetchIfNeeded(recordingID: recordingID)
+            }
+        }
+        .fileImporter(
+            isPresented: $isFileImporterPresented,
+            allowedContentTypes: [.audio],
+            allowsMultipleSelection: false
+        ) { result in
+            guard case .success(let urls) = result,
+                  let url = urls.first else {
+                return
+            }
+            onSelectLocalFile(url)
+        }
+        .fileImporter(
+            isPresented: $isFolderImporterPresented,
+            allowedContentTypes: [.folder],
+            allowsMultipleSelection: false
+        ) { result in
+            guard case .success(let urls) = result,
+                  let url = urls.first else {
+                return
+            }
+            switch folderSelectionPurpose {
+            case .connect:
+                onSelectMusicFolder(url)
+            case .createOrUpdateIndex:
+                #if os(macOS)
+                localLibrary.createOrUpdateLibraryIndex(in: url)
+                #endif
+            }
+        }
+    }
 
-                    Text(item.track.artist)
-                        .font(.callout)
+    private func expandedPlayer(_ item: PlaybackQueueItem) -> some View {
+        VStack(spacing: 0) {
+            releaseIdentity(item.track)
+                .padding(.top, releaseIdentityTopInset)
+
+            ScrollView {
+                LazyVStack(
+                    alignment: .leading,
+                    spacing: 0,
+                    pinnedViews: [.sectionHeaders]
+                ) {
+                    playerMetadataLabel(mediumTrackTitle(item.track))
+                        .padding(.top, 14)
+
+                    Section {
+                        TrackDetailPagerView(
+                            selectedPage: $selectedDetailPage,
+                            recordingID: item.track.recordingID,
+                            detailStore: detailStore,
+                            onSelectArtist: onSelectArtist
+                        )
+                        .padding(.top, 8)
+                        .padding(.bottom, 10)
+                    } header: {
+                        trackTitleRow(item.track)
+                    }
+                }
+            }
+            .scrollIndicators(.hidden)
+
+            playerMetadataLabel(fileAndOutputTitle(item))
+                .padding(.top, 8)
+
+            CollapsedPlayerBar(
+                controller: controller,
+                contentInset: 0
+            )
+                .frame(height: expandedTransportHeight)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func releaseIdentity(_ track: PlaybackTrack) -> some View {
+        HStack(alignment: .top, spacing: 16) {
+            artwork(track.artworkData)
+                .frame(width: artworkSize, height: artworkSize)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(track.albumTitle.isEmpty ? track.title : track.albumTitle)
+                    .font(.title2.weight(.bold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(3)
+
+                Text(track.artist)
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(3)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func playerMetadataLabel(_ title: String) -> some View {
+        Text(title)
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 6)
+            .padding(.bottom, 6)
+    }
+
+    @ViewBuilder
+    private func artwork(_ data: Data?) -> some View {
+        if let data, let image = PlatformImage(data: data) {
+            #if os(iOS)
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFill()
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            #else
+            Image(nsImage: image)
+                .resizable()
+                .scaledToFill()
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            #endif
+        } else {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color.secondary.opacity(0.12))
+                .overlay {
+                    Image(systemName: "music.note")
+                        .font(.title2)
                         .foregroundStyle(.secondary)
                 }
+        }
+    }
 
-                HStack(spacing: 24) {
-                    Button {
-                        Task { await controller.stop() }
-                    } label: {
-                        Image(systemName: "stop.fill")
-                    }
+    private func trackTitleRow(_ track: PlaybackTrack) -> some View {
+        HStack(spacing: 12) {
+            Text(track.title)
+                .font(.callout.weight(.semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
 
-                    Button {
-                        Task { await controller.togglePlayback() }
-                    } label: {
-                        Image(
-                            systemName: controller.status.isPlaying
-                                ? "pause.fill"
-                                : "play.fill"
-                        )
-                    }
-                    .disabled(controller.status == .loading)
-                }
-                .buttonStyle(.plain)
-                .font(.title2)
+            Spacer(minLength: 8)
 
-                Text(playbackStatusText)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            } else {
-                EmptyStateView(
-                    title: "Playback foundation ready",
-                    subtitle: "Choose one local lossless track"
-                )
-            }
+            Text(formatTime(controller.preparedDuration ?? track.duration ?? 0))
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background {
+            Capsule(style: .continuous)
+                .fill(Color.gray.opacity(0.15))
+        }
+    }
 
-            Button(controller.currentItem == nil ? "Choose Audio File" : "Choose Another File") {
+    private var libraryControls: some View {
+        VStack(spacing: 18) {
+            EmptyStateView(
+                title: "Playback foundation ready",
+                subtitle: "Choose one local lossless track"
+            )
+
+            Button("Choose Audio File") {
                 isFileImporterPresented = true
             }
             .buttonStyle(.bordered)
@@ -93,37 +232,148 @@ struct PlayerCardContentView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .fileImporter(
-            isPresented: $isFileImporterPresented,
-            allowedContentTypes: [.audio],
-            allowsMultipleSelection: false
-        ) { result in
-            guard case .success(let urls) = result,
-                  let url = urls.first else {
-                return
+    }
+
+    private func mediumTrackTitle(_ track: PlaybackTrack) -> String {
+        var components: [String] = []
+
+        if let mediumFormat = track.mediumFormat?.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        ), !mediumFormat.isEmpty {
+            if let discNumber = track.discNumber {
+                components.append("\(mediumFormat) \(discNumber)")
+            } else {
+                components.append(mediumFormat)
             }
-            onSelectLocalFile(url)
+        } else if let discNumber = track.discNumber {
+            components.append("DISC \(discNumber)")
         }
-        .fileImporter(
-            isPresented: $isFolderImporterPresented,
-            allowedContentTypes: [.folder],
-            allowsMultipleSelection: false
-        ) { result in
-            guard case .success(let urls) = result,
-                  let url = urls.first else {
-                return
+
+        if let trackNumber = track.trackNumber {
+            components.append("TRACK \(trackNumber)")
+        }
+
+        return components.isEmpty ? "TRACK" : components.joined(separator: " / ").uppercased()
+    }
+
+    private func fileAndOutputTitle(_ item: PlaybackQueueItem) -> String {
+        let route = "\(sourceName(item.source)) → \(currentOutputName)"
+        let format = audioFormatText(item.track.audioFormat)
+        return format.isEmpty ? route : "\(route)\n\(format)"
+    }
+
+    private func sourceName(_ source: PlaybackSource) -> String {
+        switch source {
+        case .localFile(let url):
+            let path = url.absoluteString.lowercased()
+            if path.contains("dropbox") {
+                return "DROPBOX"
             }
-            switch folderSelectionPurpose {
-            case .connect:
-                onSelectMusicFolder(url)
-            case .createOrUpdateIndex:
-                #if os(macOS)
-                localLibrary.createOrUpdateLibraryIndex(in: url)
-                #endif
+            if path.contains("icloud") || path.contains("ubiquity") {
+                return "ICLOUD"
             }
+            return "LOCAL"
         }
     }
+
+    private func audioFormatText(_ format: PlaybackAudioFormat?) -> String {
+        guard let format else { return "" }
+
+        var components = [format.codec.uppercased()]
+
+        if let bitrate = format.bitrate, bitrate > 0 {
+            components.append("\(Int((bitrate / 1_000).rounded())) kbps")
+        }
+
+        let sampleRate = format.sampleRate >= 1_000
+            ? String(format: "%.1f kHz", format.sampleRate / 1_000)
+            : String(format: "%.0f Hz", format.sampleRate)
+
+        if let bitDepth = format.bitDepth {
+            components.append("\(sampleRate) / \(bitDepth) bit")
+        } else if format.sampleRate > 0 {
+            components.append(sampleRate)
+        }
+
+        switch format.channelCount {
+        case 1:
+            components.append("MONO")
+        case 2:
+            components.append("STEREO")
+        case let count where count > 2:
+            components.append("\(count) CHANNELS")
+        default:
+            break
+        }
+
+        return components.joined(separator: " • ")
+    }
+
+    private var currentOutputName: String {
+        #if os(iOS)
+        let name = AVAudioSession.sharedInstance().currentRoute.outputs.first?.portName
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return name?.nilIfEmpty?.uppercased() ?? "SYSTEM OUTPUT"
+        #else
+        return macDefaultOutputName()?.uppercased() ?? "SYSTEM OUTPUT"
+        #endif
+    }
+
+    #if os(macOS)
+    private func macDefaultOutputName() -> String? {
+        var deviceID = AudioDeviceID(kAudioObjectUnknown)
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        var defaultDeviceAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+
+        guard AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject),
+            &defaultDeviceAddress,
+            0,
+            nil,
+            &size,
+            &deviceID
+        ) == noErr,
+        deviceID != kAudioObjectUnknown else {
+            return nil
+        }
+
+        var unmanagedName: Unmanaged<CFString>?
+        size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
+        var nameAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioObjectPropertyName,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+
+        guard AudioObjectGetPropertyData(
+            deviceID,
+            &nameAddress,
+            0,
+            nil,
+            &size,
+            &unmanagedName
+        ) == noErr,
+        let name = unmanagedName?.takeUnretainedValue() else {
+            return nil
+        }
+
+        return name as String
+    }
+    #endif
+
+    #if os(iOS)
+    private let artworkSize: CGFloat = 132
+    private let expandedTransportHeight: CGFloat = 70
+    private let releaseIdentityTopInset: CGFloat = 0
+    #else
+    private let artworkSize: CGFloat = 116
+    private let expandedTransportHeight: CGFloat = 58
+    private let releaseIdentityTopInset: CGFloat = -8
+    #endif
 
     private var libraryStatusText: String {
         if localLibrary.isScanning {
@@ -145,36 +395,15 @@ struct PlayerCardContentView: View {
         return counts
     }
 
-    private var playbackStatusText: String {
-        switch controller.status {
-        case .idle:
-            return "Ready"
-        case .loading:
-            return "Preparing lossless PCM…"
-        case .ready:
-            return "Ready"
-        case .playing:
-            return timeText
-        case .paused:
-            return "Paused · \(timeText)"
-        case .stopped:
-            return "Stopped"
-        case .failed(let failure):
-            return failure.message
-        }
-    }
-
-    private var timeText: String {
-        let elapsed = formatTime(controller.position)
-        guard let duration = controller.preparedDuration else {
-            return elapsed
-        }
-        return "\(elapsed) / \(formatTime(duration))"
-    }
-
     private func formatTime(_ time: TimeInterval) -> String {
         let seconds = max(Int(time.rounded(.down)), 0)
         return String(format: "%d:%02d", seconds / 60, seconds % 60)
+    }
+}
+
+private extension String {
+    var nilIfEmpty: String? {
+        isEmpty ? nil : self
     }
 }
 

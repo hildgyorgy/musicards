@@ -26,6 +26,7 @@ struct PlaybackTrack: Identifiable, Equatable {
     let albumTitle: String
     let duration: TimeInterval?
     let artworkData: Data?
+    let mediumFormat: String?
     let discNumber: Int?
     let trackNumber: Int?
     let audioFormat: PlaybackAudioFormat?
@@ -40,6 +41,7 @@ struct PlaybackTrack: Identifiable, Equatable {
         albumTitle: String,
         duration: TimeInterval?,
         artworkData: Data?,
+        mediumFormat: String? = nil,
         discNumber: Int? = nil,
         trackNumber: Int? = nil,
         audioFormat: PlaybackAudioFormat? = nil
@@ -53,6 +55,7 @@ struct PlaybackTrack: Identifiable, Equatable {
         self.albumTitle = albumTitle
         self.duration = duration
         self.artworkData = artworkData
+        self.mediumFormat = mediumFormat
         self.discNumber = discNumber
         self.trackNumber = trackNumber
         self.audioFormat = audioFormat

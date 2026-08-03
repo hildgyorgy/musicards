@@ -19,7 +19,7 @@ enum DeckStyle {
     static let expandedTopInset: CGFloat = 0
     static let cardBottomInset: CGFloat = 8
 
-    static let peek: CGFloat = 40
+    static let peek: CGFloat = 36
 
     // MARK: - Card shape
 

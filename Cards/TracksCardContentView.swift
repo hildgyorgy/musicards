@@ -18,18 +18,8 @@ struct TracksCardContentView: View {
     @State private var expandedTrackID: String?
     @State private var selectedPageByTrackID: [String: Int] = [:]
 
-    @Environment(\.colorScheme) private var colorScheme
-
     // Classical support — owned here, matching the MBViewer pattern.
     @ObservedObject var classicalMetadataStore: ClassicalMetadataStore
-
-    // MARK: - Derived colours
-
-    private var cardBackground: Color {
-            colorScheme == .dark
-                ? AppStyle.darkCardBackgroundColor
-                : AppStyle.lightCardBackgroundColor
-        }
 
     // MARK: - Classical detection
     //
@@ -432,21 +422,7 @@ struct TracksCardContentView: View {
 
     @ViewBuilder
     private func mediumHeader(_ title: String) -> some View {
-        Text(title)
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity, alignment: .center)
-            .padding(.vertical, 6)
-            .background {
-                #if os(macOS)
-                Capsule(style: .continuous)
-                    .fill(.ultraThinMaterial)
-                #else
-                Rectangle().fill(cardBackground)
-                #endif
-            }
-            .padding(.horizontal, 0)
-            .padding(.bottom, 6)
+        CardSectionHeaderView(title: title)
     }
 
     // MARK: - Expand / collapse
@@ -540,6 +516,36 @@ struct TracksCardContentView: View {
         let minutes = totalSeconds / 60
         let seconds = totalSeconds % 60
         return String(format: "%d:%02d", minutes, seconds)
+    }
+}
+
+struct CardSectionHeaderView: View {
+    let title: String
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var cardBackground: Color {
+        colorScheme == .dark
+            ? AppStyle.darkCardBackgroundColor
+            : AppStyle.lightCardBackgroundColor
+    }
+
+    var body: some View {
+        Text(title)
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.vertical, 6)
+            .background {
+                #if os(macOS)
+                Capsule(style: .continuous)
+                    .fill(.ultraThinMaterial)
+                #else
+                Rectangle().fill(cardBackground)
+                #endif
+            }
+            .padding(.bottom, 6)
     }
 }
 

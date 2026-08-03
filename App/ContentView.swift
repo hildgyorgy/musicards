@@ -154,6 +154,10 @@ struct ContentView: View {
                 },
                 onRefreshLibrary: {
                     appModel.refreshLocalLibrary()
+                },
+                detailStore: appModel.trackDetailStore,
+                onSelectArtist: { artistID in
+                    appModel.selectArtist(id: artistID)
                 }
             )
         }

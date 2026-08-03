@@ -5,8 +5,24 @@
 
 import SwiftUI
 
+#if os(macOS)
+import AppKit
+#endif
+
 struct CollapsedPlayerBar: View {
     @ObservedObject var controller: PlaybackController
+    let contentInset: CGFloat?
+
+    @State private var scrubPosition: TimeInterval = 0
+    @State private var isScrubbing = false
+
+    init(
+        controller: PlaybackController,
+        contentInset: CGFloat? = nil
+    ) {
+        self.controller = controller
+        self.contentInset = contentInset
+    }
 
     var body: some View {
         HStack(spacing: platformSpacing) {
@@ -53,14 +69,14 @@ struct CollapsedPlayerBar: View {
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
                 }
+                .allowsHitTesting(false)
 
-                ProgressView(value: progress)
-                    .progressViewStyle(.linear)
-                    .tint(.primary)
+                interactiveSeekBar
+                    .accessibilityLabel("Playback position")
+                    .accessibilityValue(formatTime(displayedPosition))
             }
-            .allowsHitTesting(false)
         }
-        .padding(.horizontal, horizontalPadding)
+        .padding(.horizontal, contentInset ?? defaultHorizontalPadding)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityElement(children: .contain)
     }
@@ -89,16 +105,105 @@ struct CollapsedPlayerBar: View {
         controller.preparedDuration ?? controller.currentItem?.track.duration
     }
 
-    private var progress: Double {
-        guard let duration, duration > 0 else { return 0 }
-        return min(max(controller.position / duration, 0), 1)
+    private var seekUpperBound: TimeInterval {
+        max(duration ?? 0, 0.001)
+    }
+
+    private var displayedPosition: TimeInterval {
+        isScrubbing ? scrubPosition : controller.position
+    }
+
+    private var seekProgress: CGFloat {
+        guard seekUpperBound > 0 else { return 0 }
+        return CGFloat(min(max(displayedPosition / seekUpperBound, 0), 1))
+    }
+
+    private var interactiveSeekBar: some View {
+        GeometryReader { proxy in
+            let width = max(proxy.size.width, 1)
+
+            ZStack {
+                ZStack(alignment: .leading) {
+                    Capsule(style: .continuous)
+                        .fill(Color.secondary.opacity(isScrubbing ? 0.30 : 0.20))
+
+                    Capsule(style: .continuous)
+                        .fill(Color.primary)
+                        .frame(width: width * seekProgress)
+                }
+                .frame(height: isScrubbing ? activeSeekHeight : idleSeekHeight)
+                .animation(.easeOut(duration: 0.12), value: isScrubbing)
+
+                #if os(macOS)
+                MacSeekInteractionView(
+                    isEnabled: duration != nil,
+                    onBegan: beginSeek,
+                    onChanged: updateSeek,
+                    onEnded: finishSeek
+                )
+                #else
+                Color.clear
+                    .contentShape(Rectangle())
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { value in
+                                let fraction = normalizedFraction(
+                                    x: value.location.x,
+                                    width: width
+                                )
+                                if !isScrubbing {
+                                    beginSeek(at: fraction)
+                                } else {
+                                    updateSeek(to: fraction)
+                                }
+                            }
+                            .onEnded { value in
+                                finishSeek(
+                                    at: normalizedFraction(
+                                        x: value.location.x,
+                                        width: width
+                                    )
+                                )
+                            }
+                    )
+                #endif
+            }
+        }
+        .frame(height: seekHitHeight)
+        .allowsHitTesting(duration != nil)
+    }
+
+    private func beginSeek(at fraction: CGFloat) {
+        guard duration != nil else { return }
+        isScrubbing = true
+        updateSeek(to: fraction)
+    }
+
+    private func updateSeek(to fraction: CGFloat) {
+        guard isScrubbing else { return }
+        scrubPosition = TimeInterval(min(max(fraction, 0), 1)) * seekUpperBound
+    }
+
+    private func finishSeek(at fraction: CGFloat) {
+        guard isScrubbing else { return }
+        updateSeek(to: fraction)
+
+        let requestedPosition = scrubPosition
+        Task {
+            await controller.seek(to: requestedPosition)
+            isScrubbing = false
+        }
+    }
+
+    private func normalizedFraction(x: CGFloat, width: CGFloat) -> CGFloat {
+        min(max(x / max(width, 1), 0), 1)
     }
 
     private var remainingTimeText: String {
         guard let duration, duration > 0 else {
             return formatTime(controller.position)
         }
-        return "−\(formatTime(max(duration - controller.position, 0)))"
+        return "−\(formatTime(max(duration - displayedPosition, 0)))"
     }
 
     private func formatTime(_ time: TimeInterval) -> String {
@@ -107,18 +212,79 @@ struct CollapsedPlayerBar: View {
     }
 
     #if os(macOS)
-    private let platformSpacing: CGFloat = 4
-    private let horizontalPadding: CGFloat = 14
+    private let platformSpacing: CGFloat = 0
+    private let defaultHorizontalPadding: CGFloat = DeckStyle.contentHorizontalPadding
     private let buttonSize: CGFloat = 30
     private let controlFont: Font = .body
     private let titleFont: Font = .caption.weight(.medium)
     private let timeFont: Font = .caption
+    private let seekHitHeight: CGFloat = 16
+    private let idleSeekHeight: CGFloat = 3
+    private let activeSeekHeight: CGFloat = 7
     #else
     private let platformSpacing: CGFloat = 0
-    private let horizontalPadding: CGFloat = 0
+    private let defaultHorizontalPadding: CGFloat = 0
     private let buttonSize: CGFloat = 44
     private let controlFont: Font = .title3
     private let titleFont: Font = .subheadline.weight(.medium)
     private let timeFont: Font = .caption
+    private let seekHitHeight: CGFloat = 20
+    private let idleSeekHeight: CGFloat = 3
+    private let activeSeekHeight: CGFloat = 7
     #endif
 }
+
+#if os(macOS)
+private struct MacSeekInteractionView: NSViewRepresentable {
+    let isEnabled: Bool
+    let onBegan: (CGFloat) -> Void
+    let onChanged: (CGFloat) -> Void
+    let onEnded: (CGFloat) -> Void
+
+    func makeNSView(context: Context) -> SeekInteractionNSView {
+        let view = SeekInteractionNSView()
+        update(view)
+        return view
+    }
+
+    func updateNSView(_ nsView: SeekInteractionNSView, context: Context) {
+        update(nsView)
+    }
+
+    private func update(_ view: SeekInteractionNSView) {
+        view.isEnabled = isEnabled
+        view.onBegan = onBegan
+        view.onChanged = onChanged
+        view.onEnded = onEnded
+    }
+}
+
+private final class SeekInteractionNSView: NSView {
+    var isEnabled = true
+    var onBegan: ((CGFloat) -> Void)?
+    var onChanged: ((CGFloat) -> Void)?
+    var onEnded: ((CGFloat) -> Void)?
+
+    override var mouseDownCanMoveWindow: Bool { false }
+
+    override func mouseDown(with event: NSEvent) {
+        guard isEnabled else { return }
+        onBegan?(fraction(for: event))
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard isEnabled else { return }
+        onChanged?(fraction(for: event))
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        guard isEnabled else { return }
+        onEnded?(fraction(for: event))
+    }
+
+    private func fraction(for event: NSEvent) -> CGFloat {
+        let point = convert(event.locationInWindow, from: nil)
+        return min(max(point.x / max(bounds.width, 1), 0), 1)
+    }
+}
+#endif
