@@ -6,12 +6,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-#if os(iOS)
-import AVFAudio
-#elseif os(macOS)
-import CoreAudio
-#endif
-
 struct PlayerCardContentView: View {
     @ObservedObject var controller: PlaybackController
     @ObservedObject var localLibrary: LocalLibraryStore
@@ -102,14 +96,22 @@ struct PlayerCardContentView: View {
             }
             .scrollIndicators(.hidden)
 
-            playerMetadataLabel(fileAndOutputTitle(item))
-                .padding(.top, 8)
+            VStack(spacing: 0) {
+                playerMetadataLabel(fileAndOutputTitle(item))
+                    .padding(.bottom, playerFooterInfoSpacing)
 
-            CollapsedPlayerBar(
-                controller: controller,
-                contentInset: 0
-            )
+                CollapsedPlayerBar(
+                    controller: controller,
+                    contentInset: 0
+                )
                 .frame(height: expandedTransportHeight)
+            }
+            #if os(macOS)
+            // The macOS deck reserves contentTopSpacing below its expanded
+            // header. Move the complete player footer into that space so the
+            // transport and its route/format information stay together.
+            .offset(y: DeckStyle.contentTopSpacing)
+            #endif
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -257,7 +259,20 @@ struct PlayerCardContentView: View {
     }
 
     private func fileAndOutputTitle(_ item: PlaybackQueueItem) -> String {
-        let route = "\(sourceName(item.source)) → \(currentOutputName)"
+        let output = AudioOutputRouteInspector.current()
+        let routeComponents = ([
+            sourceName(item.source),
+            output.transport.displayName,
+            output.deviceName.nilIfEmpty?.uppercased()
+        ] as [String?])
+            .compactMap { $0 }
+            .reduce(into: [String]()) { result, component in
+                if result.last?.caseInsensitiveCompare(component) != .orderedSame {
+                    result.append(component)
+                }
+            }
+        let route = routeComponents
+            .joined(separator: " → ")
         let format = audioFormatText(item.track.audioFormat)
         return format.isEmpty ? route : "\(route)\n\(format)"
     }
@@ -309,62 +324,6 @@ struct PlayerCardContentView: View {
         return components.joined(separator: " • ")
     }
 
-    private var currentOutputName: String {
-        #if os(iOS)
-        let name = AVAudioSession.sharedInstance().currentRoute.outputs.first?.portName
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        return name?.nilIfEmpty?.uppercased() ?? "SYSTEM OUTPUT"
-        #else
-        return macDefaultOutputName()?.uppercased() ?? "SYSTEM OUTPUT"
-        #endif
-    }
-
-    #if os(macOS)
-    private func macDefaultOutputName() -> String? {
-        var deviceID = AudioDeviceID(kAudioObjectUnknown)
-        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
-        var defaultDeviceAddress = AudioObjectPropertyAddress(
-            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain
-        )
-
-        guard AudioObjectGetPropertyData(
-            AudioObjectID(kAudioObjectSystemObject),
-            &defaultDeviceAddress,
-            0,
-            nil,
-            &size,
-            &deviceID
-        ) == noErr,
-        deviceID != kAudioObjectUnknown else {
-            return nil
-        }
-
-        var unmanagedName: Unmanaged<CFString>?
-        size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
-        var nameAddress = AudioObjectPropertyAddress(
-            mSelector: kAudioObjectPropertyName,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain
-        )
-
-        guard AudioObjectGetPropertyData(
-            deviceID,
-            &nameAddress,
-            0,
-            nil,
-            &size,
-            &unmanagedName
-        ) == noErr,
-        let name = unmanagedName?.takeUnretainedValue() else {
-            return nil
-        }
-
-        return name as String
-    }
-    #endif
-
     #if os(iOS)
     private let artworkSize: CGFloat = 132
     private let expandedTransportHeight: CGFloat = 70
@@ -374,6 +333,7 @@ struct PlayerCardContentView: View {
     private let expandedTransportHeight: CGFloat = 58
     private let releaseIdentityTopInset: CGFloat = -8
     #endif
+    private let playerFooterInfoSpacing: CGFloat = 8
 
     private var libraryStatusText: String {
         if localLibrary.isScanning {

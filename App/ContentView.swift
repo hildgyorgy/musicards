@@ -7,6 +7,10 @@
 
 import SwiftUI
 
+#if os(macOS)
+import AppKit
+#endif
+
 struct ContentView: View {
 
     private var cards: [DeckCard<MusiCardID>] {
@@ -352,5 +356,14 @@ struct ContentView: View {
                 appModel.localLibrary.refreshIfNeeded()
             }
         }
+        #if os(macOS)
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: NSApplication.willTerminateNotification
+            )
+        ) { _ in
+            appModel.restoreAudioOutputConfiguration()
+        }
+        #endif
     }
 }

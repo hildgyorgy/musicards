@@ -138,6 +138,10 @@ final class MusiCardsAppModel: ObservableObject {
         Task { await localLibrary.refreshAll() }
     }
 
+    func restoreAudioOutputConfiguration() {
+        playbackController.restoreOutputConfiguration()
+    }
+
     func playIndexedTrack(
         releaseTrackID: String?,
         recordingID: String?

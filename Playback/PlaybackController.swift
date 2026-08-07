@@ -105,6 +105,7 @@ final class PlaybackController: ObservableObject {
 
     func clearQueue() async {
         await replaceQueue(with: [])
+        engine.restoreOutputConfiguration()
     }
 
     func play() async {
@@ -163,6 +164,11 @@ final class PlaybackController: ObservableObject {
         position = 0
         status = queue.isEmpty ? .idle : .stopped
         await engine.stop()
+        engine.restoreOutputConfiguration()
+    }
+
+    func restoreOutputConfiguration() {
+        engine.restoreOutputConfiguration()
     }
 
     func seek(to requestedPosition: TimeInterval) async {

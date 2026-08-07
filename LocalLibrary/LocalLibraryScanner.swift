@@ -113,6 +113,7 @@ enum LocalLibraryScanner {
             let metadata = try await metadataTask
             let duration = try? await durationTask
             let audioTracks = try await tracksTask
+            
             guard let audioTrack = audioTracks.first else {
                 throw NativePlaybackEngineError("The indexed file contains no audio track")
             }

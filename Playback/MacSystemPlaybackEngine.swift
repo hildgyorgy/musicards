@@ -17,6 +17,8 @@ final class MacSystemPlaybackEngine: PlaybackEngine {
     private var progressTask: Task<Void, Never>?
     private var isOutputRunning = false
     private var preparationGeneration: UInt64 = 0
+    private var originalSampleRates: [AudioDeviceID: Float64] = [:]
+    private var configuredOutputDeviceID: AudioDeviceID?
 
     func prepare(_ item: PlaybackQueueItem) async throws {
         guard case .localFile(let url) = item.source else {
@@ -129,6 +131,20 @@ final class MacSystemPlaybackEngine: PlaybackEngine {
         )
     }
 
+    func restoreOutputConfiguration() {
+        let savedRates = originalSampleRates
+        var ratesStillToRestore: [AudioDeviceID: Float64] = [:]
+
+        for (deviceID, originalRate) in savedRates {
+            if !setNominalSampleRate(originalRate, for: deviceID) {
+                ratesStillToRestore[deviceID] = originalRate
+            }
+        }
+
+        originalSampleRates = ratesStillToRestore
+        configuredOutputDeviceID = nil
+    }
+
     private func configureOutputUnit(for decodedPCM: DecodedPCM) throws {
         var description = AudioComponentDescription(
             componentType: kAudioUnitType_Output,
@@ -229,23 +245,20 @@ final class MacSystemPlaybackEngine: PlaybackEngine {
     }
 
     private func matchDefaultOutputSampleRate(_ sampleRate: Double) {
-        var deviceID = AudioDeviceID(kAudioObjectUnknown)
-        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
-        var defaultDeviceAddress = AudioObjectPropertyAddress(
-            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain
-        )
+        let route = AudioOutputRouteInspector.current()
+        guard let rawDeviceID = route.deviceID else {
+            return
+        }
+        let deviceID = AudioDeviceID(rawDeviceID)
 
-        guard AudioObjectGetPropertyData(
-            AudioObjectID(kAudioObjectSystemObject),
-            &defaultDeviceAddress,
-            0,
-            nil,
-            &size,
-            &deviceID
-        ) == noErr,
-        deviceID != kAudioObjectUnknown else {
+        if let configuredOutputDeviceID,
+           configuredOutputDeviceID != deviceID {
+            restoreSampleRate(for: configuredOutputDeviceID)
+        }
+
+        guard route.transport.allowsDeviceSampleRateMatching else {
+            restoreSampleRate(for: deviceID)
+            configuredOutputDeviceID = nil
             return
         }
 
@@ -264,15 +277,67 @@ final class MacSystemPlaybackEngine: PlaybackEngine {
             return
         }
 
+        var currentRate: Float64 = 0
+        var size = UInt32(MemoryLayout<Float64>.size)
+        guard AudioObjectGetPropertyData(
+            deviceID,
+            &rateAddress,
+            0,
+            nil,
+            &size,
+            &currentRate
+        ) == noErr else {
+            return
+        }
+
+        configuredOutputDeviceID = deviceID
+
+        guard abs(currentRate - sampleRate) > 0.5 else {
+            return
+        }
+
+        if setNominalSampleRate(sampleRate, for: deviceID),
+           originalSampleRates[deviceID] == nil {
+            originalSampleRates[deviceID] = currentRate
+        }
+    }
+
+    private func restoreSampleRate(for deviceID: AudioDeviceID) {
+        guard let originalRate = originalSampleRates[deviceID] else { return }
+        if setNominalSampleRate(originalRate, for: deviceID) {
+            originalSampleRates.removeValue(forKey: deviceID)
+        }
+    }
+
+    @discardableResult
+    private func setNominalSampleRate(
+        _ sampleRate: Float64,
+        for deviceID: AudioDeviceID
+    ) -> Bool {
+        var rateAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyNominalSampleRate,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var isSettable: DarwinBoolean = false
+        guard AudioObjectIsPropertySettable(
+            deviceID,
+            &rateAddress,
+            &isSettable
+        ) == noErr,
+        isSettable.boolValue else {
+            return false
+        }
+
         var requestedRate = sampleRate
-        AudioObjectSetPropertyData(
+        return AudioObjectSetPropertyData(
             deviceID,
             &rateAddress,
             0,
             nil,
             UInt32(MemoryLayout<Float64>.size),
             &requestedRate
-        )
+        ) == noErr
     }
 
     private func startProgressUpdates() {
