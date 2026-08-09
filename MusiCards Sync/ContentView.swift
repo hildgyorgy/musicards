@@ -288,14 +288,51 @@ struct ContentView: View {
         }
     }
 
-    private func summaryView(_ summary: SyncSummary) -> some View {
+    private func summaryView(
+        _ summary: SyncSummary,
+        indexSummary: LibraryIndexSyncSummary? = nil
+    ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
+            if let indexSummary {
+                summaryStatusRow(
+                    "Library index generated",
+                    isCompleted: indexSummary.indexGenerated
+                )
+                summaryStatusRow(
+                    "Previous index removed",
+                    isCompleted: indexSummary.previousIndexRemoved
+                )
+            }
+
             summaryRow("New files", summary.newFiles)
             summaryRow("Modified files", summary.modifiedFiles)
             summaryRow("New folders", summary.newFolders)
             summaryRow("Deleted files", summary.deletedFiles)
             summaryRow("Deleted folders", summary.deletedFolders)
             summaryRow("System cleanup", summary.systemCleanup)
+
+            if let indexSummary {
+                summaryStatusRow(
+                    "New index published",
+                    isCompleted: indexSummary.newIndexPublished
+                )
+            }
+        }
+    }
+
+    private func summaryStatusRow(
+        _ title: String,
+        isCompleted: Bool
+    ) -> some View {
+        HStack(spacing: 18) {
+            Text(title)
+                .frame(width: 150, alignment: .leading)
+
+            Text(isCompleted ? "Done" : "Not completed")
+                .font(.system(.body, design: .monospaced))
+                .foregroundStyle(.secondary)
+
+            Spacer()
         }
     }
 
@@ -355,7 +392,10 @@ struct ContentView: View {
                 }
 
                 if let syncSummary = model.displayedSyncSummary {
-                    summaryView(syncSummary)
+                    summaryView(
+                        syncSummary,
+                        indexSummary: model.displayedLibraryIndexSyncSummary
+                    )
                     .padding(.top, 2)
                 }
             }

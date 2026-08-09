@@ -111,6 +111,11 @@ final class SyncViewModelTests: XCTestCase {
         )
         model.syncCompletedFileCount = 3
         model.syncTotalFileCount = 10
+        model.libraryIndexSyncSummary = LibraryIndexSyncSummary(
+            indexGenerated: true,
+            previousIndexRemoved: true,
+            newIndexPublished: false
+        )
         model.syncPhase = .synchronizationStopped
 
         XCTAssertEqual(model.preview.newFiles.count, 10)
@@ -119,6 +124,14 @@ final class SyncViewModelTests: XCTestCase {
             model.syncCompletedSummary
         )
         XCTAssertEqual(model.syncFileProgressText, "3 files completed")
+        XCTAssertEqual(
+            model.displayedLibraryIndexSyncSummary,
+            LibraryIndexSyncSummary(
+                indexGenerated: true,
+                previousIndexRemoved: true,
+                newIndexPublished: false
+            )
+        )
         XCTAssertFalse(model.canSync)
 
         model.syncPhase = .completed

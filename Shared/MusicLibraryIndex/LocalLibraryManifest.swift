@@ -1,6 +1,6 @@
 //
 //  LocalLibraryManifest.swift
-//  MusiCards
+//  MusiCards Shared
 //
 
 import Foundation
@@ -129,7 +129,7 @@ enum LocalLibraryManifestLoader {
 
         if let coordinationError { throw coordinationError }
         guard let result else {
-            throw NativePlaybackEngineError(
+            throw MusicLibraryIndexError(
                 "Could not read \(fileName) from the selected folder."
             )
         }
@@ -149,7 +149,7 @@ enum LocalLibraryManifestLoader {
               !relativePath.contains("\\"),
               !components.isEmpty,
               components.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." }) else {
-            throw NativePlaybackEngineError(
+            throw MusicLibraryIndexError(
                 "library.json contains an unsafe file path."
             )
         }

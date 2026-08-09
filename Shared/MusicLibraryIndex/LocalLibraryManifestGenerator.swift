@@ -1,6 +1,6 @@
 //
 //  LocalLibraryManifestGenerator.swift
-//  MusiCards
+//  MusiCards Shared
 //
 
 #if os(macOS)
@@ -10,6 +10,7 @@ nonisolated struct LocalLibraryManifestGenerationSummary: Sendable {
     let indexedAlbumCount: Int
     let indexedTrackCount: Int
     let skippedFolderCount: Int
+    let indexWasUpdated: Bool
 
     var warningMessage: String? {
         guard skippedFolderCount > 0 else { return nil }
@@ -40,6 +41,7 @@ enum LocalLibraryManifestGenerator {
         var skippedFolderCount = 0
 
         for (index, folder) in folders.enumerated() {
+            try Task.checkCancellation()
             let folderCandidates = (groupedCandidates[folder] ?? [])
                 .sorted { $0.relativePath < $1.relativePath }
             await progress("Indexing album \(index + 1) / \(folders.count)…")
@@ -64,14 +66,19 @@ enum LocalLibraryManifestGenerator {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .withoutEscapingSlashes]
         let data = try encoder.encode(albums)
-        try data.write(
-            to: rootURL.appendingPathComponent(LocalLibraryManifestLoader.fileName),
-            options: .atomic
+        let manifestURL = rootURL.appendingPathComponent(
+            LocalLibraryManifestLoader.fileName
         )
+        let existingData = try? Data(contentsOf: manifestURL)
+        let indexWasUpdated = existingData != data
+        if indexWasUpdated {
+            try data.write(to: manifestURL, options: .atomic)
+        }
         return LocalLibraryManifestGenerationSummary(
             indexedAlbumCount: albums.count,
             indexedTrackCount: albums.reduce(0) { $0 + $1.tracks.count },
-            skippedFolderCount: skippedFolderCount
+            skippedFolderCount: skippedFolderCount,
+            indexWasUpdated: indexWasUpdated
         )
     }
 

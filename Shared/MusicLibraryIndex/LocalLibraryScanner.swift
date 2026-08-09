@@ -1,6 +1,6 @@
 //
 //  LocalLibraryScanner.swift
-//  MusiCards
+//  MusiCards Shared
 //
 
 import AudioToolbox
@@ -54,7 +54,7 @@ enum LocalLibraryScanner {
             includingPropertiesForKeys: keys,
             options: [.skipsHiddenFiles, .skipsPackageDescendants]
         ) else {
-            throw NativePlaybackEngineError("Could not read the selected music folder")
+            throw MusicLibraryIndexError("Could not read the selected music folder")
         }
 
         var candidates: [LocalAudioFileCandidate] = []
@@ -98,13 +98,13 @@ enum LocalLibraryScanner {
             }
             group.addTask {
                 try await Task.sleep(for: timeout)
-                throw NativePlaybackEngineError(
+                throw MusicLibraryIndexError(
                     "Timed out while reading \(candidate.url.lastPathComponent)"
                 )
             }
 
             guard let result = try await group.next() else {
-                throw NativePlaybackEngineError("Could not read audio metadata")
+                throw MusicLibraryIndexError("Could not read audio metadata")
             }
             group.cancelAll()
             return result
@@ -125,7 +125,7 @@ enum LocalLibraryScanner {
             let audioTracks = try await tracksTask
             
             guard let audioTrack = audioTracks.first else {
-                throw NativePlaybackEngineError("The indexed file contains no audio track")
+                throw MusicLibraryIndexError("The indexed file contains no audio track")
             }
 
             async let descriptionsTask = audioTrack.load(.formatDescriptions)

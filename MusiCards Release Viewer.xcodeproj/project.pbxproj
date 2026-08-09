@@ -139,6 +139,11 @@
 			path = LocalLibrary;
 			sourceTree = "<group>";
 		};
+		F5C0DE042FD0000000000004 /* Shared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Shared;
+			sourceTree = "<group>";
+		};
 		F5E510E12FC4BDF300E797D6 /* Deck */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = Deck;
@@ -199,6 +204,7 @@
 			children = (
 				F5E521402F8292AD00D2CEAE /* Products */,
 				F5C0DE032FD0000000000003 /* MusiCards */,
+				F5C0DE042FD0000000000004 /* Shared */,
 				F5B632B630260A6100A44573 /* MusiCards Sync */,
 				F5B700023027C00100AEA397 /* MusiCards SyncTests */,
 			);
@@ -320,6 +326,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				F5B632B630260A6100A44573 /* MusiCards Sync */,
+				F5C0DE042FD0000000000004 /* Shared */,
 			);
 			name = "MusiCards Sync";
 			productName = "MusiCards Sync";
@@ -361,6 +368,7 @@
 				F5A09F5E2FBC746A00E5404B /* MusiCardsMac */,
 				F5C0DE012FD0000000000001 /* Playback */,
 				F5C0DE022FD0000000000002 /* LocalLibrary */,
+				F5C0DE042FD0000000000004 /* Shared */,
 				F5E510E12FC4BDF300E797D6 /* Deck */,
 			);
 			name = MusiCards;

@@ -17,6 +17,8 @@ final class RsyncArgumentsTests: XCTestCase {
         XCTAssertTrue(arguments.contains("--timeout=30"))
         XCTAssertFalse(arguments.contains("--no-inc-recursive"))
         XCTAssertFalse(arguments.contains("--info=progress2"))
+        XCTAssertFalse(arguments.contains("--filter=P /library.json"))
+        XCTAssertFalse(arguments.contains("--exclude=/library.json"))
         XCTAssertEqual(Array(arguments.suffix(2)), [
             configuration.sourcePath,
             configuration.destination.remoteDestination
@@ -34,6 +36,8 @@ final class RsyncArgumentsTests: XCTestCase {
         XCTAssertFalse(arguments.contains("--info=progress2"))
         XCTAssertTrue(arguments.contains("--out-format=%i|%n|%b"))
         XCTAssertTrue(arguments.contains("--outbuf=L"))
+        XCTAssertFalse(arguments.contains("--filter=P /library.json"))
+        XCTAssertTrue(arguments.contains("--exclude=/library.json"))
     }
 
     func testLocalDestinationDoesNotAddSshArguments() {
@@ -55,6 +59,140 @@ final class RsyncArgumentsTests: XCTestCase {
         XCTAssertFalse(arguments.contains("--timeout=30"))
         XCTAssertFalse(arguments.contains("-e"))
         XCTAssertEqual(arguments.last, "/Volumes/Destination/")
+    }
+
+    func testRemoteIndexPublicationTransfersOnlyManifest() {
+        let configuration = remoteConfiguration()
+        let arguments = SyncEngine.libraryIndexPublishArguments(
+            configuration: configuration
+        )
+
+        XCTAssertFalse(arguments.contains("--delete"))
+        XCTAssertFalse(arguments.contains("--delete-excluded"))
+        XCTAssertFalse(arguments.contains("--exclude=/library.json"))
+        XCTAssertTrue(arguments.contains("--timeout=30"))
+        XCTAssertTrue(arguments.contains("-e"))
+        XCTAssertEqual(Array(arguments.suffix(2)), [
+            "/Volumes/Source/library.json",
+            configuration.destination.remoteDestination
+        ])
+    }
+
+    func testRemoteIndexInvalidationDeletesOnlyManifest() {
+        let configuration = remoteConfiguration()
+        let arguments = SyncEngine.libraryIndexInvalidationArguments(
+            configuration: configuration,
+            emptySourcePath: "/tmp/empty-index-source"
+        )
+
+        XCTAssertTrue(arguments.contains("--delete"))
+        XCTAssertFalse(arguments.contains("--delete-excluded"))
+        XCTAssertTrue(arguments.contains("--include=/library.json"))
+        XCTAssertTrue(arguments.contains("--exclude=/*"))
+        XCTAssertTrue(arguments.contains("--timeout=30"))
+        XCTAssertTrue(arguments.contains("-e"))
+        XCTAssertEqual(Array(arguments.suffix(2)), [
+            "/tmp/empty-index-source/",
+            configuration.destination.remoteDestination
+        ])
+    }
+
+    func testLocalIndexInvalidationDoesNotAddSSHArguments() {
+        let configuration = SyncConfiguration(
+            rsyncPath: "/opt/homebrew/bin/rsync",
+            sourcePath: "/Volumes/Source/",
+            destination: DestinationProfile(
+                name: "Local folder",
+                kind: .local,
+                path: "/Volumes/Destination/"
+            ),
+            sshKeyPath: "/tmp/key"
+        )
+        let arguments = SyncEngine.libraryIndexInvalidationArguments(
+            configuration: configuration,
+            emptySourcePath: "/tmp/empty-index-source/"
+        )
+
+        XCTAssertFalse(arguments.contains("--timeout=30"))
+        XCTAssertFalse(arguments.contains("-e"))
+        XCTAssertEqual(Array(arguments.suffix(2)), [
+            "/tmp/empty-index-source/",
+            "/Volumes/Destination/"
+        ])
+    }
+
+    func testLocalIndexInvalidationPreservesMusicAndDeletesManifest() throws {
+        let fileManager = FileManager.default
+        let testRoot = fileManager.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let emptySource = testRoot.appendingPathComponent(
+            "empty",
+            isDirectory: true
+        )
+        let destination = testRoot.appendingPathComponent(
+            "destination",
+            isDirectory: true
+        )
+        try fileManager.createDirectory(
+            at: emptySource,
+            withIntermediateDirectories: true
+        )
+        try fileManager.createDirectory(
+            at: destination,
+            withIntermediateDirectories: true
+        )
+        defer { try? fileManager.removeItem(at: testRoot) }
+
+        let manifestURL = destination.appendingPathComponent("library.json")
+        let musicURL = destination.appendingPathComponent("track.flac")
+        try Data("old index".utf8).write(to: manifestURL)
+        try Data("music".utf8).write(to: musicURL)
+
+        let configuration = SyncConfiguration(
+            rsyncPath: "/opt/homebrew/bin/rsync",
+            sourcePath: testRoot.path,
+            destination: DestinationProfile(
+                name: "Local folder",
+                kind: .local,
+                path: destination.path + "/"
+            ),
+            sshKeyPath: "/tmp/key"
+        )
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: configuration.rsyncPath)
+        process.arguments = SyncEngine.libraryIndexInvalidationArguments(
+            configuration: configuration,
+            emptySourcePath: emptySource.path
+        )
+        try process.run()
+        process.waitUntilExit()
+
+        XCTAssertEqual(process.terminationStatus, 0)
+        XCTAssertFalse(fileManager.fileExists(atPath: manifestURL.path))
+        XCTAssertTrue(fileManager.fileExists(atPath: musicURL.path))
+    }
+
+    func testLocalIndexPublicationDoesNotAddSSHArguments() {
+        let configuration = SyncConfiguration(
+            rsyncPath: "/opt/homebrew/bin/rsync",
+            sourcePath: "/Volumes/Source/",
+            destination: DestinationProfile(
+                name: "Local folder",
+                kind: .local,
+                path: "/Volumes/Destination/"
+            ),
+            sshKeyPath: "/tmp/key"
+        )
+        let arguments = SyncEngine.libraryIndexPublishArguments(
+            configuration: configuration
+        )
+
+        XCTAssertFalse(arguments.contains("--timeout=30"))
+        XCTAssertFalse(arguments.contains("-e"))
+        XCTAssertEqual(Array(arguments.suffix(2)), [
+            "/Volumes/Source/library.json",
+            "/Volumes/Destination/"
+        ])
     }
 
     private func remoteConfiguration() -> SyncConfiguration {

@@ -65,3 +65,9 @@ nonisolated struct SyncSummary: Equatable, Sendable {
         newFiles + modifiedFiles + deletedFiles + systemCleanup
     }
 }
+
+nonisolated struct LibraryIndexSyncSummary: Equatable, Sendable {
+    var indexGenerated = false
+    var previousIndexRemoved = false
+    var newIndexPublished = false
+}

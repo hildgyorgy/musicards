@@ -1,6 +1,6 @@
 //
 //  FastAudioMetadataReader.swift
-//  MusiCards
+//  MusiCards Shared
 //
 
 import Foundation
@@ -15,7 +15,7 @@ nonisolated enum FastAudioMetadataReader {
         case "m4a":
             return try readM4A(candidate)
         default:
-            throw NativePlaybackEngineError(
+            throw MusicLibraryIndexError(
                 "The fast metadata reader does not support \(candidate.url.pathExtension)."
             )
         }
@@ -107,7 +107,7 @@ nonisolated enum FastAudioMetadataReader {
     ) throws -> ScannedAudioFile {
         let reader = try BinaryReader(url: candidate.url)
         guard try reader.read(count: 4) == Data("fLaC".utf8) else {
-            throw NativePlaybackEngineError("Invalid FLAC header")
+            throw MusicLibraryIndexError("Invalid FLAC header")
         }
 
         var parsed = ParsedMetadata(codec: "FLAC")
@@ -204,7 +204,7 @@ nonisolated enum FastAudioMetadataReader {
             end: reader.fileSize,
             type: moov
         ) else {
-            throw NativePlaybackEngineError("M4A file has no moov atom")
+            throw MusicLibraryIndexError("M4A file has no moov atom")
         }
 
         var parsed = ParsedMetadata(codec: "M4A")
@@ -432,7 +432,7 @@ nonisolated enum FastAudioMetadataReader {
         end: UInt64
     ) throws -> [MP4Box] {
         guard start <= end, end <= reader.fileSize else {
-            throw NativePlaybackEngineError("Invalid MP4 container range")
+            throw MusicLibraryIndexError("Invalid MP4 container range")
         }
         var result: [MP4Box] = []
         var position = start
@@ -454,7 +454,7 @@ nonisolated enum FastAudioMetadataReader {
                 boxSize = size32
             }
             guard boxSize >= headerSize, boxSize <= end - position else {
-                throw NativePlaybackEngineError("Invalid MP4 box structure")
+                throw MusicLibraryIndexError("Invalid MP4 box structure")
             }
             let boxEnd = position + boxSize
             result.append(
@@ -491,7 +491,7 @@ private nonisolated final class BinaryReader {
 
     func seek(to offset: UInt64) throws {
         guard offset <= fileSize else {
-            throw NativePlaybackEngineError("Unexpected end of audio file")
+            throw MusicLibraryIndexError("Unexpected end of audio file")
         }
         try handle.seek(toOffset: offset)
         self.offset = offset
@@ -506,7 +506,7 @@ private nonisolated final class BinaryReader {
               UInt64(count) <= fileSize - offset,
               let data = try handle.read(upToCount: count),
               data.count == count else {
-            throw NativePlaybackEngineError("Unexpected end of audio file")
+            throw MusicLibraryIndexError("Unexpected end of audio file")
         }
         offset += UInt64(count)
         return data

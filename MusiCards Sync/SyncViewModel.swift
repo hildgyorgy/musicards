@@ -41,7 +41,10 @@ enum RemoteRsyncStatus: Equatable {
 enum SyncOperationPhase: Equatable {
     case idle
     case preparing
+    case generatingIndex
+    case invalidatingIndex
     case synchronizing
+    case publishingIndex
     case verifying
     case completed
     case completedWithRemainingChanges
@@ -69,6 +72,7 @@ final class SyncViewModel {
     var syncCompletedFileCount = 0
     var syncTotalFileCount = 0
     var syncCompletedSummary = SyncSummary()
+    var libraryIndexSyncSummary = LibraryIndexSyncSummary()
     var syncPhase = SyncOperationPhase.idle
     var localRsyncStatus = LocalRsyncStatus.checking
     var remoteRsyncStatus = RemoteRsyncStatus.notApplicable
@@ -176,8 +180,14 @@ final class SyncViewModel {
             return nil
         case .preparing:
             return "Checking rsync requirements"
+        case .generatingIndex:
+            return "Scanning music library and generating index"
+        case .invalidatingIndex:
+            return "Invalidating previous library index"
         case .synchronizing:
             return "Synchronization in progress"
+        case .publishingIndex:
+            return "Publishing library index"
         case .verifying:
             return "Synchronization complete — verifying"
         case .completed:
@@ -199,7 +209,7 @@ final class SyncViewModel {
         guard syncTotalFileCount > 0 else { return nil }
 
         switch syncPhase {
-        case .preparing, .synchronizing:
+        case .preparing, .generatingIndex, .invalidatingIndex, .synchronizing, .publishingIndex:
             return "\(syncCompletedFileCount) / \(syncTotalFileCount) files"
         case .verifying,
              .completed,
@@ -223,9 +233,14 @@ final class SyncViewModel {
              .synchronizationFailed,
              .verificationFailed:
             return syncCompletedSummary
-        case .idle, .preparing, .synchronizing, .verifying:
+        case .idle, .preparing, .generatingIndex, .invalidatingIndex, .synchronizing, .publishingIndex, .verifying:
             return nil
         }
+    }
+
+    var displayedLibraryIndexSyncSummary: LibraryIndexSyncSummary? {
+        guard displayedSyncSummary != nil else { return nil }
+        return libraryIndexSyncSummary
     }
 
     var destinationOptions: [DestinationProfile] {
@@ -326,6 +341,18 @@ final class SyncViewModel {
                 )
                 progressLines.append("Local \(localInfo.displayLine)")
 
+                let indexSummary = try await updateSourceLibraryIndex()
+                let indexAction = indexSummary.indexWasUpdated
+                    ? "Library index updated"
+                    : "Library index already up to date"
+                progressLines.append(
+                    "\(indexAction) · \(indexSummary.indexedAlbumCount) releases · " +
+                    "\(indexSummary.indexedTrackCount) tracks"
+                )
+                if let warning = indexSummary.warningMessage {
+                    progressLines.append(warning)
+                }
+
                 if let remoteInfo = try await validateAndRecordRemoteRsync(
                     using: engine
                 ) {
@@ -373,6 +400,7 @@ final class SyncViewModel {
         isSyncing = true
         progressTracker = RsyncProgressTracker(preview: preview)
         syncCompletedSummary = progressTracker.completedSummary
+        libraryIndexSyncSummary = LibraryIndexSyncSummary()
         syncCompletedFileCount = 0
         syncTotalFileCount = progressTracker.totalCount
         syncProgress = syncTotalFileCount > 0 ? 0 : nil
@@ -418,6 +446,32 @@ final class SyncViewModel {
                     progressLines.append("Remote \(remoteInfo.displayLine)")
                 }
 
+                syncPhase = .generatingIndex
+                progressLines.append("— Scanning music library —")
+                let indexSummary = try await updateSourceLibraryIndex()
+                libraryIndexSyncSummary.indexGenerated = true
+                progressLines.append(
+                    "Library index generated · " +
+                    "\(indexSummary.indexedAlbumCount) releases · " +
+                    "\(indexSummary.indexedTrackCount) tracks"
+                )
+                if let warning = indexSummary.warningMessage {
+                    progressLines.append(warning)
+                }
+
+                syncPhase = .invalidatingIndex
+                progressTitle = "Invalidating previous library index…"
+                progressLines.append("— Invalidating previous library index —")
+                try await engine.invalidateLibraryIndex { lines in
+                    lineBuffer.append(lines)
+                }
+                consumeProgressLines(
+                    lineBuffer.drain(),
+                    tracksFileProgress: false
+                )
+                libraryIndexSyncSummary.previousIndexRemoved = true
+                progressLines.append("Previous destination index removed")
+
                 syncPhase = .synchronizing
                 progressTitle = "Synchronizing…"
 
@@ -429,6 +483,20 @@ final class SyncViewModel {
                     lineBuffer.drain(),
                     tracksFileProgress: true
                 )
+
+                syncPhase = .publishingIndex
+                progressTitle = "Publishing library index…"
+                progressLines.append("— Publishing library index —")
+                try await engine.publishLibraryIndex { lines in
+                    lineBuffer.append(lines)
+                }
+                consumeProgressLines(
+                    lineBuffer.drain(),
+                    tracksFileProgress: false
+                )
+                libraryIndexSyncSummary.newIndexPublished = true
+                progressLines.append("New destination index published")
+
                 transferCompleted = true
                 progressTracker.markAllCompleted()
                 syncCompletedSummary = progressTracker.completedSummary
@@ -712,6 +780,20 @@ final class SyncViewModel {
         return info
     }
 
+    private func updateSourceLibraryIndex()
+        async throws -> LocalLibraryManifestGenerationSummary {
+        let sourceURL = URL(
+            fileURLWithPath: configuration.sourcePath,
+            isDirectory: true
+        )
+        progressTitle = "Updating library index…"
+        return try await LocalLibraryManifestGenerator.generate(
+            in: sourceURL
+        ) { [weak self] message in
+            self?.progressTitle = message
+        }
+    }
+
     @discardableResult
     private func beginRemoteRsyncCheck(destinationName: String) -> UUID {
         let requestID = UUID()
@@ -790,6 +872,7 @@ final class SyncViewModel {
         syncCompletedFileCount = 0
         syncTotalFileCount = 0
         syncCompletedSummary = SyncSummary()
+        libraryIndexSyncSummary = LibraryIndexSyncSummary()
         syncProgress = nil
     }
 

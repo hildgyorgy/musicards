@@ -252,12 +252,38 @@ nonisolated final class SyncEngine {
     ) async throws {
         _ = try await runRsync(
             dryRun: false,
+            invalidatesLibraryIndex: false,
+            publishesLibraryIndex: false,
+            onOutput: onOutput
+        )
+    }
+
+    func invalidateLibraryIndex(
+        onOutput: @escaping @Sendable ([String]) -> Void = { _ in }
+    ) async throws {
+        _ = try await runRsync(
+            dryRun: false,
+            invalidatesLibraryIndex: true,
+            publishesLibraryIndex: false,
+            onOutput: onOutput
+        )
+    }
+
+    func publishLibraryIndex(
+        onOutput: @escaping @Sendable ([String]) -> Void = { _ in }
+    ) async throws {
+        _ = try await runRsync(
+            dryRun: false,
+            invalidatesLibraryIndex: false,
+            publishesLibraryIndex: true,
             onOutput: onOutput
         )
     }
 
     private func runRsync(
         dryRun: Bool,
+        invalidatesLibraryIndex: Bool = false,
+        publishesLibraryIndex: Bool = false,
         onOutput: @escaping @Sendable ([String]) -> Void
     ) async throws -> String {
 
@@ -270,6 +296,8 @@ nonisolated final class SyncEngine {
                     let output = try Self.runRsyncBlocking(
                         configuration: configuration,
                         dryRun: dryRun,
+                        invalidatesLibraryIndex: invalidatesLibraryIndex,
+                        publishesLibraryIndex: publishesLibraryIndex,
                         processState: processState,
                         onOutput: onOutput
                     )
@@ -286,6 +314,8 @@ nonisolated final class SyncEngine {
     private static func runRsyncBlocking(
         configuration: SyncConfiguration,
         dryRun: Bool,
+        invalidatesLibraryIndex: Bool,
+        publishesLibraryIndex: Bool,
         processState: RsyncProcessState,
         onOutput: @escaping @Sendable ([String]) -> Void
     ) throws -> String {
@@ -302,10 +332,30 @@ nonisolated final class SyncEngine {
         process.executableURL =
             URL(fileURLWithPath: configuration.rsyncPath)
 
-        process.arguments = rsyncArguments(
-            configuration: configuration,
-            dryRun: dryRun
-        )
+        var invalidationDirectoryURL: URL?
+
+        if invalidatesLibraryIndex {
+            let directoryURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent(UUID().uuidString, isDirectory: true)
+            try FileManager.default.createDirectory(
+                at: directoryURL,
+                withIntermediateDirectories: true
+            )
+            invalidationDirectoryURL = directoryURL
+            process.arguments = libraryIndexInvalidationArguments(
+                configuration: configuration,
+                emptySourcePath: directoryURL.path
+            )
+        } else if publishesLibraryIndex {
+            process.arguments = libraryIndexPublishArguments(
+                configuration: configuration
+            )
+        } else {
+            process.arguments = rsyncArguments(
+                configuration: configuration,
+                dryRun: dryRun
+            )
+        }
 
         process.standardOutput = pipe
         process.standardError = pipe
@@ -342,7 +392,12 @@ nonisolated final class SyncEngine {
             finished.signal()
         }
 
-        defer { processState.clearProcess() }
+        defer {
+            processState.clearProcess()
+            if let invalidationDirectoryURL {
+                try? FileManager.default.removeItem(at: invalidationDirectoryURL)
+            }
+        }
 
         try processState.start(process)
         finished.wait()
@@ -509,6 +564,11 @@ nonisolated final class SyncEngine {
             arguments.append("--dry-run")
             arguments.append("--out-format=%i|%n")
         } else {
+            // The destination manifest is invalidated before the bulk transfer.
+            // Keep the freshly generated source manifest out of this pass; it
+            // is published separately only after every music file succeeds.
+            arguments.append("--exclude=/\(LocalLibraryManifestLoader.fileName)")
+
             // %b is a transfer-statistic escape, so rsync emits each itemized
             // file line after that file has finished instead of before it starts.
             arguments.append("--out-format=%i|%n|%b")
@@ -521,6 +581,83 @@ nonisolated final class SyncEngine {
             configuration.destination.remoteDestination
         )
 
+        return arguments
+    }
+
+    static func libraryIndexInvalidationArguments(
+        configuration: SyncConfiguration,
+        emptySourcePath: String
+    ) -> [String] {
+        var arguments: [String] = [
+            "-a",
+            "--delete",
+            "--itemize-changes",
+            "--iconv=UTF-8-MAC,UTF-8",
+            "--secluded-args",
+            "--include=/\(LocalLibraryManifestLoader.fileName)",
+            "--exclude=/*",
+            "--out-format=%i|%n|%b",
+            "--outbuf=L"
+        ]
+
+        if configuration.destination.kind == .remote {
+            arguments.append("--timeout=30")
+            arguments.append(contentsOf: [
+                "-e",
+                """
+                ssh -i \(configuration.sshKeyPath) \
+                -o BatchMode=yes \
+                -o ConnectTimeout=5 \
+                -o ConnectionAttempts=1 \
+                -o ControlMaster=no \
+                -o ControlPersist=no \
+                -o ControlPath=none
+                """
+            ])
+        }
+
+        let sourcePath = emptySourcePath.hasSuffix("/")
+            ? emptySourcePath
+            : emptySourcePath + "/"
+        arguments.append(sourcePath)
+        arguments.append(configuration.destination.remoteDestination)
+        return arguments
+    }
+
+    static func libraryIndexPublishArguments(
+        configuration: SyncConfiguration
+    ) -> [String] {
+        var arguments: [String] = [
+            "-a",
+            "--itemize-changes",
+            "--iconv=UTF-8-MAC,UTF-8",
+            "--secluded-args",
+            "--out-format=%i|%n|%b",
+            "--outbuf=L"
+        ]
+
+        if configuration.destination.kind == .remote {
+            arguments.append("--timeout=30")
+            arguments.append(contentsOf: [
+                "-e",
+                """
+                ssh -i \(configuration.sshKeyPath) \
+                -o BatchMode=yes \
+                -o ConnectTimeout=5 \
+                -o ConnectionAttempts=1 \
+                -o ControlMaster=no \
+                -o ControlPersist=no \
+                -o ControlPath=none
+                """
+            ])
+        }
+
+        let sourceURL = URL(
+            fileURLWithPath: configuration.sourcePath,
+            isDirectory: true
+        ).appendingPathComponent(LocalLibraryManifestLoader.fileName)
+        arguments.append(sourceURL.path)
+        arguments.append(configuration.destination.remoteDestination)
         return arguments
     }
 }
