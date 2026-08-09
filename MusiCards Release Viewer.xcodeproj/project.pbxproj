@@ -133,21 +133,12 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		F5E5111A2FC4F35600E797D6 /* Styles */ = {
-			isa = PBXGroup;
-			children = (
-				F5E5111B2FC4F38800E797D6 /* AppStyle.swift */,
-			);
-			path = Styles;
-			sourceTree = "<group>";
-		};
-		F5E521362F8292AD00D2CEAE = {
+		F5C0DE032FD0000000000003 /* MusiCards */ = {
 			isa = PBXGroup;
 			children = (
 				F54FE6322F9C104D00646913 /* PrivacyInfo.xcprivacy */,
 				F5E81AE92F982C6B008F35BB /* MusiCards Release Viewer-Info.plist */,
 				F5A09F5E2FBC746A00E5404B /* MusiCardsMac */,
-				F5E521402F8292AD00D2CEAE /* Products */,
 				F5ECDD572F85CF3D006161E3 /* Resources */,
 				F5ECDD512F85CE95006161E3 /* App */,
 				F5ECDD562F85CF27006161E3 /* Cards */,
@@ -159,6 +150,23 @@
 				F5C0DE012FD0000000000001 /* Playback */,
 				F5C0DE022FD0000000000002 /* LocalLibrary */,
 				F59F29112F923B1E00A50F8C /* MusiCards.icon */,
+			);
+			path = MusiCards;
+			sourceTree = "<group>";
+		};
+		F5E5111A2FC4F35600E797D6 /* Styles */ = {
+			isa = PBXGroup;
+			children = (
+				F5E5111B2FC4F38800E797D6 /* AppStyle.swift */,
+			);
+			path = Styles;
+			sourceTree = "<group>";
+		};
+		F5E521362F8292AD00D2CEAE = {
+			isa = PBXGroup;
+			children = (
+				F5E521402F8292AD00D2CEAE /* Products */,
+				F5C0DE032FD0000000000003 /* MusiCards */,
 			);
 			sourceTree = "<group>";
 		};
@@ -512,7 +520,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
-				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = MusiCardsMac/MusiCardsMac.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = MusiCards/MusiCardsMac/MusiCardsMac.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 5;
@@ -524,7 +532,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "MusiCards Release Viewer-Info.plist";
+				INFOPLIST_FILE = "MusiCards/MusiCards Release Viewer-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = MusiCards;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
 				INFOPLIST_KEY_NSAppleMusicUsageDescription = "MusiCards uses Apple Music to detect the currently playing track and find the matching release.";
@@ -553,7 +561,7 @@
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_OBJC_BRIDGING_HEADER = "Playback/MusiCards-Bridging-Header.h";
+				SWIFT_OBJC_BRIDGING_HEADER = "MusiCards/Playback/MusiCards-Bridging-Header.h";
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -566,7 +574,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
-				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = MusiCardsMac/MusiCardsMac.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = MusiCards/MusiCardsMac/MusiCardsMac.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 5;
@@ -578,7 +586,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "MusiCards Release Viewer-Info.plist";
+				INFOPLIST_FILE = "MusiCards/MusiCards Release Viewer-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = MusiCards;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
 				INFOPLIST_KEY_NSAppleMusicUsageDescription = "MusiCards uses Apple Music to detect the currently playing track and find the matching release.";
@@ -607,7 +615,7 @@
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_OBJC_BRIDGING_HEADER = "Playback/MusiCards-Bridging-Header.h";
+				SWIFT_OBJC_BRIDGING_HEADER = "MusiCards/Playback/MusiCards-Bridging-Header.h";
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
