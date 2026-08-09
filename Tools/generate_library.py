@@ -7,6 +7,7 @@ import time
 
 
 SUPPORTED_EXTENSIONS = (".flac", ".m4a")
+INDEX_VERSION = 2
 
 
 def parse_arguments():
@@ -354,6 +355,8 @@ def load_existing_library(output_path):
 
 
 def album_is_unchanged(album, folder_path, audio_files):
+    if album.get("index_version") != INDEX_VERSION:
+        return False
     tracks = album.get("tracks")
     if not isinstance(tracks, list) or len(tracks) != len(audio_files):
         return False
@@ -469,6 +472,7 @@ def main():
             print(f"⚠️ Album Artist tag is missing; using the parent folder name: {root}")
 
         library.append({
+            "index_version": INDEX_VERSION,
             "album_name": album_name,
             "artist_name": artist_name,
             "album_mbid": album_meta["album_mbid"],

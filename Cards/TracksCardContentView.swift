@@ -255,7 +255,9 @@ struct TracksCardContentView: View {
         return localLibrary.containsTrack(
             releaseID: releaseID,
             releaseTrackID: row.releaseTrackID,
-            recordingID: row.recordingID
+            recordingID: row.recordingID,
+            allowsRecordingFallback: release?
+                .hasUniqueOccurrence(ofRecordingID: row.recordingID) == true
         )
     }
 

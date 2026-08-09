@@ -150,7 +150,9 @@ final class MusiCardsAppModel: ObservableObject {
               let selectedFile = localLibrary.audioFile(
                 releaseID: release.id,
                 releaseTrackID: releaseTrackID,
-                recordingID: recordingID
+                recordingID: recordingID,
+                allowsRecordingFallback: release
+                    .hasUniqueOccurrence(ofRecordingID: recordingID)
               ),
               let selectedURL = localLibrary.url(for: selectedFile) else {
             return
@@ -173,7 +175,11 @@ final class MusiCardsAppModel: ObservableObject {
                     guard let file = localLibrary.audioFile(
                         releaseID: release.id,
                         releaseTrackID: track.id,
-                        recordingID: track.recording?.id
+                        recordingID: track.recording?.id,
+                        allowsRecordingFallback: release
+                            .hasUniqueOccurrence(
+                                ofRecordingID: track.recording?.id
+                            )
                     ), let url = localLibrary.url(for: file) else {
                         continue
                     }

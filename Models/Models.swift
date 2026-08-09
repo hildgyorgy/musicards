@@ -37,6 +37,29 @@ struct MBRelease: Decodable {
     }
 }
 extension MBRelease {
+    /// Recording MBIDs identify the musical recording, not a particular
+    /// appearance of it on a release. Falling back to a recording match is
+    /// therefore safe only when that recording occurs exactly once across
+    /// every medium/layer of this release.
+    func hasUniqueOccurrence(ofRecordingID recordingID: String?) -> Bool {
+        guard let recordingID = recordingID?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+              !recordingID.isEmpty else {
+            return false
+        }
+
+        var occurrenceCount = 0
+        for medium in media ?? [] {
+            for track in medium.tracks ?? [] where
+                track.recording?.id.caseInsensitiveCompare(recordingID)
+                    == .orderedSame {
+                occurrenceCount += 1
+                if occurrenceCount > 1 { return false }
+            }
+        }
+        return occurrenceCount == 1
+    }
+
     var appleMusicURL: URL? {
         externalURL(containingAnyOf: [
             "music.apple.com",

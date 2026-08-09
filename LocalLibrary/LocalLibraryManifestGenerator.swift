@@ -19,6 +19,8 @@ nonisolated struct LocalLibraryManifestGenerationSummary: Sendable {
 }
 
 enum LocalLibraryManifestGenerator {
+    nonisolated private static let currentIndexVersion = 2
+
     nonisolated static func generate(
         in rootURL: URL,
         progress: @escaping @MainActor @Sendable (String) -> Void
@@ -98,6 +100,7 @@ enum LocalLibraryManifestGenerator {
         _ album: LocalLibraryManifestAlbum,
         candidates: [LocalAudioFileCandidate]
     ) -> Bool {
+        guard album.indexVersion == currentIndexVersion else { return false }
         guard album.tracks.count == candidates.count else { return false }
         let tracksByFilename = Dictionary(
             uniqueKeysWithValues: album.tracks.map { ($0.filename, $0) }
@@ -146,6 +149,7 @@ enum LocalLibraryManifestGenerator {
                 .lastPathComponent
 
         return LocalLibraryManifestAlbum(
+            indexVersion: currentIndexVersion,
             albumName: albumMetadata.albumTitle.isEmpty
                 ? fallbackFolderName
                 : albumMetadata.albumTitle,

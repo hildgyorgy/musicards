@@ -84,7 +84,17 @@ enum LocalLibraryScanner {
     ) async throws -> ScannedAudioFile {
         try await withThrowingTaskGroup(of: ScannedAudioFile.self) { group in
             group.addTask {
+                #if os(macOS)
+                do {
+                    return try FastAudioMetadataReader.read(candidate)
+                } catch {
+                    // Raw AAC and unusual containers retain the proven
+                    // AVFoundation path instead of failing the whole index.
+                    return try await readMetadataWithoutTimeout(from: candidate)
+                }
+                #else
                 try await readMetadataWithoutTimeout(from: candidate)
+                #endif
             }
             group.addTask {
                 try await Task.sleep(for: timeout)

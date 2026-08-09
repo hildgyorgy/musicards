@@ -22,7 +22,7 @@ final class LocalLibraryStore: ObservableObject {
     private var accessedRootIDs = Set<String>()
     private var tracksByReleaseID: [String: [LocalAudioFileSnapshot]] = [:]
     private var tracksByReleaseTrackKey: [String: LocalAudioFileSnapshot] = [:]
-    private var tracksByRecordingKey: [String: LocalAudioFileSnapshot] = [:]
+    private var legacyTracksByRecordingKey: [String: LocalAudioFileSnapshot] = [:]
 
     init() {
         do {
@@ -169,21 +169,24 @@ final class LocalLibraryStore: ObservableObject {
     func containsTrack(
         releaseID: String,
         releaseTrackID: String?,
-        recordingID: String?
+        recordingID: String?,
+        allowsRecordingFallback: Bool
     ) -> Bool {
         audioFile(
             releaseID: releaseID,
             releaseTrackID: releaseTrackID,
-            recordingID: recordingID
+            recordingID: recordingID,
+            allowsRecordingFallback: allowsRecordingFallback
         ) != nil
     }
 
     func audioFile(
         releaseID: String,
         releaseTrackID: String?,
-        recordingID: String?
+        recordingID: String?,
+        allowsRecordingFallback: Bool
     ) -> LocalAudioFileSnapshot? {
-        if let releaseTrackID,
+        if let releaseTrackID = nonemptyMBID(releaseTrackID),
            let exactMatch = tracksByReleaseTrackKey[
                releaseTrackKey(
                    releaseID: releaseID,
@@ -192,8 +195,11 @@ final class LocalLibraryStore: ObservableObject {
            ] {
             return exactMatch
         }
-        guard let recordingID else { return nil }
-        return tracksByRecordingKey[
+        guard allowsRecordingFallback,
+              let recordingID = nonemptyMBID(recordingID) else {
+            return nil
+        }
+        return legacyTracksByRecordingKey[
             recordingKey(releaseID: releaseID, recordingID: recordingID)
         ]
     }
@@ -431,10 +437,10 @@ final class LocalLibraryStore: ObservableObject {
             ).mapValues { $0.map(\.1) }
 
             tracksByReleaseTrackKey = [:]
-            tracksByRecordingKey = [:]
+            var legacyRecordingCandidates: [String: [LocalAudioFileSnapshot]] = [:]
             for file in snapshots {
                 guard let releaseID = file.releaseMBID else { continue }
-                if let releaseTrackID = file.releaseTrackMBID {
+                if let releaseTrackID = nonemptyMBID(file.releaseTrackMBID) {
                     let key = releaseTrackKey(
                         releaseID: releaseID,
                         releaseTrackID: releaseTrackID
@@ -442,16 +448,16 @@ final class LocalLibraryStore: ObservableObject {
                     if tracksByReleaseTrackKey[key] == nil {
                         tracksByReleaseTrackKey[key] = file
                     }
-                }
-                if let recordingID = file.recordingMBID {
+                } else if let recordingID = nonemptyMBID(file.recordingMBID) {
                     let key = recordingKey(
                         releaseID: releaseID,
                         recordingID: recordingID
                     )
-                    if tracksByRecordingKey[key] == nil {
-                        tracksByRecordingKey[key] = file
-                    }
+                    legacyRecordingCandidates[key, default: []].append(file)
                 }
+            }
+            legacyTracksByRecordingKey = legacyRecordingCandidates.compactMapValues {
+                $0.count == 1 ? $0[0] : nil
             }
 
             folderNames = roots
@@ -470,6 +476,12 @@ final class LocalLibraryStore: ObservableObject {
 
     private func normalizedMBID(_ value: String) -> String {
         value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    private func nonemptyMBID(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let normalized = normalizedMBID(value)
+        return normalized.isEmpty ? nil : normalized
     }
 
     private func recordingKey(releaseID: String, recordingID: String) -> String {

@@ -6,6 +6,7 @@
 import Foundation
 
 nonisolated struct LocalLibraryManifestAlbum: Codable, Sendable {
+    let indexVersion: Int?
     let albumName: String?
     let artistName: String?
     let albumMBID: String
@@ -17,6 +18,7 @@ nonisolated struct LocalLibraryManifestAlbum: Codable, Sendable {
     let tracks: [LocalLibraryManifestTrack]
 
     enum CodingKeys: String, CodingKey {
+        case indexVersion = "index_version"
         case albumName = "album_name"
         case artistName = "artist_name"
         case albumMBID = "album_mbid"
