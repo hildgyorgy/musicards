@@ -31,8 +31,6 @@ final class SearchViewModel: ObservableObject {
     @Published var isLoadingMoreVersions = false
     @Published var hasMoreVersions = false
 
-    // Track whether the current comma-search fell back to recording/track search
-
     // MARK: - Shared state
     @Published var mode: SearchMode = .search
     @Published var searchError: Error?
@@ -41,9 +39,11 @@ final class SearchViewModel: ObservableObject {
     private var searchTask: Task<Void, Never>?
     private var suppressNextQueryChange = false
     private let musicBrainzService: MusicBrainzService
+    private let localLibrary: LocalLibraryStore
 
-    init(service: MusicBrainzService) {
+    init(service: MusicBrainzService, localLibrary: LocalLibraryStore) {
         self.musicBrainzService = service
+        self.localLibrary = localLibrary
     }
 
     // Search mode pagination
@@ -154,7 +154,10 @@ final class SearchViewModel: ObservableObject {
                 hasMoreResults = results.count == pageSize
                 searchError = nil
 
-                await prepareReleaseRowsSequentially(from: results, append: false)
+                await prepareReleaseRowsSequentially(
+                    from: playableReleasesFirst(results),
+                    append: false
+                )
 
             } catch is CancellationError {
                 return
@@ -311,61 +314,19 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
 
         do {
             if q.contains(",") || MBIdentifiers.isBareBarcode(q) || MBIdentifiers.isMBID(q) {
-                if MBIdentifiers.isBareBarcode(q) || MBIdentifiers.isMBID(q) {
-                    // Barcode / MBID — release lookup only, no track search
-                    let results = try await musicBrainzService.searchReleases(
-                        query: q,
-                        limit: pageSize,
-                        offset: currentOffset
-                    )
-                    let sorted = sortRawReleases(results, query: q)
-                    releaseResults = []
-                    artistRows = []
-                    currentOffset = results.count
-                    hasMoreResults = results.count == pageSize
-                    await prepareReleaseRowsSequentially(from: sorted, append: false)
-
-                } else {
-                    // Comma query — run release search AND track search in parallel,
-                    // then merge: release-title matches first, track-containing releases appended.
-                    let parsed = parseCommaQuery(q)
-
-                    async let releasesFetch = musicBrainzService.searchReleases(
-                        query: q,
-                        limit: pageSize,
-                        offset: 0
-                    )
-                    async let recordingsFetch = musicBrainzService.searchRecordings(
-                        trackTitle: parsed.after,
-                        artistName: parsed.before.isEmpty ? nil : parsed.before,
-                        limit: pageSize,
-                        offset: 0
-                    )
-
-                    let (releaseResults_, recordings) = try await (releasesFetch, recordingsFetch)
-
-                    let sortedReleases = sortRawReleases(releaseResults_, query: q)
-                    let trackReleases  = flattenRecordingResults(recordings)
-
-                    // Merge: keep release-title hits first, append track hits not already present
-                    // Track-only results are sorted: searched artist first, compilations last
-                    let releaseIDs = Set(sortedReleases.map(\.id))
-                    let trackOnly  = sortTrackOnlyResults(
-                        trackReleases.filter { !releaseIDs.contains($0.id) },
-                        artistQuery: parsed.before
-                    )
-                    let merged = prioritizeAndFilterByArtist(
-                        sortedReleases + trackOnly,
-                        artistQuery: parsed.before
-                    )
-
-                    releaseResults = []
-                    artistRows = []
-                    currentOffset = merged.count
-                    hasMoreResults = releaseResults_.count == pageSize || trackReleases.count == pageSize
-
-                    await prepareReleaseRowsSequentially(from: merged, append: false)
-                }
+                let results = try await musicBrainzService.searchReleases(
+                    query: q,
+                    limit: pageSize,
+                    offset: currentOffset
+                )
+                let sorted = playableReleasesFirst(
+                    sortRawReleases(results, query: q)
+                )
+                releaseResults = []
+                artistRows = []
+                currentOffset = results.count
+                hasMoreResults = results.count == pageSize
+                await prepareReleaseRowsSequentially(from: sorted, append: false)
 
             } else {
                 let results = try await musicBrainzService.searchArtists(
@@ -382,7 +343,7 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
                     )
                 }
 
-                artistRows = rows
+                artistRows = playableArtistsFirst(rows)
                 releaseResults = []
                 currentOffset = rows.count
                 hasMoreResults = rows.count == pageSize
@@ -438,7 +399,7 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
                 offset: 0
             )
 
-            let sorted = sortedVersions(results)
+            let sorted = playableReleasesFirst(sortedVersions(results))
 
             releaseResults = []
             artistRows = []
@@ -487,7 +448,7 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
                 offset: versionsOffset
             )
 
-            let sorted = sortedVersions(results)
+            let sorted = playableReleasesFirst(sortedVersions(results))
             versionsOffset += results.count
             hasMoreVersions = hasMore
 
@@ -555,54 +516,17 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
         guard !q.isEmpty else { return }
 
         do {
-            if q.contains(",") && !MBIdentifiers.isBareBarcode(q) && !MBIdentifiers.isMBID(q) {
-                // Parallel release + track search, same merge logic as initial search
-                let parsed = parseCommaQuery(q)
-
-                async let releasesFetch = musicBrainzService.searchReleases(
-                    query: q,
-                    limit: pageSize,
-                    offset: currentOffset
-                )
-                async let recordingsFetch = musicBrainzService.searchRecordings(
-                    trackTitle: parsed.after,
-                    artistName: parsed.before.isEmpty ? nil : parsed.before,
-                    limit: pageSize,
-                    offset: currentOffset
-                )
-
-                let (releaseResults_, recordings) = try await (releasesFetch, recordingsFetch)
-
-                let sortedReleases = sortRawReleases(releaseResults_, query: q)
-                let trackReleases  = flattenRecordingResults(recordings)
-
-                let existing   = Set(releaseResults.map(\.id))
-                let releaseIDs = Set(sortedReleases.map(\.id))
-                let trackOnly  = sortTrackOnlyResults(
-                    trackReleases.filter { !releaseIDs.contains($0.id) },
-                    artistQuery: parsed.before
-                )
-                let merged = prioritizeAndFilterByArtist(
-                    (sortedReleases + trackOnly).filter { !existing.contains($0.id) },
-                    artistQuery: parsed.before
-                )
-
-                currentOffset += merged.count
-                hasMoreResults = releaseResults_.count == pageSize || trackReleases.count == pageSize
-
-                await prepareReleaseRowsSequentially(from: merged, append: true)
-
-            } else {
-                let results = try await musicBrainzService.searchReleases(
-                    query: q,
-                    limit: pageSize,
-                    offset: currentOffset
-                )
-                let sorted = sortRawReleases(results, query: q)
-                currentOffset += results.count
-                hasMoreResults = results.count == pageSize
-                await prepareReleaseRowsSequentially(from: sorted, append: true)
-            }
+            let results = try await musicBrainzService.searchReleases(
+                query: q,
+                limit: pageSize,
+                offset: currentOffset
+            )
+            let sorted = playableReleasesFirst(
+                sortRawReleases(results, query: q)
+            )
+            currentOffset += results.count
+            hasMoreResults = results.count == pageSize
+            await prepareReleaseRowsSequentially(from: sorted, append: true)
         } catch is CancellationError {
             return
         } catch {
@@ -629,7 +553,7 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
                 )
             }
 
-            appendUniqueArtistRows(rows)
+            appendUniqueArtistRows(playableArtistsFirst(rows))
             currentOffset += results.count
             hasMoreResults = results.count == pageSize
 
@@ -645,11 +569,42 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
     private func appendUniqueReleaseRow(_ row: SearchReleaseRow) {
         guard !releaseResults.contains(where: { $0.id == row.id }) else { return }
         releaseResults.append(row)
+        releaseResults = stablePlayableFirst(
+            releaseResults,
+            isPlayable: { localLibrary.containsRelease($0.id) }
+        )
     }
 
     private func appendUniqueArtistRows(_ rows: [SearchArtistRow]) {
         let existing = Set(artistRows.map(\.id))
         artistRows.append(contentsOf: rows.filter { !existing.contains($0.id) })
+        artistRows = playableArtistsFirst(artistRows)
+    }
+
+    private func playableReleasesFirst(
+        _ releases: [MBReleaseSearchResult]
+    ) -> [MBReleaseSearchResult] {
+        stablePlayableFirst(
+            releases,
+            isPlayable: { localLibrary.containsRelease($0.id) }
+        )
+    }
+
+    private func playableArtistsFirst(
+        _ artists: [SearchArtistRow]
+    ) -> [SearchArtistRow] {
+        stablePlayableFirst(
+            artists,
+            isPlayable: { localLibrary.containsArtist(named: $0.name) }
+        )
+    }
+
+    private func stablePlayableFirst<Element>(
+        _ elements: [Element],
+        isPlayable: (Element) -> Bool
+    ) -> [Element] {
+        let grouped = Dictionary(grouping: elements, by: isPlayable)
+        return (grouped[true] ?? []) + (grouped[false] ?? [])
     }
 
     private nonisolated func makeReleaseRow(
@@ -769,18 +724,7 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
         }
     }
 
-    // MARK: - Track search helpers
-
-    /// Split "artist, track" or ", track" into its two parts.
-    private nonisolated func parseCommaQuery(_ q: String) -> (before: String, after: String) {
-        let raw = q.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let commaIndex = raw.firstIndex(of: ",") else {
-            return (before: "", after: raw)
-        }
-        let before = String(raw[..<commaIndex]).trimmingCharacters(in: .whitespacesAndNewlines)
-        let after  = String(raw[raw.index(after: commaIndex)...]).trimmingCharacters(in: .whitespacesAndNewlines)
-        return (before: before, after: after)
-    }
+    // MARK: - Shazam recording resolution helpers
 
     /// Flatten recording search results into a deduplicated list of releases.
     /// Preserves score-order by keeping the first occurrence of each release ID.
@@ -837,52 +781,6 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// Sort track-only results so the searched artist's own releases come first,
-    /// then everything else (compilations, various-artists, etc.) in original order.
-    private nonisolated func sortTrackOnlyResults(
-        _ releases: [MBReleaseSearchResult],
-        artistQuery: String
-    ) -> [MBReleaseSearchResult] {
-        guard !artistQuery.isEmpty else { return releases }
-
-        let needle = artistQuery.lowercased()
-
-        return releases.sorted { a, b in
-            let aMatch = artistCreditMatches(a.artistCredit, needle: needle)
-            let bMatch = artistCreditMatches(b.artistCredit, needle: needle)
-            if aMatch != bMatch { return aMatch }
-            return false  // stable: preserve original order within each group
-        }
-    }
-    
-    private nonisolated func prioritizeAndFilterByArtist(
-        _ releases: [MBReleaseSearchResult],
-        artistQuery: String
-    ) -> [MBReleaseSearchResult] {
-        let query = artistQuery.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        guard !query.isEmpty else { return releases }
-
-        let ranked = releases.map { release in
-            (release: release, rank: artistMatchRank(release.artistCredit, artistQuery: query))
-        }
-
-        let hasStrongArtistMatches = ranked.contains { $0.rank <= 1 }
-
-        let filtered = hasStrongArtistMatches
-            ? ranked.filter { $0.rank <= 2 }
-            : ranked
-
-        return filtered.sorted { a, b in
-            if a.rank != b.rank {
-                return a.rank < b.rank
-            }
-
-            return false
-        }
-        .map(\.release)
-    }
-
     private nonisolated func artistMatchRank(
         _ credit: [MBArtistCredit]?,
         artistQuery: String
@@ -933,16 +831,6 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
             .filter { token in
                 token.count >= 3 && !genericTokens.contains(token)
             }
-    }
-
-    private nonisolated func artistCreditMatches(
-        _ credit: [MBArtistCredit]?,
-        needle: String
-    ) -> Bool {
-        guard let credit else { return false }
-        return credit.contains {
-            $0.name.lowercased().contains(needle)
-        }
     }
 
     // MARK: - Private helpers

@@ -23,6 +23,8 @@ final class LocalLibraryStore: ObservableObject {
     private var tracksByReleaseID: [String: [LocalAudioFileSnapshot]] = [:]
     private var tracksByReleaseTrackKey: [String: LocalAudioFileSnapshot] = [:]
     private var legacyTracksByRecordingKey: [String: LocalAudioFileSnapshot] = [:]
+    private var normalizedArtistCredits = Set<String>()
+    private var normalizedArtistCreditsByAlbumTitle: [String: Set<String>] = [:]
 
     init() {
         do {
@@ -164,6 +166,21 @@ final class LocalLibraryStore: ObservableObject {
 
     func containsRelease(_ releaseID: String) -> Bool {
         tracksByReleaseID[normalizedMBID(releaseID)]?.isEmpty == false
+    }
+
+    func containsArtist(named artistName: String) -> Bool {
+        let needle = normalizedLibraryText(artistName)
+        guard !needle.isEmpty else { return false }
+        return normalizedArtistCredits.contains(needle)
+    }
+
+    func containsReleaseGroup(title: String, artistName: String) -> Bool {
+        let artist = normalizedLibraryText(artistName)
+        let album = normalizedLibraryText(title)
+        guard !artist.isEmpty, !album.isEmpty else { return false }
+        return normalizedArtistCreditsByAlbumTitle[album]?.contains {
+            artistCredit($0, contains: artist)
+        } == true
     }
 
     func containsTrack(
@@ -436,6 +453,20 @@ final class LocalLibraryStore: ObservableObject {
                 by: { $0.0 }
             ).mapValues { $0.map(\.1) }
 
+            normalizedArtistCredits = Set(
+                snapshots.compactMap { file in
+                    let artist = normalizedLibraryText(file.artist)
+                    return artist.isEmpty ? nil : artist
+                }
+            )
+            normalizedArtistCreditsByAlbumTitle = [:]
+            for file in snapshots {
+                let artist = normalizedLibraryText(file.artist)
+                let album = normalizedLibraryText(file.albumTitle)
+                guard !artist.isEmpty, !album.isEmpty else { continue }
+                normalizedArtistCreditsByAlbumTitle[album, default: []].insert(artist)
+            }
+
             tracksByReleaseTrackKey = [:]
             var legacyRecordingCandidates: [String: [LocalAudioFileSnapshot]] = [:]
             for file in snapshots {
@@ -476,6 +507,24 @@ final class LocalLibraryStore: ObservableObject {
 
     private func normalizedMBID(_ value: String) -> String {
         value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    private func normalizedLibraryText(_ value: String) -> String {
+        value
+            .folding(
+                options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive],
+                locale: Locale(identifier: "en_US_POSIX")
+            )
+            .split(whereSeparator: { !$0.isLetter && !$0.isNumber })
+            .map(String.init)
+            .joined(separator: " ")
+    }
+
+    private func artistCredit(_ credit: String, contains artist: String) -> Bool {
+        credit == artist
+            || credit.hasPrefix("\(artist) ")
+            || credit.hasSuffix(" \(artist)")
+            || credit.contains(" \(artist) ")
     }
 
     private func nonemptyMBID(_ value: String?) -> String? {

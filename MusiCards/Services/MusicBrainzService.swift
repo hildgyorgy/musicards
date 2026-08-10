@@ -289,8 +289,7 @@ struct MusicBrainzService {
         return (result.releases, result.releases.count == limit)
     }
 
-    /// Search recordings by title (and optionally artist), returning the releases they appear on.
-    /// Used as a fallback when a comma-syntax query finds no matching releases.
+    /// Resolve a Shazam match through recording search and return its releases.
     func searchRecordings(
         trackTitle: String,
         artistName: String? = nil,

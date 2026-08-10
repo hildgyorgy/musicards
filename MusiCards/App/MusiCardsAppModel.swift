@@ -75,12 +75,16 @@ final class MusiCardsAppModel: ObservableObject {
     init(playbackEngine: PlaybackEngine? = nil) {
         let service = musicBrainzService
         let playbackEngine = playbackEngine ?? PlaybackEngineFactory.makeDefault()
+        let localLibrary = LocalLibraryStore()
 
-        self.searchViewModel = SearchViewModel(service: service)
+        self.localLibrary = localLibrary
+        self.searchViewModel = SearchViewModel(
+            service: service,
+            localLibrary: localLibrary
+        )
         self.trackDetailStore = TrackDetailStore(service: service)
         self.classicalMetadataStore = ClassicalMetadataStore(service: service)
         self.playbackController = PlaybackController(engine: playbackEngine)
-        self.localLibrary = LocalLibraryStore()
         self.localPlaybackNowPlayingCoordinator =
             PlatformNowPlayingCoordinator(controller: self.playbackController)
         self.playbackItemObservation = self.playbackController.$currentIndex

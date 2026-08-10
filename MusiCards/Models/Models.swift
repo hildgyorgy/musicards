@@ -399,7 +399,7 @@ struct MBWork: Decodable {
     }
 }
 
-// MARK: - Recording search (used for track-title search via comma syntax)
+// MARK: - Recording search (used to resolve Shazam matches)
 
 struct MBRecordingSearchResponse: Decodable {
     let recordings: [MBRecordingSearchResult]

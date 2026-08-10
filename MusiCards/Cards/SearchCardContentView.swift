@@ -150,16 +150,23 @@ struct SearchCardContentView: View {
                     dismissKeyboard()
                     onSelectArtist(artist)
                 } label: {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(artist.name)
-                            .font(.body)
-                            .foregroundStyle(Color.blue)
-                            .lineLimit(1)
-                        if !artist.lifeSpan.isEmpty {
-                            Text(artist.lifeSpan)
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
+                    HStack(alignment: .center, spacing: 8) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(artist.name)
+                                .font(.body)
+                                .foregroundStyle(Color.blue)
                                 .lineLimit(1)
+                            if !artist.lifeSpan.isEmpty {
+                                Text(artist.lifeSpan)
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                        if localLibrary.containsArtist(named: artist.name) {
+                            playableIndicator(label: "Artist available in local library")
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -215,10 +222,7 @@ struct SearchCardContentView: View {
             Spacer(minLength: 0)
 
             if localLibrary.containsRelease(release.id) {
-                Image(systemName: "play.fill")
-                    .font(.caption2)
-                    .foregroundStyle(Color.blue)
-                    .accessibilityLabel("Available in local library")
+                playableIndicator(label: "Release available in local library")
             }
         }
     }
@@ -290,12 +294,25 @@ struct SearchCardContentView: View {
     }
 
     private func artistRow(_ artist: SearchArtistRow) -> some View {
-        Text(artist.name)
-            .font(.body)
+        HStack(spacing: 8) {
+            Text(artist.name)
+                .font(.body)
+                .foregroundStyle(Color.blue)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            if localLibrary.containsArtist(named: artist.name) {
+                playableIndicator(label: "Artist available in local library")
+            }
+        }
+        .padding(.vertical, 0)
+    }
+
+    private func playableIndicator(label: String) -> some View {
+        Image(systemName: "play.fill")
+            .font(.caption2)
             .foregroundStyle(Color.blue)
-            .lineLimit(1)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.vertical, 0)
+            .accessibilityLabel(label)
     }
 
     private func sectionLabel(_ text: String) -> some View {

@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct ArtistCardContentView: View {
+    @ObservedObject var localLibrary: LocalLibraryStore
     let artist: MBArtistDetail?
     let releaseGroups: [MBReleaseGroupSummary]
     let wikipedia: (title: String, extract: String)?
@@ -94,6 +95,15 @@ struct ArtistCardContentView: View {
                                                     .font(.callout)
                                                     .foregroundStyle(Color.blue)
                                                     .frame(maxWidth: .infinity, alignment: .leading)
+
+                                                if isPlayable(group) {
+                                                    Image(systemName: "play.fill")
+                                                        .font(.caption2)
+                                                        .foregroundStyle(Color.blue)
+                                                        .accessibilityLabel(
+                                                            "Release group available in local library"
+                                                        )
+                                                }
                                             }
 #if os(macOS)
                                             .padding(.leading, 10)
@@ -173,6 +183,14 @@ struct ArtistCardContentView: View {
     }
 
     // MARK: - Helpers
+
+    private func isPlayable(_ group: MBReleaseGroupSummary) -> Bool {
+        guard let artistName = artist?.name else { return false }
+        return localLibrary.containsReleaseGroup(
+            title: group.title,
+            artistName: artistName
+        )
+    }
 
     private func displayExcerpt(for text: String, limit: Int = 150) -> String {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)

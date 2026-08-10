@@ -256,6 +256,7 @@ struct ContentView: View {
                 MusiCardsSpinner()
             } else {
                 ArtistCardContentView(
+                    localLibrary: appModel.localLibrary,
                     artist: appModel.selectedArtist,
                     releaseGroups: appModel.artistReleaseGroups,
                     wikipedia: appModel.artistWikipedia,
