@@ -459,6 +459,7 @@ nonisolated final class SyncEngine {
         process.executableURL = URL(fileURLWithPath: "/usr/bin/ssh")
         process.arguments = [
             "-i", configuration.sshKeyPath,
+            "-p", String(configuration.destination.sshPort),
             "-o", "BatchMode=yes",
             "-o", "ConnectTimeout=5",
             "-o", "ConnectionAttempts=1",
@@ -537,6 +538,7 @@ nonisolated final class SyncEngine {
             "--exclude=._*",
             "--exclude=.Spotlight-V100",
             "--exclude=.Trashes",
+            "--exclude=/\(LocalLibraryManifestLoader.fileName)",
 
         ]
         switch configuration.destination.kind {
@@ -547,6 +549,7 @@ nonisolated final class SyncEngine {
             "-e",
             """
             ssh -i \(configuration.sshKeyPath) \
+            -p \(configuration.destination.sshPort) \
             -o BatchMode=yes \
             -o ConnectTimeout=5 \
             -o ConnectionAttempts=1 \
@@ -564,11 +567,6 @@ nonisolated final class SyncEngine {
             arguments.append("--dry-run")
             arguments.append("--out-format=%i|%n")
         } else {
-            // The destination manifest is invalidated before the bulk transfer.
-            // Keep the freshly generated source manifest out of this pass; it
-            // is published separately only after every music file succeeds.
-            arguments.append("--exclude=/\(LocalLibraryManifestLoader.fileName)")
-
             // %b is a transfer-statistic escape, so rsync emits each itemized
             // file line after that file has finished instead of before it starts.
             arguments.append("--out-format=%i|%n|%b")
@@ -606,6 +604,7 @@ nonisolated final class SyncEngine {
                 "-e",
                 """
                 ssh -i \(configuration.sshKeyPath) \
+                -p \(configuration.destination.sshPort) \
                 -o BatchMode=yes \
                 -o ConnectTimeout=5 \
                 -o ConnectionAttempts=1 \
@@ -642,6 +641,7 @@ nonisolated final class SyncEngine {
                 "-e",
                 """
                 ssh -i \(configuration.sshKeyPath) \
+                -p \(configuration.destination.sshPort) \
                 -o BatchMode=yes \
                 -o ConnectTimeout=5 \
                 -o ConnectionAttempts=1 \

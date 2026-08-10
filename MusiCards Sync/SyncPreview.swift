@@ -67,7 +67,23 @@ nonisolated struct SyncSummary: Equatable, Sendable {
 }
 
 nonisolated struct LibraryIndexSyncSummary: Equatable, Sendable {
-    var indexGenerated = false
-    var previousIndexRemoved = false
-    var newIndexPublished = false
+    var indexGenerated: Bool
+    var previousIndexRemoved: Bool
+    var newIndexPublished: Bool
+    var musicBrainzReadyAlbumCount: Int?
+    var totalAlbumCount: Int?
+
+    init(
+        indexGenerated: Bool = false,
+        previousIndexRemoved: Bool = false,
+        newIndexPublished: Bool = false,
+        musicBrainzReadyAlbumCount: Int? = nil,
+        totalAlbumCount: Int? = nil
+    ) {
+        self.indexGenerated = indexGenerated
+        self.previousIndexRemoved = previousIndexRemoved
+        self.newIndexPublished = newIndexPublished
+        self.musicBrainzReadyAlbumCount = musicBrainzReadyAlbumCount
+        self.totalAlbumCount = totalAlbumCount
+    }
 }

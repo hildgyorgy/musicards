@@ -58,6 +58,7 @@ enum SyncOperationPhase: Equatable {
 @Observable
 final class SyncViewModel {
     var configuration: SyncConfiguration
+    var remoteDestinations: [DestinationProfile]
     var preview = SyncPreview()
     var isChecking = false
     var errorMessage: String?
@@ -79,10 +80,13 @@ final class SyncViewModel {
     private var localVolumeRevision = 0
 
     @ObservationIgnored private let configurationStore: SyncConfigurationStore
+    @ObservationIgnored private let remoteDestinationStore: RemoteDestinationStore
     @ObservationIgnored private let configurationValidator =
         SyncConfigurationValidator()
     @ObservationIgnored private let completedItemParser =
         RsyncCompletedItemParser()
+    @ObservationIgnored private let remoteLocationSetupService =
+        RemoteLocationSetupService()
     @ObservationIgnored private var progressTracker =
         RsyncProgressTracker()
     @ObservationIgnored private var activeEngine: SyncEngine?
@@ -91,15 +95,25 @@ final class SyncViewModel {
 
     init() {
         let configurationStore = SyncConfigurationStore()
+        let remoteDestinationStore = RemoteDestinationStore()
         self.configurationStore = configurationStore
+        self.remoteDestinationStore = remoteDestinationStore
         configuration = configurationStore.load()
+        remoteDestinations = remoteDestinationStore.load()
+        migrateSelectedRemoteDestinationIfNeeded()
         prepareRemoteRsyncStatus()
         localVolumesDidChange()
     }
 
-    init(configurationStore: SyncConfigurationStore) {
+    init(
+        configurationStore: SyncConfigurationStore,
+        remoteDestinationStore: RemoteDestinationStore = RemoteDestinationStore()
+    ) {
         self.configurationStore = configurationStore
+        self.remoteDestinationStore = remoteDestinationStore
         configuration = configurationStore.load()
+        remoteDestinations = remoteDestinationStore.load()
+        migrateSelectedRemoteDestinationIfNeeded()
         prepareRemoteRsyncStatus()
         localVolumesDidChange()
     }
@@ -109,14 +123,16 @@ final class SyncViewModel {
     }
 
     var canCheck: Bool {
-        !isBusy && isLocalRsyncReady && !configuration.sourcePath.isEmpty
+        !isBusy &&
+            isLocalRsyncReady &&
+            !configuration.sourcePath.isEmpty &&
+            configuration.destination != .unconfigured
     }
 
     var canSync: Bool {
         !isBusy &&
             isLocalRsyncReady &&
             hasChecked &&
-            preview.hasChanges &&
             syncPhase == .idle
     }
 
@@ -245,7 +261,7 @@ final class SyncViewModel {
 
     var destinationOptions: [DestinationProfile] {
         _ = localVolumeRevision
-        var options = DestinationProfile.defaults
+        var options = remoteDestinations
 
         if configuration.destination.kind == .local,
            !configuration.destination.path.isEmpty,
@@ -340,18 +356,6 @@ final class SyncViewModel {
                     using: engine
                 )
                 progressLines.append("Local \(localInfo.displayLine)")
-
-                let indexSummary = try await updateSourceLibraryIndex()
-                let indexAction = indexSummary.indexWasUpdated
-                    ? "Library index updated"
-                    : "Library index already up to date"
-                progressLines.append(
-                    "\(indexAction) · \(indexSummary.indexedAlbumCount) releases · " +
-                    "\(indexSummary.indexedTrackCount) tracks"
-                )
-                if let warning = indexSummary.warningMessage {
-                    progressLines.append(warning)
-                }
 
                 if let remoteInfo = try await validateAndRecordRemoteRsync(
                     using: engine
@@ -450,6 +454,10 @@ final class SyncViewModel {
                 progressLines.append("— Scanning music library —")
                 let indexSummary = try await updateSourceLibraryIndex()
                 libraryIndexSyncSummary.indexGenerated = true
+                libraryIndexSyncSummary.musicBrainzReadyAlbumCount =
+                    indexSummary.indexedAlbumCount
+                libraryIndexSyncSummary.totalAlbumCount =
+                    indexSummary.indexedAlbumCount + indexSummary.skippedFolderCount
                 progressLines.append(
                     "Library index generated · " +
                     "\(indexSummary.indexedAlbumCount) releases · " +
@@ -600,6 +608,60 @@ final class SyncViewModel {
         saveAndInvalidatePreview()
     }
 
+    func addRemoteDestination(_ profile: DestinationProfile) {
+        guard profile.kind == .remote else { return }
+
+        if let index = remoteDestinations.firstIndex(where: { $0.id == profile.id }) {
+            remoteDestinations[index] = profile
+        } else {
+            remoteDestinations.append(profile)
+        }
+        remoteDestinationStore.save(remoteDestinations)
+        selectDestination(profile)
+    }
+
+    func pairAndAddRemoteDestination(
+        _ profile: DestinationProfile,
+        password: String
+    ) async throws {
+        var testConfiguration = configuration
+        testConfiguration.destination = profile
+
+        try await remoteLocationSetupService.ensureKeyPair(
+            at: testConfiguration.sshKeyPath
+        )
+
+        do {
+            _ = try await SyncEngine(
+                configuration: testConfiguration
+            ).validateRemoteRsync()
+        } catch {
+            guard !password.isEmpty else {
+                throw RemoteLocationSetupService.SetupError.passwordRequired
+            }
+            try await remoteLocationSetupService.installPublicKey(
+                for: profile,
+                password: password,
+                privateKeyPath: testConfiguration.sshKeyPath
+            )
+            _ = try await SyncEngine(
+                configuration: testConfiguration
+            ).validateRemoteRsync()
+        }
+
+        addRemoteDestination(profile)
+    }
+
+    func removeCurrentRemoteDestination() {
+        guard configuration.destination.kind == .remote else { return }
+
+        remoteDestinations.removeAll { $0.id == configuration.destination.id }
+        remoteDestinationStore.save(remoteDestinations)
+        configuration.destination = .unconfigured
+        prepareRemoteRsyncStatus()
+        saveAndInvalidatePreview()
+    }
+
     func loadRsyncVersion() async {
         let engine = SyncEngine(configuration: configuration)
         _ = try? await validateAndRecordLocalRsync(using: engine)
@@ -644,6 +706,17 @@ final class SyncViewModel {
     private func saveAndInvalidatePreview() {
         configurationStore.save(configuration)
         invalidatePreview(resetProgress: true)
+    }
+
+    private func migrateSelectedRemoteDestinationIfNeeded() {
+        let selected = configuration.destination
+        guard selected.kind == .remote,
+              !remoteDestinations.contains(where: { $0.id == selected.id }) else {
+            return
+        }
+
+        remoteDestinations.append(selected)
+        remoteDestinationStore.save(remoteDestinations)
     }
 
     private func validateSelectedPaths() -> Bool {

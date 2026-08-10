@@ -18,6 +18,7 @@ nonisolated struct DestinationProfile:
 
     var user: String?
     var host: String?
+    var port: Int?
     var path: String
 
     init(
@@ -26,6 +27,7 @@ nonisolated struct DestinationProfile:
         kind: DestinationKind,
         user: String? = nil,
         host: String? = nil,
+        port: Int? = nil,
         path: String
     ) {
         self.id = id
@@ -33,7 +35,12 @@ nonisolated struct DestinationProfile:
         self.kind = kind
         self.user = user
         self.host = host
+        self.port = port
         self.path = path
+    }
+
+    var sshPort: Int {
+        port ?? 22
     }
 
     var remoteDestination: String {
@@ -52,27 +59,10 @@ nonisolated struct DestinationProfile:
 }
 
 extension DestinationProfile {
-
-    nonisolated static let umbrelRPi5 = DestinationProfile(
-        id: UUID(uuidString: "11111111-1111-1111-1111-111111111111")!,
-        name: "Umbrel – RPi 5",
-        kind: .remote,
-        user: "umbrel",
-        host: "umbrel.local",
-        path: "/home/umbrel/umbrel/home/Music/"
+    nonisolated static let unconfigured = DestinationProfile(
+        id: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!,
+        name: "Choose Destination",
+        kind: .local,
+        path: ""
     )
-
-    nonisolated static let casaOSRPi4 = DestinationProfile(
-        id: UUID(uuidString: "22222222-2222-2222-2222-222222222222")!,
-        name: "CasaOS – RPi 4",
-        kind: .remote,
-        user: "rpi4",
-        host: "192.168.1.33",
-        path: "/media/devmon/MUSIC/Music/"
-    )
-
-    nonisolated static let defaults: [DestinationProfile] = [
-        .umbrelRPi5,
-        .casaOSRPi4
-    ]
 }

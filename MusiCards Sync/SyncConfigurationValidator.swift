@@ -6,6 +6,9 @@ nonisolated struct SyncConfigurationValidator: Sendable {
         case sameSourceAndDestination
         case destinationInsideSource
         case sourceInsideDestination
+        case incompleteRemoteDestination
+        case invalidRemotePort
+        case invalidRemotePath
 
         var errorDescription: String? {
             switch self {
@@ -17,6 +20,12 @@ nonisolated struct SyncConfigurationValidator: Sendable {
                 return "The local destination cannot be inside the source folder."
             case .sourceInsideDestination:
                 return "The source cannot be inside the local destination because synchronization could delete unrelated destination files."
+            case .incompleteRemoteDestination:
+                return "Remote destination requires a name, hostname, username, and folder path."
+            case .invalidRemotePort:
+                return "SSH port must be between 1 and 65535."
+            case .invalidRemotePath:
+                return "Remote destination folder must be an absolute path beginning with /."
             }
         }
     }
@@ -36,7 +45,24 @@ nonisolated struct SyncConfigurationValidator: Sendable {
     }
 
     func validate(_ configuration: SyncConfiguration) throws {
-        guard configuration.destination.kind == .local else { return }
+        if configuration.destination.kind == .remote {
+            let destination = configuration.destination
+            guard !destination.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  let host = destination.host,
+                  !host.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  let user = destination.user,
+                  !user.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  !destination.path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                throw ValidationError.incompleteRemoteDestination
+            }
+            guard (1...65_535).contains(destination.sshPort) else {
+                throw ValidationError.invalidRemotePort
+            }
+            guard destination.path.hasPrefix("/") else {
+                throw ValidationError.invalidRemotePath
+            }
+            return
+        }
 
         guard !configuration.destination.path.isEmpty else {
             throw ValidationError.localDestinationUnavailable(

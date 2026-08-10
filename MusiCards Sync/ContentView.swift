@@ -32,6 +32,9 @@ private struct WindowChromeConfigurator: NSViewRepresentable {
 struct ContentView: View {
 
     @State private var model: SyncViewModel
+    @State private var showDestinationPicker = false
+    @State private var showRemoteLocationSetup = false
+    @State private var showRemoveRemoteConfirmation = false
 
     init() {
         _model = State(initialValue: SyncViewModel())
@@ -114,6 +117,25 @@ struct ContentView: View {
                 }
             )
         }
+        .sheet(isPresented: $showRemoteLocationSetup) {
+            RemoteLocationSetupView { profile, password in
+                try await model.pairAndAddRemoteDestination(
+                    profile,
+                    password: password
+                )
+            }
+        }
+        .confirmationDialog(
+            "Remove remote location?",
+            isPresented: $showRemoveRemoteConfirmation
+        ) {
+            Button("Remove", role: .destructive) {
+                model.removeCurrentRemoteDestination()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This removes the saved location from MusiCards Sync. It does not delete music or SSH keys from the server.")
+        }
         .background(
             WindowChromeConfigurator(refreshToken: model.hasChecked)
         )
@@ -174,51 +196,23 @@ struct ContentView: View {
 
     private var destinationSection: some View {
         HStack(alignment: .center, spacing: AppDesign.contentGap) {
-            Menu {
-                ForEach(model.destinationOptions) { profile in
-                    Button {
-                        model.selectDestination(profile)
-                    } label: {
-                        if model.configuration.destination == profile {
-                            Label(
-                                destinationDisplayName(profile),
-                                systemImage: "checkmark"
-                            )
-                        } else {
-                            Text(destinationDisplayName(profile))
-                        }
-                    }
-                }
-
-                Divider()
-
-                Button("External Drive…") {
-                    chooseDestinationFolder()
-                }
+            Button {
+                showDestinationPicker = true
             } label: {
-                Rectangle()
-                    .fill(Color.primary.opacity(0.001))
-                    .frame(
-                        width: AppDesign.railWidth,
-                        height: AppDesign.railControlHeight
-                    )
-            }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            .disabled(model.isBusy)
-            .frame(
-                width: AppDesign.railWidth,
-                height: AppDesign.railControlHeight
-            )
-            .overlay {
                 AppRailSymbol(
                     systemName: "arrow.right",
                     isEnabled: !model.isBusy
                 )
-                .allowsHitTesting(false)
             }
-            .accessibilityLabel("Choose Destination")
+            .buttonStyle(AppRailButtonStyle())
+            .disabled(model.isBusy)
             .help("Choose Destination")
+            .popover(
+                isPresented: $showDestinationPicker,
+                arrowEdge: .trailing
+            ) {
+                destinationPicker
+            }
 
             VStack(alignment: .leading, spacing: AppDesign.detailSpacing) {
                 AppSectionHeader("Destination")
@@ -235,6 +229,81 @@ struct ContentView: View {
                     .textSelection(.enabled)
             }
         }
+    }
+
+    private var destinationPicker: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            if !model.destinationOptions.isEmpty {
+                ForEach(model.destinationOptions) { profile in
+                    Button {
+                        showDestinationPicker = false
+                        model.selectDestination(profile)
+                    } label: {
+                        HStack(spacing: 12) {
+                            Text(destinationDisplayName(profile))
+                            Spacer(minLength: 24)
+                            if model.configuration.destination == profile {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Divider()
+                    .padding(.vertical, 3)
+            }
+
+            destinationPickerButton("Add Remote Location…") {
+                showDestinationPicker = false
+                DispatchQueue.main.async {
+                    showRemoteLocationSetup = true
+                }
+            }
+
+            destinationPickerButton("External Drive…") {
+                showDestinationPicker = false
+                DispatchQueue.main.async {
+                    chooseDestinationFolder()
+                }
+            }
+
+            if model.configuration.destination.kind == .remote {
+                Divider()
+                    .padding(.vertical, 3)
+                destinationPickerButton(
+                    "Remove Current Remote Location…",
+                    foregroundStyle: .red
+                ) {
+                    showDestinationPicker = false
+                    DispatchQueue.main.async {
+                        showRemoveRemoteConfirmation = true
+                    }
+                }
+            }
+        }
+        .padding(8)
+        .frame(minWidth: 270)
+    }
+
+    private func destinationPickerButton(
+        _ title: String,
+        foregroundStyle: Color = .primary,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(title)
+                .foregroundStyle(foregroundStyle)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private var previewSection: some View {
@@ -278,10 +347,13 @@ struct ContentView: View {
             Text("Ready to check for changes")
                 .foregroundStyle(.secondary)
         } else if model.preview.hasChanges {
-            summaryView(SyncSummary(preview: model.preview))
+            summaryView(
+                SyncSummary(preview: model.preview),
+                usesPreviewLabels: true
+            )
         } else {
             Label(
-                "Destination is up to date",
+                "Music files are up to date",
                 systemImage: "checkmark.circle.fill"
             )
             .foregroundStyle(.secondary)
@@ -290,7 +362,8 @@ struct ContentView: View {
 
     private func summaryView(
         _ summary: SyncSummary,
-        indexSummary: LibraryIndexSyncSummary? = nil
+        indexSummary: LibraryIndexSyncSummary? = nil,
+        usesPreviewLabels: Bool = false
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             if let indexSummary {
@@ -298,6 +371,15 @@ struct ContentView: View {
                     "Library index generated",
                     isCompleted: indexSummary.indexGenerated
                 )
+                if let readyAlbumCount =
+                        indexSummary.musicBrainzReadyAlbumCount,
+                   let totalAlbumCount = indexSummary.totalAlbumCount {
+                    summaryRatioRow(
+                        "MusicBrainz-ready albums",
+                        numerator: readyAlbumCount,
+                        denominator: totalAlbumCount
+                    )
+                }
                 summaryStatusRow(
                     "Previous index removed",
                     isCompleted: indexSummary.previousIndexRemoved
@@ -307,8 +389,14 @@ struct ContentView: View {
             summaryRow("New files", summary.newFiles)
             summaryRow("Modified files", summary.modifiedFiles)
             summaryRow("New folders", summary.newFolders)
-            summaryRow("Deleted files", summary.deletedFiles)
-            summaryRow("Deleted folders", summary.deletedFolders)
+            summaryRow(
+                usesPreviewLabels ? "Files to delete" : "Deleted files",
+                summary.deletedFiles
+            )
+            summaryRow(
+                usesPreviewLabels ? "Folders to delete" : "Deleted folders",
+                summary.deletedFolders
+            )
             summaryRow("System cleanup", summary.systemCleanup)
 
             if let indexSummary {
@@ -326,7 +414,7 @@ struct ContentView: View {
     ) -> some View {
         HStack(spacing: 18) {
             Text(title)
-                .frame(width: 150, alignment: .leading)
+                .frame(width: 190, alignment: .leading)
 
             Text(isCompleted ? "Done" : "Not completed")
                 .font(.system(.body, design: .monospaced))
@@ -336,10 +424,28 @@ struct ContentView: View {
         }
     }
 
+    private func summaryRatioRow(
+        _ title: String,
+        numerator: Int,
+        denominator: Int
+    ) -> some View {
+        HStack(spacing: 18) {
+            Text(title)
+                .frame(width: 190, alignment: .leading)
+
+            Text("\(numerator.formatted()) / \(denominator.formatted())")
+                .font(.system(.body, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+
+            Spacer()
+        }
+    }
+
     private func summaryRow(_ title: String, _ count: Int) -> some View {
         HStack(spacing: 18) {
             Text(title)
-                .frame(width: 150, alignment: .leading)
+                .frame(width: 190, alignment: .leading)
 
             Text(count.formatted())
                 .font(.system(.body, design: .monospaced))
@@ -436,6 +542,10 @@ struct ContentView: View {
     private func destinationDisplayName(
         _ profile: DestinationProfile
     ) -> String {
+
+        if profile == .unconfigured {
+            return "Choose Destination"
+        }
 
         guard profile.kind == .local else {
             return profile.name

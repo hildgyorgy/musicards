@@ -14,7 +14,7 @@ nonisolated struct SyncConfiguration: Codable, Equatable, Sendable {
 
         sourcePath: "",
 
-        destination: .umbrelRPi5,
+        destination: .unconfigured,
 
         sshKeyPath: FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".ssh/musicards_sync")

@@ -26,8 +26,20 @@ final class SyncViewModelTests: XCTestCase {
 
         model.selectSource(path: "/tmp/Music")
 
+        XCTAssertFalse(model.canCheck)
+
+        model.addRemoteDestination(remoteDestination())
+
         XCTAssertTrue(model.canCheck)
         XCTAssertEqual(model.configuration.sourcePath, "/tmp/Music/")
+    }
+
+    func testCheckRequiresASelectedDestination() {
+        let model = makeModel()
+        model.selectSource(path: "/tmp/Music")
+
+        XCTAssertEqual(model.configuration.destination, .unconfigured)
+        XCTAssertFalse(model.canCheck)
     }
 
     func testUnsupportedLocalRsyncDisablesCheck() {
@@ -114,7 +126,9 @@ final class SyncViewModelTests: XCTestCase {
         model.libraryIndexSyncSummary = LibraryIndexSyncSummary(
             indexGenerated: true,
             previousIndexRemoved: true,
-            newIndexPublished: false
+            newIndexPublished: false,
+            musicBrainzReadyAlbumCount: 35,
+            totalAlbumCount: 1_250
         )
         model.syncPhase = .synchronizationStopped
 
@@ -129,7 +143,9 @@ final class SyncViewModelTests: XCTestCase {
             LibraryIndexSyncSummary(
                 indexGenerated: true,
                 previousIndexRemoved: true,
-                newIndexPublished: false
+                newIndexPublished: false,
+                musicBrainzReadyAlbumCount: 35,
+                totalAlbumCount: 1_250
             )
         )
         XCTAssertFalse(model.canSync)
@@ -163,12 +179,49 @@ final class SyncViewModelTests: XCTestCase {
         model.hasChecked = true
         model.syncProgress = 0.5
 
-        model.selectDestination(.casaOSRPi4)
+        let destination = remoteDestination()
+        model.addRemoteDestination(destination)
 
         XCTAssertFalse(model.hasChecked)
         XCTAssertFalse(model.preview.hasChanges)
         XCTAssertNil(model.syncProgress)
-        XCTAssertEqual(model.configuration.destination, .casaOSRPi4)
+        XCTAssertEqual(model.configuration.destination, destination)
+    }
+
+    func testPreviouslySelectedRemoteDestinationMigratesIntoProfileStore() {
+        let destination = remoteDestination()
+        var configuration = SyncConfiguration.defaultConfiguration
+        configuration.destination = destination
+        SyncConfigurationStore(userDefaults: userDefaults).save(configuration)
+
+        let model = makeModel()
+
+        XCTAssertEqual(model.configuration.destination, destination)
+        XCTAssertEqual(model.remoteDestinations, [destination])
+        XCTAssertEqual(
+            RemoteDestinationStore(userDefaults: userDefaults).load(),
+            [destination]
+        )
+    }
+
+    func testRemovingSelectedRemoteKeepsNoEndpointInConfiguration() {
+        let model = makeModel()
+        model.addRemoteDestination(remoteDestination())
+
+        model.removeCurrentRemoteDestination()
+
+        XCTAssertEqual(model.configuration.destination, .unconfigured)
+        XCTAssertTrue(model.remoteDestinations.isEmpty)
+        XCTAssertFalse(model.canCheck)
+    }
+
+    func testCompletedCheckAllowsIndexOnlySyncWithoutFileChanges() {
+        let model = makeModel()
+        model.selectSource(path: "/tmp/Music")
+        model.hasChecked = true
+        model.preview = SyncPreview()
+
+        XCTAssertTrue(model.canSync)
     }
 
     func testUnavailableLocalDestinationIsNotOfferedAndInvalidatesPreview() {
@@ -208,7 +261,10 @@ final class SyncViewModelTests: XCTestCase {
 
     private func makeModel() -> SyncViewModel {
         let model = SyncViewModel(
-            configurationStore: SyncConfigurationStore(userDefaults: userDefaults)
+            configurationStore: SyncConfigurationStore(userDefaults: userDefaults),
+            remoteDestinationStore: RemoteDestinationStore(
+                userDefaults: userDefaults
+            )
         )
 
         model.localRsyncStatus = .available(
@@ -220,5 +276,15 @@ final class SyncViewModelTests: XCTestCase {
         )
 
         return model
+    }
+
+    private func remoteDestination() -> DestinationProfile {
+        DestinationProfile(
+            name: "Test server",
+            kind: .remote,
+            user: "music",
+            host: "server.local",
+            path: "/srv/music/"
+        )
     }
 }

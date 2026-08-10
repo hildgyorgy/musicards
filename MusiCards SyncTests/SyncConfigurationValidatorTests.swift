@@ -62,9 +62,48 @@ final class SyncConfigurationValidatorTests: XCTestCase {
     func testRemoteDestinationDoesNotUseLocalOverlapRules() throws {
         var configuration = SyncConfiguration.defaultConfiguration
         configuration.sourcePath = "/Music/"
-        configuration.destination = .casaOSRPi4
+        configuration.destination = remoteDestination()
 
         XCTAssertNoThrow(try validator.validate(configuration))
+    }
+
+    func testRejectsIncompleteRemoteDestination() {
+        var configuration = SyncConfiguration.defaultConfiguration
+        configuration.sourcePath = "/Music/"
+        configuration.destination = DestinationProfile(
+            name: "Server",
+            kind: .remote,
+            user: "music",
+            host: "",
+            path: "/srv/music/"
+        )
+
+        XCTAssertThrowsError(try validator.validate(configuration)) { error in
+            XCTAssertEqual(
+                error as? SyncConfigurationValidator.ValidationError,
+                .incompleteRemoteDestination
+            )
+        }
+    }
+
+    func testRejectsInvalidRemotePort() {
+        var configuration = SyncConfiguration.defaultConfiguration
+        configuration.sourcePath = "/Music/"
+        configuration.destination = DestinationProfile(
+            name: "Server",
+            kind: .remote,
+            user: "music",
+            host: "server.local",
+            port: 70_000,
+            path: "/srv/music/"
+        )
+
+        XCTAssertThrowsError(try validator.validate(configuration)) { error in
+            XCTAssertEqual(
+                error as? SyncConfigurationValidator.ValidationError,
+                .invalidRemotePort
+            )
+        }
     }
 
     func testRejectsUnavailableLocalDestination() {
@@ -100,6 +139,16 @@ final class SyncConfigurationValidatorTests: XCTestCase {
                 path: destination
             ),
             sshKeyPath: "/tmp/key"
+        )
+    }
+
+    private func remoteDestination() -> DestinationProfile {
+        DestinationProfile(
+            name: "Test server",
+            kind: .remote,
+            user: "music",
+            host: "server.local",
+            path: "/srv/music/"
         )
     }
 }

@@ -15,10 +15,15 @@ final class RsyncArgumentsTests: XCTestCase {
         XCTAssertTrue(arguments.contains("--iconv=UTF-8-MAC,UTF-8"))
         XCTAssertTrue(arguments.contains("--secluded-args"))
         XCTAssertTrue(arguments.contains("--timeout=30"))
+        XCTAssertTrue(
+            arguments.contains(where: {
+                $0.contains("-p 2222")
+            })
+        )
         XCTAssertFalse(arguments.contains("--no-inc-recursive"))
         XCTAssertFalse(arguments.contains("--info=progress2"))
         XCTAssertFalse(arguments.contains("--filter=P /library.json"))
-        XCTAssertFalse(arguments.contains("--exclude=/library.json"))
+        XCTAssertTrue(arguments.contains("--exclude=/library.json"))
         XCTAssertEqual(Array(arguments.suffix(2)), [
             configuration.sourcePath,
             configuration.destination.remoteDestination
@@ -199,7 +204,14 @@ final class RsyncArgumentsTests: XCTestCase {
         SyncConfiguration(
             rsyncPath: "/opt/homebrew/bin/rsync",
             sourcePath: "/Volumes/Source/",
-            destination: .casaOSRPi4,
+            destination: DestinationProfile(
+                name: "Test server",
+                kind: .remote,
+                user: "music",
+                host: "server.local",
+                port: 2_222,
+                path: "/srv/music/"
+            ),
             sshKeyPath: "/Users/test/.ssh/musicards_sync"
         )
     }
