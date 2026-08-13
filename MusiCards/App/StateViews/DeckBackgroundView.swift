@@ -6,14 +6,31 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct DeckBackgroundView: View {
 
+    @ObservedObject var localLibrary: LocalLibraryStore
+    let onSelectMusicFolder: ((URL) -> Void)?
+
+    @Environment(\.colorScheme) private var colorScheme
     @State private var isShowingAbout = false
     @State private var isHoveringLogo = false
+    @State private var isFolderImporterPresented = false
+
+    init(
+        localLibrary: LocalLibraryStore,
+        onSelectMusicFolder: ((URL) -> Void)? = nil
+    ) {
+        self.localLibrary = localLibrary
+        self.onSelectMusicFolder = onSelectMusicFolder
+    }
 
     var body: some View {
         GeometryReader { proxy in
+            #if os(iOS)
+            iosHome
+            #else
             ScrollView {
                 VStack(spacing: 16) {
 
@@ -122,51 +139,183 @@ struct DeckBackgroundView: View {
                 .frame(maxWidth: .infinity)
                 .multilineTextAlignment(.center)
             }
-            .overlay(alignment: .bottom) {
-                #if os(iOS)
-                    Image(systemName: "arrow.up")
-                        .font(.title3)
-                        .foregroundStyle(.tint)
-                        .padding(.bottom, 195)
-                #endif
-            }
             .scrollIndicators(.hidden)
             .ignoresSafeArea(edges: .bottom)
-            #if os(iOS)
-                .sheet(isPresented: $isShowingAbout) {
-                    AboutView()
-                }
-            #elseif os(macOS)
-                .overlay {
-                    if isShowingAbout {
-                        Color.clear
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            isShowingAbout = false
-                        }
-                    }
-                }
-                .overlay {
-                    if isShowingAbout {
-                        AboutSheetView {
-                            isShowingAbout = false
-                        }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .transition(.scale.combined(with: .opacity))
-                        .onTapGesture {}
-                    }
-                }
-                .animation(.spring(duration: 0.35), value: isShowingAbout)
-                .onKeyPress(.escape) {
-                    if isShowingAbout {
+            .overlay {
+                if isShowingAbout {
+                    Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture {
                         isShowingAbout = false
-                        return .handled
                     }
-                    return .ignored
                 }
+            }
+            .overlay {
+                if isShowingAbout {
+                    AboutSheetView {
+                        isShowingAbout = false
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .transition(.scale.combined(with: .opacity))
+                    .onTapGesture {}
+                }
+            }
+            .animation(.spring(duration: 0.35), value: isShowingAbout)
+            .onKeyPress(.escape) {
+                if isShowingAbout {
+                    isShowingAbout = false
+                    return .handled
+                }
+                return .ignored
+            }
             #endif
         }
     }
+
+    #if os(iOS)
+    private var iosHome: some View {
+        VStack(spacing: 0) {
+            VStack(spacing: 16) {
+                Text("MusiCards")
+                    .font(.largeTitle.weight(.bold))
+                    .foregroundStyle(.primary)
+
+                Image("mb_logo")
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 52, height: 52)
+                    .foregroundStyle(.primary)
+                    .padding(.top, 10)
+                    .padding(.bottom, 4)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        isShowingAbout = true
+                    }
+
+                VStack(spacing: 14) {
+                    homePrompt(connectionHeading)
+
+                    Button {
+                        isFolderImporterPresented = true
+                    } label: {
+                        Text(connectionButtonTitle)
+                            .font(.footnote.weight(.semibold))
+                            .tracking(4)
+                            .foregroundStyle(
+                                colorScheme == .dark ? Color.black : .white
+                            )
+                            .padding(.horizontal, 30)
+                            .frame(height: 32)
+                            .background {
+                                Capsule(style: .continuous)
+                                    .fill(Color.primary)
+                                    .shadow(
+                                        color: .black.opacity(0.22),
+                                        radius: 8,
+                                        y: 4
+                                    )
+                            }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(connectionAccessibilityLabel)
+
+                    homePrompt("YOUR MUSIC LIBRARY")
+
+                    if let report = compatibilityReport {
+                        homePrompt(report)
+                            .multilineTextAlignment(.center)
+                            .padding(.top, 28)
+                    }
+
+                    if let message = connectionMessage {
+                        Text(message)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 36)
+                            .padding(.top, 8)
+                    }
+                }
+            }
+            .padding(.top, 100)
+
+            Spacer(minLength: 24)
+
+            homePrompt("TO EXPLORE:")
+                .padding(.bottom, explorePromptBottomInset)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .sheet(isPresented: $isShowingAbout) {
+            AboutView()
+        }
+        .fileImporter(
+            isPresented: $isFolderImporterPresented,
+            allowedContentTypes: [.folder],
+            allowsMultipleSelection: false
+        ) { result in
+            guard case .success(let urls) = result,
+                  let url = urls.first else {
+                return
+            }
+            onSelectMusicFolder?(url)
+        }
+    }
+
+    private func homePrompt(_ title: String) -> some View {
+        Text(title)
+            .font(.system(.footnote, design: .monospaced))
+            .tracking(2)
+            .foregroundStyle(.primary)
+    }
+
+    private var isLibraryConnected: Bool {
+        localLibrary.summary.folderCount > 0
+            && localLibrary.connectionErrorMessage == nil
+    }
+
+    private var connectionHeading: String {
+        if localLibrary.isScanning { return "CONNECTING…" }
+        return isLibraryConnected ? "YOU HAVE SUCCESSFULLY" : "TO PLAY:"
+    }
+
+    private var connectionButtonTitle: String {
+        if localLibrary.isScanning { return "CONNECTING" }
+        return isLibraryConnected ? "CONNECTED" : "CONNECT"
+    }
+
+    private var connectionAccessibilityLabel: String {
+        isLibraryConnected
+            ? "Connected music library. Select another library"
+            : "Connect your music library"
+    }
+
+    private var compatibilityReport: String? {
+        guard isLibraryConnected, !localLibrary.isScanning else { return nil }
+        let summary = localLibrary.summary
+        if let total = summary.totalAlbumCount {
+            return "\(summary.identifiedAlbumCount) / \(total) ALBUMS\nIDENTIFIED AS PLAYABLE"
+        }
+        return "\(summary.identifiedAlbumCount) ALBUMS\nIDENTIFIED AS PLAYABLE"
+    }
+
+    private var connectionMessage: String? {
+        if let error = localLibrary.connectionErrorMessage {
+            return error.uppercased()
+        }
+        guard localLibrary.isScanning else { return nil }
+        return localLibrary.statusMessage?.uppercased()
+    }
+
+    private var explorePromptBottomInset: CGFloat {
+        let collapsedCardPeeks = CGFloat(MusiCardID.allCases.count - 2)
+            * DeckStyle.peek
+        return DeckStyle.cardBottomInset
+            + DeckStyle.collapsedPlayerHeight
+            + collapsedCardPeeks
+            + 24
+    }
+    #endif
 
     private func codeText(_ text: String) -> some View {
         Text(text)

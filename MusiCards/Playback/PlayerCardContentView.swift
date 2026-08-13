@@ -9,13 +9,10 @@ import UniformTypeIdentifiers
 struct PlayerCardContentView: View {
     @ObservedObject var controller: PlaybackController
     @ObservedObject var localLibrary: LocalLibraryStore
-    let onSelectLocalFile: (URL) -> Void
     let onSelectMusicFolder: (URL) -> Void
-    let onRefreshLibrary: () -> Void
     @ObservedObject var detailStore: TrackDetailStore
     let onSelectArtist: (String) -> Void
 
-    @State private var isFileImporterPresented = false
     @State private var isFolderImporterPresented = false
     @State private var folderSelectionPurpose = FolderSelectionPurpose.connect
     @State private var selectedDetailPage = 1
@@ -25,7 +22,11 @@ struct PlayerCardContentView: View {
             if let item = controller.currentItem {
                 expandedPlayer(item)
             } else {
+                #if os(iOS)
+                idlePlayer
+                #else
                 libraryControls
+                #endif
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -34,17 +35,6 @@ struct PlayerCardContentView: View {
             if let recordingID = controller.currentItem?.track.recordingID {
                 detailStore.fetchIfNeeded(recordingID: recordingID)
             }
-        }
-        .fileImporter(
-            isPresented: $isFileImporterPresented,
-            allowedContentTypes: [.audio],
-            allowsMultipleSelection: false
-        ) { result in
-            guard case .success(let urls) = result,
-                  let url = urls.first else {
-                return
-            }
-            onSelectLocalFile(url)
         }
         .fileImporter(
             isPresented: $isFolderImporterPresented,
@@ -65,6 +55,55 @@ struct PlayerCardContentView: View {
             }
         }
     }
+
+    #if os(iOS)
+    private var idlePlayer: some View {
+        VStack(spacing: 0) {
+            Spacer()
+
+            Text("SELECT PLAYABLE TRACKS")
+                .font(.footnote)
+                .tracking(AppStyle.cardLabelTracking)
+                .foregroundStyle(.secondary)
+
+            Spacer()
+
+            idleTransport
+                .frame(height: expandedTransportHeight)
+        }
+    }
+
+    private var idleTransport: some View {
+        HStack(spacing: 0) {
+            ForEach(
+                ["backward.end.fill", "pause.fill", "forward.end.fill"],
+                id: \.self
+            ) { systemName in
+                Image(systemName: systemName)
+                    .font(.title3)
+                    .foregroundStyle(Color.secondary.opacity(0.65))
+                    .frame(width: 44, height: 44)
+            }
+
+            Spacer(minLength: 14)
+
+            VStack(spacing: 4) {
+                HStack {
+                    Spacer()
+                    Text("0:00")
+                        .font(.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
+
+                Capsule(style: .continuous)
+                    .stroke(Color.secondary.opacity(0.65), lineWidth: 1)
+                    .frame(height: 3)
+            }
+        }
+        .allowsHitTesting(false)
+    }
+    #endif
 
     private func expandedPlayer(_ item: PlaybackQueueItem) -> some View {
         VStack(spacing: 0) {
@@ -201,25 +240,12 @@ struct PlayerCardContentView: View {
                 subtitle: "Choose one local lossless track"
             )
 
-            Button("Choose Audio File") {
-                isFileImporterPresented = true
+            Button("Connect Music Folder") {
+                folderSelectionPurpose = .connect
+                isFolderImporterPresented = true
             }
             .buttonStyle(.bordered)
-
-            HStack(spacing: 10) {
-                Button("Connect Music Folder") {
-                    folderSelectionPurpose = .connect
-                    isFolderImporterPresented = true
-                }
-                .buttonStyle(.bordered)
-                .disabled(localLibrary.isScanning)
-
-                Button("Reload Index") {
-                    onRefreshLibrary()
-                }
-                .buttonStyle(.bordered)
-                .disabled(localLibrary.summary.folderCount == 0 || localLibrary.isScanning)
-            }
+            .disabled(localLibrary.isScanning)
 
             #if os(macOS)
             Button("Create / Update Library Index") {
@@ -230,9 +256,6 @@ struct PlayerCardContentView: View {
             .disabled(localLibrary.isScanning)
             #endif
 
-            Text(libraryStatusText)
-                .font(.caption)
-                .foregroundStyle(.secondary)
         }
     }
 
@@ -334,26 +357,6 @@ struct PlayerCardContentView: View {
     private let releaseIdentityTopInset: CGFloat = -8
     #endif
     private let playerFooterInfoSpacing: CGFloat = 8
-
-    private var libraryStatusText: String {
-        if localLibrary.isScanning {
-            return localLibrary.statusMessage?.uppercased()
-                ?? "SCANNING MUSIC LIBRARY…"
-        }
-        if let error = localLibrary.connectionErrorMessage {
-            return error.uppercased()
-        }
-        if localLibrary.summary.folderCount == 0 {
-            return localLibrary.statusMessage?.uppercased()
-                ?? "NO MUSIC FOLDER"
-        }
-        let summary = localLibrary.summary
-        let counts = "\(summary.releaseCount) RELEASES · \(summary.trackCount) TRACKS"
-        if let warning = localLibrary.indexWarningMessage {
-            return "\(counts) · \(warning.uppercased())"
-        }
-        return counts
-    }
 
     private func formatTime(_ time: TimeInterval) -> String {
         let seconds = max(Int(time.rounded(.down)), 0)

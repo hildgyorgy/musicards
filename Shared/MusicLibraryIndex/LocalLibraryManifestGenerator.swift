@@ -62,6 +62,12 @@ enum LocalLibraryManifestGenerator {
             }
         }
 
+        // Keep the compatibility report inside library.json so every client
+        // can present the same identified/total album count without rescanning.
+        for index in albums.indices {
+            albums[index].libraryAlbumCount = folders.count
+        }
+
         await progress("Writing library.json…")
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .withoutEscapingSlashes]
@@ -157,6 +163,7 @@ enum LocalLibraryManifestGenerator {
 
         return LocalLibraryManifestAlbum(
             indexVersion: currentIndexVersion,
+            libraryAlbumCount: nil,
             albumName: albumMetadata.albumTitle.isEmpty
                 ? fallbackFolderName
                 : albumMetadata.albumTitle,

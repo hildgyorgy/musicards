@@ -7,6 +7,7 @@ import Foundation
 
 nonisolated struct LocalLibraryManifestAlbum: Codable, Sendable {
     let indexVersion: Int?
+    var libraryAlbumCount: Int?
     let albumName: String?
     let artistName: String?
     let albumMBID: String
@@ -19,6 +20,7 @@ nonisolated struct LocalLibraryManifestAlbum: Codable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case indexVersion = "index_version"
+        case libraryAlbumCount = "library_album_count"
         case albumName = "album_name"
         case artistName = "artist_name"
         case albumMBID = "album_mbid"
@@ -29,6 +31,12 @@ nonisolated struct LocalLibraryManifestAlbum: Codable, Sendable {
         case folderPath = "folder_path"
         case tracks
     }
+}
+
+nonisolated struct LocalLibraryManifestSnapshot: Sendable {
+    let files: [ScannedAudioFile]
+    let identifiedAlbumCount: Int
+    let totalAlbumCount: Int?
 }
 
 nonisolated struct LocalLibraryManifestTrack: Codable, Sendable {
@@ -66,7 +74,7 @@ enum LocalLibraryManifestLoader {
 
     nonisolated static func load(
         from rootURL: URL
-    ) async throws -> [ScannedAudioFile] {
+    ) async throws -> LocalLibraryManifestSnapshot {
         let manifestURL = rootURL.appendingPathComponent(fileName)
         let data = try await Task.detached(priority: .utility) {
             try coordinatedData(from: manifestURL)
@@ -110,7 +118,14 @@ enum LocalLibraryManifestLoader {
                 )
             }
         }
-        return files
+        let totalAlbumCount = albums
+            .compactMap(\.libraryAlbumCount)
+            .max()
+        return LocalLibraryManifestSnapshot(
+            files: files,
+            identifiedAlbumCount: albums.count,
+            totalAlbumCount: totalAlbumCount
+        )
     }
 
     private nonisolated static func coordinatedData(

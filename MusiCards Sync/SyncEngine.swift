@@ -538,6 +538,7 @@ nonisolated final class SyncEngine {
             "--exclude=._*",
             "--exclude=.Spotlight-V100",
             "--exclude=.Trashes",
+            "--filter=P /\(LocalLibraryManifestLoader.fileName)",
             "--exclude=/\(LocalLibraryManifestLoader.fileName)",
 
         ]

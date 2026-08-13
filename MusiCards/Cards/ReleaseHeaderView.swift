@@ -10,6 +10,8 @@ import SwiftUI
 struct ReleaseHeaderView: View {
     let release: MBRelease?
     let coverImage: PlatformImage?
+    let isPlayable: Bool
+    let onPlayRelease: () -> Void
     let onSelectArtist: (String) -> Void
     
     @Environment(\.colorScheme) private var colorScheme
@@ -49,11 +51,29 @@ struct ReleaseHeaderView: View {
             }
             
             if let release = release {
-                Text(release.title)
-                    .font(AppStyle.primaryHeaderFont.weight(.bold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(3)
-                    .padding(.top, 6)
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    Text(release.title)
+                        .font(AppStyle.primaryHeaderFont.weight(.bold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(3)
+
+                    Spacer(minLength: 8)
+
+                    #if os(iOS)
+                    if isPlayable {
+                        Button(action: onPlayRelease) {
+                            Image(systemName: "play.fill")
+                                .font(.title3)
+                                .foregroundStyle(.blue)
+                                .frame(width: 44, height: 44)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Play release")
+                    }
+                    #endif
+                }
+                .padding(.top, 6)
                 
                 ArtistCreditLinksView(
                     artistCredits: release.artistCredit,

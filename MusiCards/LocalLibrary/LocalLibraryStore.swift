@@ -14,7 +14,6 @@ final class LocalLibraryStore: ObservableObject {
     @Published private(set) var isScanning = false
     @Published private(set) var statusMessage: String?
     @Published private(set) var connectionErrorMessage: String?
-    @Published private(set) var indexWarningMessage: String?
 
     private let container: ModelContainer
     private let context: ModelContext
@@ -80,7 +79,6 @@ final class LocalLibraryStore: ObservableObject {
             let bookmark = try makeBookmark(for: url)
             isScanning = true
             connectionErrorMessage = nil
-            indexWarningMessage = nil
             statusMessage = "Connecting music folder…"
             Task {
                 await connectMusicFolder(
@@ -111,12 +109,11 @@ final class LocalLibraryStore: ObservableObject {
             let bookmark = try makeBookmark(for: url)
             isScanning = true
             connectionErrorMessage = nil
-            indexWarningMessage = nil
             statusMessage = "Preparing library index…"
 
             Task {
                 do {
-                    let generationSummary = try await LocalLibraryManifestGenerator.generate(
+                    _ = try await LocalLibraryManifestGenerator.generate(
                         in: url,
                         progress: { [weak self] message in
                             self?.statusMessage = message
@@ -128,9 +125,6 @@ final class LocalLibraryStore: ObservableObject {
                         bookmark: bookmark,
                         didAccess: didAccess
                     )
-                    if connectionErrorMessage == nil {
-                        indexWarningMessage = generationSummary.warningMessage
-                    }
                 } catch {
                     isScanning = false
                     url.stopAccessingSecurityScopedResource()
@@ -245,7 +239,7 @@ final class LocalLibraryStore: ObservableObject {
 
         do {
             statusMessage = "Reading library.json…"
-            let scannedFiles = try await LocalLibraryManifestLoader.load(
+            let manifest = try await LocalLibraryManifestLoader.load(
                 from: rootURL
             )
 
@@ -253,12 +247,14 @@ final class LocalLibraryStore: ObservableObject {
                 FetchDescriptor<LocalAudioFileRecord>()
             )
             let existing = allRecords.filter { $0.rootID == rootID }
-            apply(scannedFiles, to: rootID, replacing: existing)
+            apply(manifest.files, to: rootID, replacing: existing)
 
             if let root = try context.fetch(
                 FetchDescriptor<LocalLibraryRootRecord>()
             ).first(where: { $0.id == rootID }) {
                 root.lastScanDate = Date()
+                root.identifiedAlbumCount = manifest.identifiedAlbumCount
+                root.totalAlbumCount = manifest.totalAlbumCount
             }
             try context.save()
             return true
@@ -277,7 +273,7 @@ final class LocalLibraryStore: ObservableObject {
         defer { isScanning = false }
 
         do {
-            let scannedFiles = try await LocalLibraryManifestLoader.load(
+            let manifest = try await LocalLibraryManifestLoader.load(
                 from: url
             )
             let existingRoots = try context.fetch(
@@ -306,8 +302,10 @@ final class LocalLibraryStore: ObservableObject {
                 for root in obsoleteRoots { context.delete(root) }
 
                 let currentFiles = existingFiles.filter { $0.rootID == existing.id }
-                apply(scannedFiles, to: existing.id, replacing: currentFiles)
+                apply(manifest.files, to: existing.id, replacing: currentFiles)
                 existing.lastScanDate = Date()
+                existing.identifiedAlbumCount = manifest.identifiedAlbumCount
+                existing.totalAlbumCount = manifest.totalAlbumCount
                 try context.save()
                 releaseAccess(for: obsoleteRoots)
 
@@ -326,12 +324,14 @@ final class LocalLibraryStore: ObservableObject {
                 let root = LocalLibraryRootRecord(
                     displayName: url.lastPathComponent,
                     bookmarkData: bookmark,
-                    lastScanDate: Date()
+                    lastScanDate: Date(),
+                    identifiedAlbumCount: manifest.identifiedAlbumCount,
+                    totalAlbumCount: manifest.totalAlbumCount
                 )
                 context.insert(root)
                 for file in existingFiles { context.delete(file) }
                 for existingRoot in existingRoots { context.delete(existingRoot) }
-                apply(scannedFiles, to: root.id, replacing: [])
+                apply(manifest.files, to: root.id, replacing: [])
                 try context.save()
                 releaseAccess(for: existingRoots)
                 retain(url: url, for: root.id, didAccess: didAccess)
@@ -495,10 +495,22 @@ final class LocalLibraryStore: ObservableObject {
                 .filter { rootURLs[$0.id] != nil }
                 .map(\.displayName)
                 .sorted()
+            let activeRoots = roots.filter { rootURLs[$0.id] != nil }
+            let hasPersistedIdentifiedCounts = !activeRoots.isEmpty
+                && activeRoots.allSatisfy { $0.identifiedAlbumCount != nil }
+            let identifiedAlbumCount = hasPersistedIdentifiedCounts
+                ? activeRoots.reduce(0) { $0 + ($1.identifiedAlbumCount ?? 0) }
+                : tracksByReleaseID.count
+            let totalAlbumCount: Int? = !activeRoots.isEmpty
+                && activeRoots.allSatisfy({ $0.totalAlbumCount != nil })
+                ? activeRoots.reduce(0) { $0 + ($1.totalAlbumCount ?? 0) }
+                : nil
             summary = LocalLibrarySummary(
                 folderCount: folderNames.count,
                 releaseCount: tracksByReleaseID.count,
-                trackCount: snapshots.count
+                trackCount: snapshots.count,
+                identifiedAlbumCount: identifiedAlbumCount,
+                totalAlbumCount: totalAlbumCount
             )
         } catch {
             statusMessage = error.localizedDescription

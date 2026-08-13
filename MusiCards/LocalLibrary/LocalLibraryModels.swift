@@ -12,17 +12,23 @@ final class LocalLibraryRootRecord {
     var displayName: String
     var bookmarkData: Data
     var lastScanDate: Date?
+    var identifiedAlbumCount: Int?
+    var totalAlbumCount: Int?
 
     init(
         id: String = UUID().uuidString,
         displayName: String,
         bookmarkData: Data,
-        lastScanDate: Date? = nil
+        lastScanDate: Date? = nil,
+        identifiedAlbumCount: Int? = nil,
+        totalAlbumCount: Int? = nil
     ) {
         self.id = id
         self.displayName = displayName
         self.bookmarkData = bookmarkData
         self.lastScanDate = lastScanDate
+        self.identifiedAlbumCount = identifiedAlbumCount
+        self.totalAlbumCount = totalAlbumCount
     }
 }
 
@@ -131,4 +137,6 @@ nonisolated struct LocalLibrarySummary: Equatable, Sendable {
     var folderCount = 0
     var releaseCount = 0
     var trackCount = 0
+    var identifiedAlbumCount = 0
+    var totalAlbumCount: Int?
 }

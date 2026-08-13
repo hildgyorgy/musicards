@@ -125,6 +125,12 @@ struct ContentView: View {
                 ReleaseHeaderView(
                     release: appModel.selectedRelease,
                     coverImage: appModel.selectedReleaseCover,
+                    isPlayable: appModel.selectedRelease.map {
+                        appModel.localLibrary.containsRelease($0.id)
+                    } ?? false,
+                    onPlayRelease: {
+                        appModel.playSelectedRelease()
+                    },
                     onSelectArtist: { artistID in
                         appModel.selectArtist(id: artistID)
                     }
@@ -147,23 +153,21 @@ struct ContentView: View {
                 artist: appModel.selectedArtist
             )
         case .player:
-            PlayerCardContentView(
-                controller: appModel.playbackController,
-                localLibrary: appModel.localLibrary,
-                onSelectLocalFile: { url in
-                    appModel.playLocalFile(url)
-                },
-                onSelectMusicFolder: { url in
-                    appModel.selectMusicFolder(url)
-                },
-                onRefreshLibrary: {
-                    appModel.refreshLocalLibrary()
-                },
-                detailStore: appModel.trackDetailStore,
-                onSelectArtist: { artistID in
-                    appModel.selectArtist(id: artistID)
-                }
-            )
+            if appModel.deckSelection.activeID == .player {
+                PlayerCardContentView(
+                    controller: appModel.playbackController,
+                    localLibrary: appModel.localLibrary,
+                    onSelectMusicFolder: { url in
+                        appModel.selectMusicFolder(url)
+                    },
+                    detailStore: appModel.trackDetailStore,
+                    onSelectArtist: { artistID in
+                        appModel.selectArtist(id: artistID)
+                    }
+                )
+            } else {
+                EmptyView()
+            }
         }
     }
 
@@ -172,7 +176,7 @@ struct ContentView: View {
     {
         switch card.id {
         case .home:
-            DeckBackgroundView()
+            DeckBackgroundView(localLibrary: appModel.localLibrary)
         case .search:
             SearchCardContentView(
                 viewModel: appModel.searchViewModel,
@@ -330,7 +334,12 @@ struct ContentView: View {
                         background: {
                             ZStack {
                                 boxBackground
-                                DeckBackgroundView()
+                                DeckBackgroundView(
+                                    localLibrary: appModel.localLibrary,
+                                    onSelectMusicFolder: { url in
+                                        appModel.selectMusicFolder(url)
+                                    }
+                                )
                             }
                         }
                     )

@@ -22,7 +22,7 @@ final class RsyncArgumentsTests: XCTestCase {
         )
         XCTAssertFalse(arguments.contains("--no-inc-recursive"))
         XCTAssertFalse(arguments.contains("--info=progress2"))
-        XCTAssertFalse(arguments.contains("--filter=P /library.json"))
+        XCTAssertTrue(arguments.contains("--filter=P /library.json"))
         XCTAssertTrue(arguments.contains("--exclude=/library.json"))
         XCTAssertEqual(Array(arguments.suffix(2)), [
             configuration.sourcePath,
@@ -41,7 +41,7 @@ final class RsyncArgumentsTests: XCTestCase {
         XCTAssertFalse(arguments.contains("--info=progress2"))
         XCTAssertTrue(arguments.contains("--out-format=%i|%n|%b"))
         XCTAssertTrue(arguments.contains("--outbuf=L"))
-        XCTAssertFalse(arguments.contains("--filter=P /library.json"))
+        XCTAssertTrue(arguments.contains("--filter=P /library.json"))
         XCTAssertTrue(arguments.contains("--exclude=/library.json"))
     }
 
@@ -64,6 +64,65 @@ final class RsyncArgumentsTests: XCTestCase {
         XCTAssertFalse(arguments.contains("--timeout=30"))
         XCTAssertFalse(arguments.contains("-e"))
         XCTAssertEqual(arguments.last, "/Volumes/Destination/")
+    }
+
+    func testLocalMirrorProtectsPublishedManifest() throws {
+        let fileManager = FileManager.default
+        let testRoot = fileManager.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let source = testRoot.appendingPathComponent("source", isDirectory: true)
+        let destination = testRoot.appendingPathComponent(
+            "destination",
+            isDirectory: true
+        )
+        try fileManager.createDirectory(
+            at: source,
+            withIntermediateDirectories: true
+        )
+        try fileManager.createDirectory(
+            at: destination,
+            withIntermediateDirectories: true
+        )
+        defer { try? fileManager.removeItem(at: testRoot) }
+
+        try Data("source index".utf8).write(
+            to: source.appendingPathComponent("library.json")
+        )
+        try Data("published index".utf8).write(
+            to: destination.appendingPathComponent("library.json")
+        )
+        try Data("music".utf8).write(
+            to: source.appendingPathComponent("track.flac")
+        )
+
+        let configuration = SyncConfiguration(
+            rsyncPath: "/opt/homebrew/bin/rsync",
+            sourcePath: source.path + "/",
+            destination: DestinationProfile(
+                name: "Local folder",
+                kind: .local,
+                path: destination.path + "/"
+            ),
+            sshKeyPath: "/tmp/key"
+        )
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: configuration.rsyncPath)
+        process.arguments = SyncEngine.rsyncArguments(
+            configuration: configuration,
+            dryRun: false
+        )
+        try process.run()
+        process.waitUntilExit()
+
+        XCTAssertEqual(process.terminationStatus, 0)
+        XCTAssertEqual(
+            try Data(contentsOf: destination.appendingPathComponent("library.json")),
+            Data("published index".utf8)
+        )
+        XCTAssertEqual(
+            try Data(contentsOf: destination.appendingPathComponent("track.flac")),
+            Data("music".utf8)
+        )
     }
 
     func testRemoteIndexPublicationTransfersOnlyManifest() {

@@ -101,45 +101,8 @@ final class MusiCardsAppModel: ObservableObject {
         localLibrary.startAutomaticRefresh()
     }
 
-    func playLocalFile(_ url: URL) {
-        let request = playbackController.beginQueueRequest()
-        Task {
-            guard await playbackController.prepareForQueueReplacement(request)
-            else { return }
-            let artworkData = await LocalAudioMetadataLoader.artworkData(
-                from: url
-            )
-            guard !Task.isCancelled else { return }
-            let track = PlaybackTrack(
-                id: url.standardizedFileURL.path,
-                releaseTrackID: nil,
-                recordingID: nil,
-                releaseID: nil,
-                title: url.deletingPathExtension().lastPathComponent,
-                artist: "Local audio",
-                albumTitle: "",
-                duration: nil,
-                artworkData: artworkData
-            )
-            let item = PlaybackQueueItem(
-                track: track,
-                source: .localFile(url)
-            )
-
-            guard await playbackController.replaceQueue(
-                with: [item],
-                request: request
-            ) else { return }
-            await playbackController.play()
-        }
-    }
-
     func selectMusicFolder(_ url: URL) {
         localLibrary.selectMusicFolder(url)
-    }
-
-    func refreshLocalLibrary() {
-        Task { await localLibrary.refreshAll() }
     }
 
     func restoreAudioOutputConfiguration() {
@@ -237,6 +200,34 @@ final class MusiCardsAppModel: ObservableObject {
                 request: request
             ) else { return }
             await playbackController.play()
+        }
+    }
+
+    func playSelectedRelease() {
+        guard let release = selectedRelease else { return }
+
+        for medium in release.media ?? [] {
+            for track in medium.tracks ?? [] {
+                let recordingID = track.recording?.id
+                let allowsRecordingFallback = release.hasUniqueOccurrence(
+                    ofRecordingID: recordingID
+                )
+
+                guard localLibrary.containsTrack(
+                    releaseID: release.id,
+                    releaseTrackID: track.id,
+                    recordingID: recordingID,
+                    allowsRecordingFallback: allowsRecordingFallback
+                ) else {
+                    continue
+                }
+
+                playIndexedTrack(
+                    releaseTrackID: track.id,
+                    recordingID: recordingID
+                )
+                return
+            }
         }
     }
 

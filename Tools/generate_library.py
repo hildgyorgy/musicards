@@ -388,6 +388,7 @@ def main():
     print(f"🎵 Music library indexing started: {music_dir}")
     library = []
     skipped_missing_release_mbid = 0
+    total_album_count = 0
     existing_library = load_existing_library(output_path)
 
     for root, dirs, files in os.walk(music_dir):
@@ -398,6 +399,7 @@ def main():
         )
         if not audio_files:
             continue
+        total_album_count += 1
 
         # JSON paths always use forward slashes so the web player and native
         # apps can resolve the same index on Windows, macOS and Linux.
@@ -484,6 +486,12 @@ def main():
             "tracks": tracks,
         })
         print(f"✅ Indexed: {artist_name} - {album_name} ({len(tracks)} tracks)")
+
+    # Store the denominator of the MusicBrainz compatibility report alongside
+    # every album. Older readers ignore the optional field; current MusiCards
+    # clients can show the same identified/total count without rescanning.
+    for album in library:
+        album["library_album_count"] = total_album_count
 
     output_directory = os.path.dirname(output_path)
     if output_directory and not os.path.isdir(output_directory):
