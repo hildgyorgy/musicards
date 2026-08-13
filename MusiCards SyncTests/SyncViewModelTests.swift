@@ -1,7 +1,6 @@
 import XCTest
 @testable import MusiCards_Sync
 
-@MainActor
 final class SyncViewModelTests: XCTestCase {
     private var suiteName: String!
     private var userDefaults: UserDefaults!
@@ -19,6 +18,7 @@ final class SyncViewModelTests: XCTestCase {
         super.tearDown()
     }
 
+    @MainActor
     func testCheckRequiresASelectedSource() {
         let model = makeModel()
 
@@ -34,6 +34,7 @@ final class SyncViewModelTests: XCTestCase {
         XCTAssertEqual(model.configuration.sourcePath, "/tmp/Music/")
     }
 
+    @MainActor
     func testCheckRequiresASelectedDestination() {
         let model = makeModel()
         model.selectSource(path: "/tmp/Music")
@@ -42,6 +43,7 @@ final class SyncViewModelTests: XCTestCase {
         XCTAssertFalse(model.canCheck)
     }
 
+    @MainActor
     func testUnsupportedLocalRsyncDisablesCheck() {
         let model = makeModel()
         model.selectSource(path: "/tmp/Music")
@@ -58,6 +60,7 @@ final class SyncViewModelTests: XCTestCase {
         XCTAssertTrue(model.localRsyncVersionText.contains("requires 3.2.6"))
     }
 
+    @MainActor
     func testRemoteRsyncStatusShowsVersionAndDestination() {
         let model = makeModel()
         model.remoteRsyncStatus = .available(
@@ -76,6 +79,7 @@ final class SyncViewModelTests: XCTestCase {
         XCTAssertFalse(model.remoteRsyncStatusIsError)
     }
 
+    @MainActor
     func testLocalDestinationHidesRemoteRsyncStatus() {
         let model = makeModel()
 
@@ -84,6 +88,7 @@ final class SyncViewModelTests: XCTestCase {
         XCTAssertNil(model.remoteRsyncVersionText)
     }
 
+    @MainActor
     func testOverlappingLocalPathsStopBeforeCheckStarts() {
         let model = makeModel()
         model.selectSource(path: "/Volumes/Music")
@@ -98,6 +103,7 @@ final class SyncViewModelTests: XCTestCase {
         )
     }
 
+    @MainActor
     func testSyncStatusDistinguishesVerificationFailure() {
         let model = makeModel()
         model.syncProgress = 1
@@ -109,6 +115,7 @@ final class SyncViewModelTests: XCTestCase {
         )
     }
 
+    @MainActor
     func testStoppedSyncKeepsPreviewAndDisplaysOnlyCompletedSummary() {
         let model = makeModel()
         model.preview.newFiles = (1...10).map { "track-\($0).m4a" }
@@ -163,6 +170,7 @@ final class SyncViewModelTests: XCTestCase {
         XCTAssertEqual(model.syncFileProgressText, "3 / 10 files")
     }
 
+    @MainActor
     func testLineBufferPreservesOrderAcrossBatches() {
         let buffer = RsyncLineBuffer()
 
@@ -173,6 +181,7 @@ final class SyncViewModelTests: XCTestCase {
         XCTAssertTrue(buffer.drain().isEmpty)
     }
 
+    @MainActor
     func testDestinationChangeInvalidatesPreviousPreview() {
         let model = makeModel()
         model.preview.newFiles = ["album/track.m4a"]
@@ -188,6 +197,7 @@ final class SyncViewModelTests: XCTestCase {
         XCTAssertEqual(model.configuration.destination, destination)
     }
 
+    @MainActor
     func testPreviouslySelectedRemoteDestinationMigratesIntoProfileStore() {
         let destination = remoteDestination()
         var configuration = SyncConfiguration.defaultConfiguration
@@ -204,6 +214,7 @@ final class SyncViewModelTests: XCTestCase {
         )
     }
 
+    @MainActor
     func testRemovingSelectedRemoteKeepsNoEndpointInConfiguration() {
         let model = makeModel()
         model.addRemoteDestination(remoteDestination())
@@ -215,6 +226,7 @@ final class SyncViewModelTests: XCTestCase {
         XCTAssertFalse(model.canCheck)
     }
 
+    @MainActor
     func testCompletedCheckAllowsIndexOnlySyncWithoutFileChanges() {
         let model = makeModel()
         model.selectSource(path: "/tmp/Music")
@@ -224,6 +236,7 @@ final class SyncViewModelTests: XCTestCase {
         XCTAssertTrue(model.canSync)
     }
 
+    @MainActor
     func testUnavailableLocalDestinationIsNotOfferedAndInvalidatesPreview() {
         let model = makeModel()
         let missingPath = "/Volumes/Missing-\(UUID().uuidString)"
@@ -247,6 +260,7 @@ final class SyncViewModelTests: XCTestCase {
         )
     }
 
+    @MainActor
     func testConfirmationMentionsDestinationDeletions() {
         let model = makeModel()
         model.preview.deletedFiles = ["old.m4a", "other.m4a"]
@@ -259,6 +273,7 @@ final class SyncViewModelTests: XCTestCase {
         )
     }
 
+    @MainActor
     private func makeModel() -> SyncViewModel {
         let model = SyncViewModel(
             configurationStore: SyncConfigurationStore(userDefaults: userDefaults),
@@ -278,6 +293,7 @@ final class SyncViewModelTests: XCTestCase {
         return model
     }
 
+    @MainActor
     private func remoteDestination() -> DestinationProfile {
         DestinationProfile(
             name: "Test server",

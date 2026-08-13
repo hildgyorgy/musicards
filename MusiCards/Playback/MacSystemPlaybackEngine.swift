@@ -200,22 +200,11 @@ final class MacSystemPlaybackEngine: PlaybackEngine {
             }
 
             var callback = AURenderCallbackStruct(
-                inputProc: {
-                    refCon,
-                    actionFlags,
-                    timeStamp,
-                    busNumber,
-                    frameCount,
-                    outputData in
-                    MCPPCMRenderCallback(
-                        refCon,
-                        actionFlags,
-                        timeStamp,
-                        busNumber,
-                        frameCount,
-                        outputData
-                    )
-                },
+                // Install the C renderer directly. Wrapping it in a Swift
+                // closure created inside this @MainActor type makes Swift 6
+                // enforce the main executor when Core Audio invokes the
+                // callback on its realtime IO thread.
+                inputProc: MCPPCMRenderCallback,
                 inputProcRefCon: UnsafeMutableRawPointer(decodedPCM.renderer)
             )
 

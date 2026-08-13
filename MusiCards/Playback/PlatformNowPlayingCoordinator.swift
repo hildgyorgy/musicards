@@ -38,7 +38,7 @@ final class PlatformNowPlayingCoordinator {
         observePlayback(controller)
     }
 
-    deinit {
+    isolated deinit {
         for registration in commandTargets {
             registration.command.removeTarget(registration.target)
         }
@@ -222,23 +222,29 @@ final class PlatformNowPlayingCoordinator {
 
         cachedArtworkItemID = item.id
 
-        #if os(iOS)
         guard let data = item.track.artworkData,
-              let image = UIImage(data: data) else {
+              let artwork = Self.makeArtwork(from: data) else {
             cachedArtwork = nil
             return nil
         }
-        #elseif os(macOS)
-        guard let data = item.track.artworkData,
-              let image = NSImage(data: data) else {
-            cachedArtwork = nil
-            return nil
-        }
-        #endif
 
-        let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
         cachedArtwork = artwork
         return artwork
+    }
+
+    /// MediaPlayer invokes an artwork request handler on its own queue. Keep
+    /// the handler outside this `@MainActor` type's isolation so Swift 6 does
+    /// not install a main-queue precondition on a system-owned callback.
+    nonisolated static func makeArtwork(
+        from data: Data
+    ) -> MPMediaItemArtwork? {
+        #if os(iOS)
+        guard let image = UIImage(data: data) else { return nil }
+        #elseif os(macOS)
+        guard let image = NSImage(data: data) else { return nil }
+        #endif
+
+        return MPMediaItemArtwork(boundsSize: image.size) { _ in image }
     }
 
     private func addTarget(

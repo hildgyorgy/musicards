@@ -61,7 +61,7 @@ struct MusicBrainzService {
             return try await searchReleasesByBarcode(trimmed, limit: limit, offset: offset)
         }
 
-        let smartQuery = buildReleaseSearchQuery(from: query)
+        let smartQuery = Self.releaseSearchQuery(from: query)
 
         var components = URLComponents(string: "https://musicbrainz.org/ws/2/release")
         components?.queryItems = [
@@ -100,7 +100,7 @@ struct MusicBrainzService {
         var components = URLComponents(string: "https://musicbrainz.org/ws/2/artist")
         components?.queryItems = [
             URLQueryItem(name: "fmt", value: "json"),
-            URLQueryItem(name: "query", value: query),
+            URLQueryItem(name: "query", value: Self.luceneEscapedText(query)),
             URLQueryItem(name: "limit", value: "\(limit)"),
             URLQueryItem(name: "offset", value: "\(offset)")
         ]
@@ -125,7 +125,7 @@ struct MusicBrainzService {
         return try JSONDecoder().decode(MBArtistDetail.self, from: data)
     }
 
-    private func buildReleaseSearchQuery(from input: String) -> String {
+    nonisolated static func releaseSearchQuery(from input: String) -> String {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard !trimmed.isEmpty else { return trimmed }
@@ -141,11 +141,11 @@ struct MusicBrainzService {
             var fields: [String] = []
 
             if !artistPart.isEmpty {
-                fields.append("artist:(\(artistPart))")
+                fields.append("artist:(\(luceneEscapedText(artistPart)))")
             }
 
             if !releasePart.isEmpty {
-                fields.append("release:(\(releasePart))")
+                fields.append("release:(\(luceneEscapedText(releasePart)))")
             }
 
             if !fields.isEmpty {
@@ -159,9 +159,35 @@ struct MusicBrainzService {
             .filter { !$0.isEmpty }
 
         if words.count >= 2 {
-            return words.map { "\"\($0)\"" }.joined(separator: " AND ")
+            return words.map {
+                "\"\(luceneQuotedText($0))\""
+            }.joined(separator: " AND ")
         } else {
-            return trimmed
+            return luceneEscapedText(trimmed)
+        }
+    }
+
+    /// Escapes Lucene query syntax while retaining the existing search shape.
+    /// URLComponents handles URL encoding separately; this protects the
+    /// MusicBrainz query parser from user-entered punctuation.
+    nonisolated static func luceneEscapedText(_ value: String) -> String {
+        let reserved = Set("+-&|!(){}[]^\"~*?:\\/")
+        return value.reduce(into: "") { result, character in
+            if reserved.contains(character) {
+                result.append("\\")
+            }
+            result.append(character)
+        }
+    }
+
+    private nonisolated static func luceneQuotedText(
+        _ value: String
+    ) -> String {
+        value.reduce(into: "") { result, character in
+            if character == "\\" || character == "\"" {
+                result.append("\\")
+            }
+            result.append(character)
         }
     }
 

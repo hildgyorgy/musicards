@@ -19,11 +19,7 @@ final class LocalLibraryStore: ObservableObject {
     private let context: ModelContext
     private var rootURLs: [String: URL] = [:]
     private var accessedRootIDs = Set<String>()
-    private var tracksByReleaseID: [String: [LocalAudioFileSnapshot]] = [:]
-    private var tracksByReleaseTrackKey: [String: LocalAudioFileSnapshot] = [:]
-    private var legacyTracksByRecordingKey: [String: LocalAudioFileSnapshot] = [:]
-    private var normalizedArtistCredits = Set<String>()
-    private var normalizedArtistCreditsByAlbumTitle: [String: Set<String>] = [:]
+    private var lookup = LocalLibraryLookup()
 
     init() {
         do {
@@ -116,22 +112,15 @@ final class LocalLibraryStore: ObservableObject {
     }
 
     func containsRelease(_ releaseID: String) -> Bool {
-        tracksByReleaseID[normalizedMBID(releaseID)]?.isEmpty == false
+        lookup.containsRelease(releaseID)
     }
 
     func containsArtist(named artistName: String) -> Bool {
-        let needle = normalizedLibraryText(artistName)
-        guard !needle.isEmpty else { return false }
-        return normalizedArtistCredits.contains(needle)
+        lookup.containsArtist(named: artistName)
     }
 
     func containsReleaseGroup(title: String, artistName: String) -> Bool {
-        let artist = normalizedLibraryText(artistName)
-        let album = normalizedLibraryText(title)
-        guard !artist.isEmpty, !album.isEmpty else { return false }
-        return normalizedArtistCreditsByAlbumTitle[album]?.contains {
-            artistCredit($0, contains: artist)
-        } == true
+        lookup.containsReleaseGroup(title: title, artistName: artistName)
     }
 
     func containsTrack(
@@ -154,22 +143,12 @@ final class LocalLibraryStore: ObservableObject {
         recordingID: String?,
         allowsRecordingFallback: Bool
     ) -> LocalAudioFileSnapshot? {
-        if let releaseTrackID = nonemptyMBID(releaseTrackID),
-           let exactMatch = tracksByReleaseTrackKey[
-               releaseTrackKey(
-                   releaseID: releaseID,
-                   releaseTrackID: releaseTrackID
-               )
-           ] {
-            return exactMatch
-        }
-        guard allowsRecordingFallback,
-              let recordingID = nonemptyMBID(recordingID) else {
-            return nil
-        }
-        return legacyTracksByRecordingKey[
-            recordingKey(releaseID: releaseID, recordingID: recordingID)
-        ]
+        lookup.audioFile(
+            releaseID: releaseID,
+            releaseTrackID: releaseTrackID,
+            recordingID: recordingID,
+            allowsRecordingFallback: allowsRecordingFallback
+        )
     }
 
     func url(for file: LocalAudioFileSnapshot) -> URL? {
@@ -402,51 +381,7 @@ final class LocalLibraryStore: ObservableObject {
                     == .orderedAscending
             }
 
-            tracksByReleaseID = Dictionary(
-                grouping: snapshots.compactMap { file -> (String, LocalAudioFileSnapshot)? in
-                    guard let releaseID = file.releaseMBID else { return nil }
-                    return (normalizedMBID(releaseID), file)
-                },
-                by: { $0.0 }
-            ).mapValues { $0.map(\.1) }
-
-            normalizedArtistCredits = Set(
-                snapshots.compactMap { file in
-                    let artist = normalizedLibraryText(file.artist)
-                    return artist.isEmpty ? nil : artist
-                }
-            )
-            normalizedArtistCreditsByAlbumTitle = [:]
-            for file in snapshots {
-                let artist = normalizedLibraryText(file.artist)
-                let album = normalizedLibraryText(file.albumTitle)
-                guard !artist.isEmpty, !album.isEmpty else { continue }
-                normalizedArtistCreditsByAlbumTitle[album, default: []].insert(artist)
-            }
-
-            tracksByReleaseTrackKey = [:]
-            var legacyRecordingCandidates: [String: [LocalAudioFileSnapshot]] = [:]
-            for file in snapshots {
-                guard let releaseID = file.releaseMBID else { continue }
-                if let releaseTrackID = nonemptyMBID(file.releaseTrackMBID) {
-                    let key = releaseTrackKey(
-                        releaseID: releaseID,
-                        releaseTrackID: releaseTrackID
-                    )
-                    if tracksByReleaseTrackKey[key] == nil {
-                        tracksByReleaseTrackKey[key] = file
-                    }
-                } else if let recordingID = nonemptyMBID(file.recordingMBID) {
-                    let key = recordingKey(
-                        releaseID: releaseID,
-                        recordingID: recordingID
-                    )
-                    legacyRecordingCandidates[key, default: []].append(file)
-                }
-            }
-            legacyTracksByRecordingKey = legacyRecordingCandidates.compactMapValues {
-                $0.count == 1 ? $0[0] : nil
-            }
+            lookup = LocalLibraryLookup(files: snapshots)
 
             folderNames = roots
                 .filter { rootURLs[$0.id] != nil }
@@ -457,14 +392,14 @@ final class LocalLibraryStore: ObservableObject {
                 && activeRoots.allSatisfy { $0.identifiedAlbumCount != nil }
             let identifiedAlbumCount = hasPersistedIdentifiedCounts
                 ? activeRoots.reduce(0) { $0 + ($1.identifiedAlbumCount ?? 0) }
-                : tracksByReleaseID.count
+                : lookup.releaseCount
             let totalAlbumCount: Int? = !activeRoots.isEmpty
                 && activeRoots.allSatisfy({ $0.totalAlbumCount != nil })
                 ? activeRoots.reduce(0) { $0 + ($1.totalAlbumCount ?? 0) }
                 : nil
             summary = LocalLibrarySummary(
                 folderCount: folderNames.count,
-                releaseCount: tracksByReleaseID.count,
+                releaseCount: lookup.releaseCount,
                 trackCount: snapshots.count,
                 identifiedAlbumCount: identifiedAlbumCount,
                 totalAlbumCount: totalAlbumCount
@@ -472,45 +407,6 @@ final class LocalLibraryStore: ObservableObject {
         } catch {
             statusMessage = error.localizedDescription
         }
-    }
-
-    private func normalizedMBID(_ value: String) -> String {
-        value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-    }
-
-    private func normalizedLibraryText(_ value: String) -> String {
-        value
-            .folding(
-                options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive],
-                locale: Locale(identifier: "en_US_POSIX")
-            )
-            .split(whereSeparator: { !$0.isLetter && !$0.isNumber })
-            .map(String.init)
-            .joined(separator: " ")
-    }
-
-    private func artistCredit(_ credit: String, contains artist: String) -> Bool {
-        credit == artist
-            || credit.hasPrefix("\(artist) ")
-            || credit.hasSuffix(" \(artist)")
-            || credit.contains(" \(artist) ")
-    }
-
-    private func nonemptyMBID(_ value: String?) -> String? {
-        guard let value else { return nil }
-        let normalized = normalizedMBID(value)
-        return normalized.isEmpty ? nil : normalized
-    }
-
-    private func recordingKey(releaseID: String, recordingID: String) -> String {
-        "\(normalizedMBID(releaseID))::\(normalizedMBID(recordingID))"
-    }
-
-    private func releaseTrackKey(
-        releaseID: String,
-        releaseTrackID: String
-    ) -> String {
-        "\(normalizedMBID(releaseID))::\(normalizedMBID(releaseTrackID))"
     }
 
     private func makeBookmark(for url: URL) throws -> Data {

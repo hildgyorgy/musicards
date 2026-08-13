@@ -7,7 +7,11 @@
 
 typedef struct MCPPCMRenderer MCPPCMRenderer;
 
-MCPPCMRenderer *MCPPCMRendererCreate(
+#if __has_feature(nullability)
+#pragma clang assume_nonnull begin
+#endif
+
+MCPPCMRenderer * _Nullable MCPPCMRendererCreate(
     uint64_t frameCapacity,
     uint32_t channelCount
 );
@@ -43,7 +47,11 @@ OSStatus MCPPCMRenderCallback(
     const AudioTimeStamp *inTimeStamp,
     UInt32 inBusNumber,
     UInt32 inNumberFrames,
-    AudioBufferList *ioData
+    AudioBufferList * _Nullable ioData
 );
+
+#if __has_feature(nullability)
+#pragma clang assume_nonnull end
+#endif
 
 #endif

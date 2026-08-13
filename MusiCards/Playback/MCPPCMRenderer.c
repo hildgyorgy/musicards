@@ -228,7 +228,7 @@ OSStatus MCPPCMRenderCallback(
     const AudioTimeStamp *inTimeStamp,
     UInt32 inBusNumber,
     UInt32 inNumberFrames,
-    AudioBufferList *ioData
+    AudioBufferList * _Nullable ioData
 ) {
     (void)inTimeStamp;
     (void)inBusNumber;

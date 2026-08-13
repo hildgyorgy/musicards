@@ -79,6 +79,12 @@ enum LocalLibraryManifestLoader {
         let data = try await Task.detached(priority: .utility) {
             try coordinatedData(from: manifestURL)
         }.value
+        return try decode(data)
+    }
+
+    nonisolated static func decode(
+        _ data: Data
+    ) throws -> LocalLibraryManifestSnapshot {
         let albums = try JSONDecoder().decode(
             [LocalLibraryManifestAlbum].self,
             from: data

@@ -114,6 +114,40 @@ nonisolated struct LocalAudioFileSnapshot: Identifiable, Sendable {
     let channelCount: Int
     let duration: TimeInterval?
 
+    init(
+        id: String,
+        rootID: String,
+        relativePath: String,
+        title: String,
+        artist: String,
+        albumTitle: String,
+        releaseMBID: String?,
+        recordingMBID: String?,
+        releaseTrackMBID: String?,
+        codec: String = "",
+        bitDepth: Int? = nil,
+        sampleRate: Double = 0,
+        bitrate: Double? = nil,
+        channelCount: Int = 0,
+        duration: TimeInterval? = nil
+    ) {
+        self.id = id
+        self.rootID = rootID
+        self.relativePath = relativePath
+        self.title = title
+        self.artist = artist
+        self.albumTitle = albumTitle
+        self.releaseMBID = releaseMBID
+        self.recordingMBID = recordingMBID
+        self.releaseTrackMBID = releaseTrackMBID
+        self.codec = codec
+        self.bitDepth = bitDepth
+        self.sampleRate = sampleRate
+        self.bitrate = bitrate
+        self.channelCount = channelCount
+        self.duration = duration
+    }
+
     init(_ record: LocalAudioFileRecord) {
         id = record.id
         rootID = record.rootID

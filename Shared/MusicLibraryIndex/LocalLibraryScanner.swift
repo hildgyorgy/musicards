@@ -128,10 +128,8 @@ enum LocalLibraryScanner {
                 throw MusicLibraryIndexError("The indexed file contains no audio track")
             }
 
-            async let descriptionsTask = audioTrack.load(.formatDescriptions)
-            async let bitrateTask = audioTrack.load(.estimatedDataRate)
-            let descriptions = try await descriptionsTask
-            let estimatedBitrate = try? await bitrateTask
+            let descriptions = try await audioTrack.load(.formatDescriptions)
+            let estimatedBitrate = try? await audioTrack.load(.estimatedDataRate)
             let format = technicalFormat(
                 from: descriptions.first,
                 url: candidate.url,

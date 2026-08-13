@@ -1,0 +1,189 @@
+//
+//  LocalLibraryLookup.swift
+//  MusiCards
+//
+
+import Foundation
+
+/// Immutable, in-memory view of the connected library.
+///
+/// Keeping matching here makes the MusicBrainz identity policy independently
+/// testable while the SwiftData store remains responsible only for persistence.
+nonisolated struct LocalLibraryLookup {
+    private let tracksByReleaseID: [String: [LocalAudioFileSnapshot]]
+    private let tracksByReleaseTrackKey: [String: LocalAudioFileSnapshot]
+    private let legacyTracksByRecordingKey: [String: LocalAudioFileSnapshot]
+    private let normalizedArtistCredits: Set<String>
+    private let normalizedArtistCreditsByAlbumTitle: [String: Set<String>]
+
+    init(files: [LocalAudioFileSnapshot] = []) {
+        let files = files.sorted {
+            $0.relativePath.localizedStandardCompare($1.relativePath)
+                == .orderedAscending
+        }
+
+        tracksByReleaseID = Dictionary(
+            grouping: files.compactMap {
+                file -> (String, LocalAudioFileSnapshot)? in
+                guard let releaseID = Self.nonemptyMBID(file.releaseMBID) else {
+                    return nil
+                }
+                return (releaseID, file)
+            },
+            by: { $0.0 }
+        ).mapValues { $0.map(\.1) }
+
+        normalizedArtistCredits = Set(
+            files.compactMap { file in
+                let artist = Self.normalizedLibraryText(file.artist)
+                return artist.isEmpty ? nil : artist
+            }
+        )
+
+        var artistsByAlbum: [String: Set<String>] = [:]
+        var exactTracks: [String: LocalAudioFileSnapshot] = [:]
+        var legacyCandidates: [String: [LocalAudioFileSnapshot]] = [:]
+
+        for file in files {
+            let artist = Self.normalizedLibraryText(file.artist)
+            let album = Self.normalizedLibraryText(file.albumTitle)
+            if !artist.isEmpty, !album.isEmpty {
+                artistsByAlbum[album, default: []].insert(artist)
+            }
+
+            guard let releaseID = Self.nonemptyMBID(file.releaseMBID) else {
+                continue
+            }
+            if let releaseTrackID = Self.nonemptyMBID(file.releaseTrackMBID) {
+                let key = Self.releaseTrackKey(
+                    releaseID: releaseID,
+                    releaseTrackID: releaseTrackID
+                )
+                if exactTracks[key] == nil {
+                    exactTracks[key] = file
+                }
+            } else if let recordingID = Self.nonemptyMBID(file.recordingMBID) {
+                let key = Self.recordingKey(
+                    releaseID: releaseID,
+                    recordingID: recordingID
+                )
+                legacyCandidates[key, default: []].append(file)
+            }
+        }
+
+        normalizedArtistCreditsByAlbumTitle = artistsByAlbum
+        tracksByReleaseTrackKey = exactTracks
+        legacyTracksByRecordingKey = legacyCandidates.compactMapValues {
+            $0.count == 1 ? $0[0] : nil
+        }
+    }
+
+    var releaseCount: Int {
+        tracksByReleaseID.count
+    }
+
+    func containsRelease(_ releaseID: String) -> Bool {
+        tracksByReleaseID[Self.normalizedMBID(releaseID)]?.isEmpty == false
+    }
+
+    func containsArtist(named artistName: String) -> Bool {
+        let needle = Self.normalizedLibraryText(artistName)
+        guard !needle.isEmpty else { return false }
+        return normalizedArtistCredits.contains(needle)
+    }
+
+    func containsReleaseGroup(title: String, artistName: String) -> Bool {
+        let artist = Self.normalizedLibraryText(artistName)
+        let album = Self.normalizedLibraryText(title)
+        guard !artist.isEmpty, !album.isEmpty else { return false }
+        return normalizedArtistCreditsByAlbumTitle[album]?.contains {
+            Self.artistCredit($0, contains: artist)
+        } == true
+    }
+
+    func containsTrack(
+        releaseID: String,
+        releaseTrackID: String?,
+        recordingID: String?,
+        allowsRecordingFallback: Bool
+    ) -> Bool {
+        audioFile(
+            releaseID: releaseID,
+            releaseTrackID: releaseTrackID,
+            recordingID: recordingID,
+            allowsRecordingFallback: allowsRecordingFallback
+        ) != nil
+    }
+
+    func audioFile(
+        releaseID: String,
+        releaseTrackID: String?,
+        recordingID: String?,
+        allowsRecordingFallback: Bool
+    ) -> LocalAudioFileSnapshot? {
+        if let releaseTrackID = Self.nonemptyMBID(releaseTrackID),
+           let exactMatch = tracksByReleaseTrackKey[
+               Self.releaseTrackKey(
+                   releaseID: releaseID,
+                   releaseTrackID: releaseTrackID
+               )
+           ] {
+            return exactMatch
+        }
+        guard allowsRecordingFallback,
+              let recordingID = Self.nonemptyMBID(recordingID) else {
+            return nil
+        }
+        return legacyTracksByRecordingKey[
+            Self.recordingKey(
+                releaseID: releaseID,
+                recordingID: recordingID
+            )
+        ]
+    }
+
+    private static func normalizedMBID(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    private static func normalizedLibraryText(_ value: String) -> String {
+        value
+            .folding(
+                options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive],
+                locale: Locale(identifier: "en_US_POSIX")
+            )
+            .split(whereSeparator: { !$0.isLetter && !$0.isNumber })
+            .map(String.init)
+            .joined(separator: " ")
+    }
+
+    private static func artistCredit(
+        _ credit: String,
+        contains artist: String
+    ) -> Bool {
+        credit == artist
+            || credit.hasPrefix("\(artist) ")
+            || credit.hasSuffix(" \(artist)")
+            || credit.contains(" \(artist) ")
+    }
+
+    private static func nonemptyMBID(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let normalized = normalizedMBID(value)
+        return normalized.isEmpty ? nil : normalized
+    }
+
+    private static func recordingKey(
+        releaseID: String,
+        recordingID: String
+    ) -> String {
+        "\(normalizedMBID(releaseID))::\(normalizedMBID(recordingID))"
+    }
+
+    private static func releaseTrackKey(
+        releaseID: String,
+        releaseTrackID: String
+    ) -> String {
+        "\(normalizedMBID(releaseID))::\(normalizedMBID(releaseTrackID))"
+    }
+}

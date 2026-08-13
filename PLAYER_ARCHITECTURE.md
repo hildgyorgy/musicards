@@ -225,10 +225,34 @@ MusiCards audio player. It is the shared starting point for future player work.
 
 ## Next task
 
-The immediate validation task is deliberately narrow:
+The next implementation phase is deliberately a stabilization phase, not a
+feature phase:
 
-> Generate `library.json` from a Picard-tagged offline folder, connect that root
-> on macOS and iOS, verify persistent restoration after restart, search for one
-> indexed release, and confirm its availability indicator and track playback.
-> Then add one album, regenerate the manifest and verify that Reload Index
-> imports the updated index.
+1. keep the current app behavior covered by repeatable regression tests;
+2. migrate incrementally to Swift 6 language mode;
+3. only after that consider the separately scoped direct-DAC playback path.
+
+## Regression safety net — 2026-08-13
+
+The `MusiCardsTests` macOS-hosted unit-test target protects shared, platform-
+independent behavior without opening audio devices or requiring a real music
+folder.
+
+- Manifest tests cover the current `library.json` schema, legacy safe defaults
+  and rejection of paths that escape the connected root.
+- Local-library matching tests cover exact release-track MBID priority, the
+  hybrid SACD/CD-layer case, partial albums, unique legacy recording-MBID
+  fallback, ambiguity rejection and exact normalized artist matching.
+- Playback-controller tests use a fake engine to cover queue replacement,
+  previous/next boundaries, prepare/play/pause behavior, automatic advance,
+  end-of-queue output restoration and seek clamping.
+- MusicBrainz query tests preserve the intended artist/release search shape and
+  verify Lucene escaping for punctuation and embedded quotes.
+
+Run the suite from Xcode with the `MusiCards` scheme, or from the repository
+root with:
+
+```sh
+xcodebuild -project "MusiCards Release Viewer.xcodeproj" \
+  -scheme MusiCards -destination "platform=macOS" test
+```

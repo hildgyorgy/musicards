@@ -60,6 +60,13 @@
 			remoteGlobalIDString = F5B632B330260A6100A44573;
 			remoteInfo = "MusiCards Sync";
 		};
+		F5C70007302D000100000007 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = F5E521372F8292AD00D2CEAE /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F5E5213E2F8292AD00D2CEAE;
+			remoteInfo = MusiCards;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
@@ -100,6 +107,7 @@
 		F5B632B430260A6100A44573 /* MusiCards Sync.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "MusiCards Sync.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		F5B700013027C00100AEA397 /* MusiCards SyncTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "MusiCards SyncTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		F5BB4C202F982A60001CA927 /* BarcodeScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BarcodeScannerView.swift; sourceTree = "<group>"; };
+		F5C70001302D000100000001 /* MusiCardsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MusiCardsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F5D185A92F93E4A100CDDB1C /* EmptyStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
 		F5D185AB2F93F71A00CDDB1C /* ErrorStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorStateView.swift; sourceTree = "<group>"; };
 		F5E5111B2FC4F38800E797D6 /* AppStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStyle.swift; sourceTree = "<group>"; };
@@ -144,6 +152,11 @@
 			path = Shared;
 			sourceTree = "<group>";
 		};
+		F5C70002302D000100000002 /* MusiCardsTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = MusiCardsTests;
+			sourceTree = "<group>";
+		};
 		F5E510E12FC4BDF300E797D6 /* Deck */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = Deck;
@@ -158,6 +171,11 @@
 			);
 		};
 		F5B700033027C00100AEA397 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
+		F5C70003302D000100000003 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
 			);
@@ -207,6 +225,7 @@
 				F5C0DE042FD0000000000004 /* Shared */,
 				F5B632B630260A6100A44573 /* MusiCards Sync */,
 				F5B700023027C00100AEA397 /* MusiCards SyncTests */,
+				F5C70002302D000100000002 /* MusiCardsTests */,
 			);
 			sourceTree = "<group>";
 		};
@@ -216,6 +235,7 @@
 				F5E5213F2F8292AD00D2CEAE /* MusiCards.app */,
 				F5B632B430260A6100A44573 /* MusiCards Sync.app */,
 				F5B700013027C00100AEA397 /* MusiCards SyncTests.xctest */,
+				F5C70001302D000100000001 /* MusiCardsTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -354,6 +374,27 @@
 			productReference = F5B700013027C00100AEA397 /* MusiCards SyncTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		F5C70004302D000100000004 /* MusiCardsTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F5C7000C302D00010000000C /* Build configuration list for PBXNativeTarget "MusiCardsTests" */;
+			buildPhases = (
+				F5C70005302D000100000005 /* Sources */,
+				F5C70003302D000100000003 /* Frameworks */,
+				F5C70006302D000100000006 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				F5C70008302D000100000008 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				F5C70002302D000100000002 /* MusiCardsTests */,
+			);
+			name = MusiCardsTests;
+			productName = MusiCardsTests;
+			productReference = F5C70001302D000100000001 /* MusiCardsTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		F5E5213E2F8292AD00D2CEAE /* MusiCards */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = F5E5214A2F8292AE00D2CEAE /* Build configuration list for PBXNativeTarget "MusiCards" */;
@@ -393,6 +434,10 @@
 						CreatedOnToolsVersion = 26.6;
 						TestTargetID = F5B632B330260A6100A44573;
 					};
+					F5C70004302D000100000004 = {
+						CreatedOnToolsVersion = 26.6;
+						TestTargetID = F5E5213E2F8292AD00D2CEAE;
+					};
 					F5E5213E2F8292AD00D2CEAE = {
 						CreatedOnToolsVersion = 26.4;
 					};
@@ -415,6 +460,7 @@
 				F5E5213E2F8292AD00D2CEAE /* MusiCards */,
 				F5B632B330260A6100A44573 /* MusiCards Sync */,
 				F5B700043027C00100AEA397 /* MusiCards SyncTests */,
+				F5C70004302D000100000004 /* MusiCardsTests */,
 			);
 		};
 /* End PBXProject section */
@@ -426,6 +472,11 @@
 			);
 		};
 		F5B700063027C00100AEA397 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+		F5C70006302D000100000006 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
 			);
@@ -446,6 +497,11 @@
 			);
 		};
 		F5B700053027C00100AEA397 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
+		F5C70005302D000100000005 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			files = (
 			);
@@ -504,6 +560,11 @@
 			target = F5B632B330260A6100A44573 /* MusiCards Sync */;
 			targetProxy = F5B700073027C00100AEA397 /* PBXContainerItemProxy */;
 		};
+		F5C70008302D000100000008 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F5E5213E2F8292AD00D2CEAE /* MusiCards */;
+			targetProxy = F5C70007302D000100000007 /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
@@ -539,7 +600,7 @@
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 			};
 			name = Debug;
 		};
@@ -575,7 +636,7 @@
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 			};
 			name = Release;
 		};
@@ -593,8 +654,8 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				SUPPORTED_PLATFORMS = macosx;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_VERSION = 5.0;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
+				SWIFT_VERSION = 6.0;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MusiCards Sync.app/Contents/MacOS/MusiCards Sync";
 			};
 			name = Debug;
@@ -613,9 +674,49 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				SUPPORTED_PLATFORMS = macosx;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_VERSION = 5.0;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
+				SWIFT_VERSION = 6.0;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MusiCards Sync.app/Contents/MacOS/MusiCards Sync";
+			};
+			name = Release;
+		};
+		F5C70009302D000100000009 /* Debug configuration for PBXNativeTarget "MusiCardsTests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 963B9MS98N;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = hu.hildgyorgy.MusiCardsTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
+				SWIFT_VERSION = 6.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MusiCards.app/Contents/MacOS/MusiCards";
+			};
+			name = Debug;
+		};
+		F5C7000A302D00010000000A /* Release configuration for PBXNativeTarget "MusiCardsTests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 963B9MS98N;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = hu.hildgyorgy.MusiCardsTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
+				SWIFT_VERSION = 6.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MusiCards.app/Contents/MacOS/MusiCards";
 			};
 			name = Release;
 		};
@@ -795,7 +896,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OBJC_BRIDGING_HEADER = "MusiCards/Playback/MusiCards-Bridging-Header.h";
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
@@ -849,7 +950,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OBJC_BRIDGING_HEADER = "MusiCards/Playback/MusiCards-Bridging-Header.h";
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
@@ -870,6 +971,14 @@
 			buildConfigurations = (
 				F5B700093027C00100AEA397 /* Debug configuration for PBXNativeTarget "MusiCards SyncTests" */,
 				F5B7000A3027C00100AEA397 /* Release configuration for PBXNativeTarget "MusiCards SyncTests" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		F5C7000C302D00010000000C /* Build configuration list for PBXNativeTarget "MusiCardsTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F5C70009302D000100000009 /* Debug configuration for PBXNativeTarget "MusiCardsTests" */,
+				F5C7000A302D00010000000A /* Release configuration for PBXNativeTarget "MusiCardsTests" */,
 			);
 			defaultConfigurationName = Release;
 		};

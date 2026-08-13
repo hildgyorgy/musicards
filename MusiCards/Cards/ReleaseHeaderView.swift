@@ -59,7 +59,6 @@ struct ReleaseHeaderView: View {
 
                     Spacer(minLength: 8)
 
-                    #if os(iOS)
                     if isPlayable {
                         Button(action: onPlayRelease) {
                             Image(systemName: "play.fill")
@@ -71,7 +70,6 @@ struct ReleaseHeaderView: View {
                         .buttonStyle(.plain)
                         .accessibilityLabel("Play release")
                     }
-                    #endif
                 }
                 .padding(.top, 6)
                 
