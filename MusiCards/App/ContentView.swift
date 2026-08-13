@@ -156,10 +156,6 @@ struct ContentView: View {
             if appModel.deckSelection.activeID == .player {
                 PlayerCardContentView(
                     controller: appModel.playbackController,
-                    localLibrary: appModel.localLibrary,
-                    onSelectMusicFolder: { url in
-                        appModel.selectMusicFolder(url)
-                    },
                     detailStore: appModel.trackDetailStore,
                     onSelectArtist: { artistID in
                         appModel.selectArtist(id: artistID)
@@ -176,7 +172,12 @@ struct ContentView: View {
     {
         switch card.id {
         case .home:
-            DeckBackgroundView(localLibrary: appModel.localLibrary)
+            DeckBackgroundView(
+                localLibrary: appModel.localLibrary,
+                onSelectMusicFolder: { url in
+                    appModel.selectMusicFolder(url)
+                }
+            )
         case .search:
             SearchCardContentView(
                 viewModel: appModel.searchViewModel,

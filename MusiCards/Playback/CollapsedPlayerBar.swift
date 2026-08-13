@@ -12,16 +12,19 @@ import AppKit
 struct CollapsedPlayerBar: View {
     @ObservedObject var controller: PlaybackController
     let contentInset: CGFloat?
+    let isPlaceholder: Bool
 
     @State private var scrubPosition: TimeInterval = 0
     @State private var isScrubbing = false
 
     init(
         controller: PlaybackController,
-        contentInset: CGFloat? = nil
+        contentInset: CGFloat? = nil,
+        isPlaceholder: Bool = false
     ) {
         self.controller = controller
         self.contentInset = contentInset
+        self.isPlaceholder = isPlaceholder
     }
 
     var body: some View {
@@ -29,19 +32,19 @@ struct CollapsedPlayerBar: View {
             transportButton(
                 systemName: "backward.end.fill",
                 accessibilityLabel: "Previous track",
-                isEnabled: controller.hasPrevious
+                isEnabled: !isPlaceholder && controller.hasPrevious
             ) {
                 await controller.selectPrevious()
             }
 
             transportButton(
-                systemName: controller.status.isPlaying
+                systemName: isPlaceholder || controller.status.isPlaying
                     ? "pause.fill"
                     : "play.fill",
                 accessibilityLabel: controller.status.isPlaying
                     ? "Pause"
                     : "Play",
-                isEnabled: controller.status != .loading
+                isEnabled: !isPlaceholder && controller.status != .loading
             ) {
                 await controller.togglePlayback()
             }
@@ -49,7 +52,7 @@ struct CollapsedPlayerBar: View {
             transportButton(
                 systemName: "forward.end.fill",
                 accessibilityLabel: "Next track",
-                isEnabled: controller.hasNext
+                isEnabled: !isPlaceholder && controller.hasNext
             ) {
                 await controller.selectNext()
             }
@@ -57,28 +60,36 @@ struct CollapsedPlayerBar: View {
 
             VStack(spacing: 4) {
                 HStack(spacing: 8) {
-                    Text(controller.currentItem?.track.title ?? "")
+                    Text(isPlaceholder ? "" : controller.currentItem?.track.title ?? "")
                         .font(titleFont)
                         .lineLimit(1)
                         .truncationMode(.tail)
 
                     Spacer(minLength: 4)
 
-                    Text(remainingTimeText)
+                    Text(isPlaceholder ? "0:00" : remainingTimeText)
                         .font(timeFont)
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
                 }
                 .allowsHitTesting(false)
 
-                interactiveSeekBar
-                    .accessibilityLabel("Playback position")
-                    .accessibilityValue(formatTime(displayedPosition))
+                if isPlaceholder {
+                    Capsule(style: .continuous)
+                        .stroke(Color.secondary.opacity(0.65), lineWidth: 1)
+                        .frame(height: idleSeekHeight)
+                        .frame(height: seekHitHeight)
+                } else {
+                    interactiveSeekBar
+                        .accessibilityLabel("Playback position")
+                        .accessibilityValue(formatTime(displayedPosition))
+                }
             }
         }
         .padding(.horizontal, contentInset ?? defaultHorizontalPadding)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityElement(children: .contain)
+        .accessibilityHidden(isPlaceholder)
     }
 
     private func transportButton(

@@ -95,49 +95,6 @@ final class LocalLibraryStore: ObservableObject {
         }
     }
 
-    #if os(macOS)
-    func createOrUpdateLibraryIndex(in url: URL) {
-        guard !isScanning else { return }
-        let didAccess = url.startAccessingSecurityScopedResource()
-
-        do {
-            guard didAccess else {
-                throw NativePlaybackEngineError(
-                    "The selected music folder could not be accessed."
-                )
-            }
-            let bookmark = try makeBookmark(for: url)
-            isScanning = true
-            connectionErrorMessage = nil
-            statusMessage = "Preparing library index…"
-
-            Task {
-                do {
-                    _ = try await LocalLibraryManifestGenerator.generate(
-                        in: url,
-                        progress: { [weak self] message in
-                            self?.statusMessage = message
-                        }
-                    )
-                    statusMessage = "Connecting generated index…"
-                    await connectMusicFolder(
-                        url,
-                        bookmark: bookmark,
-                        didAccess: didAccess
-                    )
-                } catch {
-                    isScanning = false
-                    url.stopAccessingSecurityScopedResource()
-                    connectionErrorMessage = "Could not create library.json: \(error.localizedDescription)"
-                }
-            }
-        } catch {
-            if didAccess { url.stopAccessingSecurityScopedResource() }
-            connectionErrorMessage = error.localizedDescription
-        }
-    }
-    #endif
-
     func refreshAll() async {
         guard !isScanning else { return }
         isScanning = true

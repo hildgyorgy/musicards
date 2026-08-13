@@ -4,17 +4,12 @@
 //
 
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct PlayerCardContentView: View {
     @ObservedObject var controller: PlaybackController
-    @ObservedObject var localLibrary: LocalLibraryStore
-    let onSelectMusicFolder: (URL) -> Void
     @ObservedObject var detailStore: TrackDetailStore
     let onSelectArtist: (String) -> Void
 
-    @State private var isFolderImporterPresented = false
-    @State private var folderSelectionPurpose = FolderSelectionPurpose.connect
     @State private var selectedDetailPage = 1
 
     var body: some View {
@@ -22,11 +17,7 @@ struct PlayerCardContentView: View {
             if let item = controller.currentItem {
                 expandedPlayer(item)
             } else {
-                #if os(iOS)
                 idlePlayer
-                #else
-                libraryControls
-                #endif
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -36,27 +27,8 @@ struct PlayerCardContentView: View {
                 detailStore.fetchIfNeeded(recordingID: recordingID)
             }
         }
-        .fileImporter(
-            isPresented: $isFolderImporterPresented,
-            allowedContentTypes: [.folder],
-            allowsMultipleSelection: false
-        ) { result in
-            guard case .success(let urls) = result,
-                  let url = urls.first else {
-                return
-            }
-            switch folderSelectionPurpose {
-            case .connect:
-                onSelectMusicFolder(url)
-            case .createOrUpdateIndex:
-                #if os(macOS)
-                localLibrary.createOrUpdateLibraryIndex(in: url)
-                #endif
-            }
-        }
     }
 
-    #if os(iOS)
     private var idlePlayer: some View {
         VStack(spacing: 0) {
             Spacer()
@@ -68,42 +40,17 @@ struct PlayerCardContentView: View {
 
             Spacer()
 
-            idleTransport
-                .frame(height: expandedTransportHeight)
+            CollapsedPlayerBar(
+                controller: controller,
+                contentInset: 0,
+                isPlaceholder: true
+            )
+            .frame(height: expandedTransportHeight)
+            #if os(macOS)
+            .offset(y: DeckStyle.contentTopSpacing)
+            #endif
         }
     }
-
-    private var idleTransport: some View {
-        HStack(spacing: 0) {
-            ForEach(
-                ["backward.end.fill", "pause.fill", "forward.end.fill"],
-                id: \.self
-            ) { systemName in
-                Image(systemName: systemName)
-                    .font(.title3)
-                    .foregroundStyle(Color.secondary.opacity(0.65))
-                    .frame(width: 44, height: 44)
-            }
-
-            Spacer(minLength: 14)
-
-            VStack(spacing: 4) {
-                HStack {
-                    Spacer()
-                    Text("0:00")
-                        .font(.caption)
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
-                }
-
-                Capsule(style: .continuous)
-                    .stroke(Color.secondary.opacity(0.65), lineWidth: 1)
-                    .frame(height: 3)
-            }
-        }
-        .allowsHitTesting(false)
-    }
-    #endif
 
     private func expandedPlayer(_ item: PlaybackQueueItem) -> some View {
         VStack(spacing: 0) {
@@ -233,32 +180,6 @@ struct PlayerCardContentView: View {
         }
     }
 
-    private var libraryControls: some View {
-        VStack(spacing: 18) {
-            EmptyStateView(
-                title: "Playback foundation ready",
-                subtitle: "Choose one local lossless track"
-            )
-
-            Button("Connect Music Folder") {
-                folderSelectionPurpose = .connect
-                isFolderImporterPresented = true
-            }
-            .buttonStyle(.bordered)
-            .disabled(localLibrary.isScanning)
-
-            #if os(macOS)
-            Button("Create / Update Library Index") {
-                folderSelectionPurpose = .createOrUpdateIndex
-                isFolderImporterPresented = true
-            }
-            .buttonStyle(.bordered)
-            .disabled(localLibrary.isScanning)
-            #endif
-
-        }
-    }
-
     private func mediumTrackTitle(_ track: PlaybackTrack) -> String {
         var components: [String] = []
 
@@ -368,9 +289,4 @@ private extension String {
     var nilIfEmpty: String? {
         isEmpty ? nil : self
     }
-}
-
-private enum FolderSelectionPurpose {
-    case connect
-    case createOrUpdateIndex
 }
