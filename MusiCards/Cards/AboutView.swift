@@ -24,7 +24,7 @@ struct AboutView: View {
 
                 playSection
 
-                Link(destination: AboutLinks.support) {
+            Link(destination: AboutLinks.help) {
                     HStack(spacing: 5) {
                         Text("Detailed help")
                         Image(systemName: "arrow.up.right")
@@ -279,10 +279,13 @@ private struct SearchRecipeRow: View {
 
 private enum AboutLinks {
     static let musicBrainz = URL(string: "https://musicbrainz.org")!
+    static let help = URL(
+        string: "https://hildgyorgy.github.io/app-support/musicards/#help"
+    )!
     static let support = URL(
-        string: "https://hildgyorgy.github.io/mb-release-viewer/support.html"
+        string: "https://hildgyorgy.github.io/app-support/musicards/#support"
     )!
     static let privacy = URL(
-        string: "https://hildgyorgy.github.io/mb-release-viewer/support.html#privacy"
+        string: "https://hildgyorgy.github.io/app-support/musicards/#privacy"
     )!
 }

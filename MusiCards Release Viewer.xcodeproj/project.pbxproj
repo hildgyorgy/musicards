@@ -10,7 +10,6 @@
 		F50A4F7E2F8EF16E006FD7A7 /* ClassicalMetadataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50A4F7C2F8EF16E006FD7A7 /* ClassicalMetadataStore.swift */; };
 		F50A4F7F2F8EF16E006FD7A7 /* ClassicalTrackFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50A4F7D2F8EF16E006FD7A7 /* ClassicalTrackFormatter.swift */; };
 		F50AC8762F8E5EE200776C7E /* DeckBackgroundView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50AC8752F8E5EE100776C7E /* DeckBackgroundView.swift */; };
-		F5A1B2C42FC0000000000002 /* LibraryConnectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5A1B2C32FC0000000000001 /* LibraryConnectionView.swift */; };
 		F51CEDE02F899A4300E70ACD /* TrackDetailStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51CEDDF2F899A3D00E70ACD /* TrackDetailStore.swift */; };
 		F51CEDE22F89A0EC00E70ACD /* TrackDetailModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51CEDE12F89A0EA00E70ACD /* TrackDetailModels.swift */; };
 		F51CEDE42F89A18900E70ACD /* TrackDetailPagerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51CEDE32F89A18800E70ACD /* TrackDetailPagerView.swift */; };
@@ -41,6 +40,7 @@
 		F59B714F2F8540170086AB37 /* MusiCardsAppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F59B714E2F8540150086AB37 /* MusiCardsAppModel.swift */; };
 		F59CE9382FBFBACF00649EA1 /* WikipediaSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F59CE9362FBFBACE00649EA1 /* WikipediaSheetView.swift */; };
 		F59F29102F90DBF900A50F8C /* MBTextFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F59F290F2F90DBF700A50F8C /* MBTextFormatter.swift */; };
+		F5A1B2C42FC0000000000002 /* LibraryConnectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5A1B2C32FC0000000000001 /* LibraryConnectionView.swift */; };
 		F5BB4C212F982A62001CA927 /* BarcodeScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5BB4C202F982A60001CA927 /* BarcodeScannerView.swift */; };
 		F5D185AA2F93E4A200CDDB1C /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5D185A92F93E4A100CDDB1C /* EmptyStateView.swift */; };
 		F5D185AC2F93F71B00CDDB1C /* ErrorStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5D185AB2F93F71A00CDDB1C /* ErrorStateView.swift */; };
@@ -74,7 +74,6 @@
 		F50A4F7C2F8EF16E006FD7A7 /* ClassicalMetadataStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClassicalMetadataStore.swift; sourceTree = "<group>"; };
 		F50A4F7D2F8EF16E006FD7A7 /* ClassicalTrackFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClassicalTrackFormatter.swift; sourceTree = "<group>"; };
 		F50AC8752F8E5EE100776C7E /* DeckBackgroundView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckBackgroundView.swift; sourceTree = "<group>"; };
-		F5A1B2C32FC0000000000001 /* LibraryConnectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryConnectionView.swift; sourceTree = "<group>"; };
 		F51CEDDF2F899A3D00E70ACD /* TrackDetailStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackDetailStore.swift; sourceTree = "<group>"; };
 		F51CEDE12F89A0EA00E70ACD /* TrackDetailModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackDetailModels.swift; sourceTree = "<group>"; };
 		F51CEDE32F89A18800E70ACD /* TrackDetailPagerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackDetailPagerView.swift; sourceTree = "<group>"; };
@@ -106,6 +105,7 @@
 		F59CE9362FBFBACE00649EA1 /* WikipediaSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WikipediaSheetView.swift; sourceTree = "<group>"; };
 		F59F290F2F90DBF700A50F8C /* MBTextFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MBTextFormatter.swift; sourceTree = "<group>"; };
 		F59F29112F923B1E00A50F8C /* MusiCards.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = MusiCards.icon; sourceTree = "<group>"; };
+		F5A1B2C32FC0000000000001 /* LibraryConnectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryConnectionView.swift; sourceTree = "<group>"; };
 		F5B632B430260A6100A44573 /* MusiCards Sync.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "MusiCards Sync.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		F5B700013027C00100AEA397 /* MusiCards SyncTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "MusiCards SyncTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		F5BB4C202F982A60001CA927 /* BarcodeScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BarcodeScannerView.swift; sourceTree = "<group>"; };
@@ -860,7 +860,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = MusiCards/MusiCardsMac/MusiCardsMac.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 963B9MS98N;
 				ENABLE_APP_SANDBOX = YES;
@@ -884,7 +884,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.4.0;
+				MARKETING_VERSION = 2.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = hu.hildgyorgy.musicards;
 				PRODUCT_NAME = MusiCards;
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -914,7 +914,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = MusiCards/MusiCardsMac/MusiCardsMac.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 963B9MS98N;
 				ENABLE_APP_SANDBOX = YES;
@@ -938,7 +938,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.4.0;
+				MARKETING_VERSION = 2.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = hu.hildgyorgy.musicards;
 				PRODUCT_NAME = MusiCards;
 				PROVISIONING_PROFILE_SPECIFIER = "";
