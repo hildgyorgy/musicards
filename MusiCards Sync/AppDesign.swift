@@ -6,6 +6,8 @@ enum AppDesign {
     static let railWidth: CGFloat = 72
     static let railSymbolSize: CGFloat = 34
     static let railControlHeight: CGFloat = 54
+    static let headerAppIconSize: CGFloat = 48
+    static let headerAppIconCornerRadius: CGFloat = 9
     static let railSymbolWeight: Font.Weight = .bold
     static let contentGap: CGFloat = 26
     static let detailSpacing: CGFloat = 5
@@ -75,4 +77,3 @@ struct AppThinProgressBar: View {
             .frame(minHeight: AppDesign.progressHeight)
     }
 }
-

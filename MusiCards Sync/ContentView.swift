@@ -50,11 +50,7 @@ struct ContentView: View {
         @Bindable var model = model
 
         VStack(alignment: .leading, spacing: 0) {
-            Text("MusiCards Sync")
-                .font(.largeTitle)
-                .fontWeight(.semibold)
-                .padding(.leading, AppDesign.railWidth + AppDesign.contentGap)
-                .padding(.bottom, 47)
+            appHeader
 
             VStack(alignment: .leading, spacing: AppDesign.sectionGap) {
                 sourceSection
@@ -162,6 +158,44 @@ struct ContentView: View {
     }
 
     // MARK: - Main window sections
+
+    private var appHeader: some View {
+        HStack(alignment: .center, spacing: AppDesign.contentGap) {
+            Link(
+                destination: URL(
+                    string: "https://hildgyorgy.github.io/app-support/musicards-sync/#help"
+                )!
+            ) {
+                Image(nsImage: NSApplication.shared.applicationIconImage)
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFit()
+                    .frame(
+                        width: AppDesign.headerAppIconSize,
+                        height: AppDesign.headerAppIconSize
+                    )
+                    .clipShape(
+                        RoundedRectangle(
+                            cornerRadius: AppDesign.headerAppIconCornerRadius,
+                            style: .continuous
+                        )
+                    )
+                    .frame(
+                        width: AppDesign.railWidth,
+                        height: AppDesign.railControlHeight
+                    )
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Open MusiCards Sync Help, Support & Privacy")
+            .accessibilityLabel("MusiCards Sync Help, Support & Privacy")
+
+            Text("MusiCards Sync")
+                .font(.largeTitle)
+                .fontWeight(.semibold)
+        }
+        .padding(.bottom, 47)
+    }
 
     private var sourceSection: some View {
         HStack(alignment: .center, spacing: AppDesign.contentGap) {
