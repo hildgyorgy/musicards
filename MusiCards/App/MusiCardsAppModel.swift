@@ -105,6 +105,16 @@ final class MusiCardsAppModel: ObservableObject {
         localLibrary.selectMusicFolder(url)
     }
 
+    func createOrUpdateLibraryIndex(_ url: URL) {
+        #if os(macOS)
+        localLibrary.createOrUpdateLibraryIndex(in: url)
+        #endif
+    }
+
+    func disconnectMusicLibrary() {
+        localLibrary.disconnectLibrary()
+    }
+
     func restoreAudioOutputConfiguration() {
         playbackController.restoreOutputConfiguration()
     }

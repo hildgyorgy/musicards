@@ -47,7 +47,7 @@ struct DeckView<ID: Hashable, CollapsedHeaderContent: View, HeaderContent: View,
 
     var body: some View {
         GeometryReader { proxy in
-            let titlebarOverlap: CGFloat = 65
+            let titlebarOverlap = DeckStyle.titlebarHeight
             let availableHeight = proxy.size.height - DeckStyle.topInset * 2 + titlebarOverlap
             let collapsedHeightTotal = cards.reduce(CGFloat.zero) { result, card in
                 guard card.slotIndex != activeSlotIndex else { return result }

@@ -91,6 +91,56 @@ final class LocalLibraryStore: ObservableObject {
         }
     }
 
+    #if os(macOS)
+    func createOrUpdateLibraryIndex(in url: URL) {
+        guard !isScanning else { return }
+        // The picker grant must be claimed before the asynchronous scan starts.
+        let didAccess = url.startAccessingSecurityScopedResource()
+
+        do {
+            let bookmark = try makeBookmark(for: url)
+            isScanning = true
+            connectionErrorMessage = nil
+            statusMessage = "Preparing music library…"
+            Task {
+                await createIndexAndConnect(
+                    url,
+                    bookmark: bookmark,
+                    didAccess: didAccess
+                )
+            }
+        } catch {
+            if didAccess {
+                url.stopAccessingSecurityScopedResource()
+            }
+            connectionErrorMessage = error.localizedDescription
+        }
+    }
+    #endif
+
+    func disconnectLibrary() {
+        guard !isScanning else { return }
+
+        do {
+            let roots = try context.fetch(
+                FetchDescriptor<LocalLibraryRootRecord>()
+            )
+            let files = try context.fetch(
+                FetchDescriptor<LocalAudioFileRecord>()
+            )
+            for file in files { context.delete(file) }
+            for root in roots { context.delete(root) }
+            try context.save()
+            releaseAccess(for: roots)
+            connectionErrorMessage = nil
+            statusMessage = "Music library disconnected"
+            rebuildLookup()
+        } catch {
+            context.rollback()
+            connectionErrorMessage = "Could not disconnect the music library: \(error.localizedDescription)"
+        }
+    }
+
     func refreshAll() async {
         guard !isScanning else { return }
         isScanning = true
@@ -204,7 +254,8 @@ final class LocalLibraryStore: ObservableObject {
     private func connectMusicFolder(
         _ url: URL,
         bookmark: Data,
-        didAccess: Bool
+        didAccess: Bool,
+        successMessage: String = "Library index connected"
     ) async {
         defer { isScanning = false }
 
@@ -274,13 +325,48 @@ final class LocalLibraryStore: ObservableObject {
             }
 
             rebuildLookup()
-            statusMessage = "Library index connected"
+            statusMessage = successMessage
         } catch {
             context.rollback()
             if didAccess { url.stopAccessingSecurityScopedResource() }
             connectionErrorMessage = manifestErrorMessage(error)
         }
     }
+
+    #if os(macOS)
+    private func createIndexAndConnect(
+        _ url: URL,
+        bookmark: Data,
+        didAccess: Bool
+    ) async {
+        do {
+            let generation = try await LocalLibraryManifestGenerator.generate(
+                in: url
+            ) { [weak self] message in
+                self?.statusMessage = message
+            }
+            var message = generation.indexWasUpdated
+                ? "Library index updated"
+                : "Library index is up to date"
+            message += " · \(generation.indexedAlbumCount) releases"
+            if let warning = generation.warningMessage {
+                message += " · \(warning)"
+            }
+            await connectMusicFolder(
+                url,
+                bookmark: bookmark,
+                didAccess: didAccess,
+                successMessage: message
+            )
+        } catch {
+            if didAccess {
+                url.stopAccessingSecurityScopedResource()
+            }
+            isScanning = false
+            connectionErrorMessage = "Could not create library.json: \(error.localizedDescription)"
+        }
+    }
+    #endif
 
     private func apply(
         _ scannedFiles: [ScannedAudioFile],

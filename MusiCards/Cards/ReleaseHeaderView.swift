@@ -51,20 +51,28 @@ struct ReleaseHeaderView: View {
             }
             
             if let release = release {
-                HStack(alignment: .firstTextBaseline, spacing: 12) {
-                    Text(release.title)
-                        .font(AppStyle.primaryHeaderFont.weight(.bold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(3)
+                HStack(alignment: .top, spacing: 12) {
+                    VStack(alignment: .leading, spacing: AppStyle.headerSpacing) {
+                        Text(release.title)
+                            .font(AppStyle.primaryHeaderFont.weight(.bold))
+                            .foregroundStyle(.primary)
+                            .lineLimit(3)
 
-                    Spacer(minLength: 8)
+                        ArtistCreditLinksView(
+                            artistCredits: release.artistCredit,
+                            onSelectArtist: onSelectArtist,
+                        )
+                        .font(AppStyle.secondaryHeaderFont)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                     if isPlayable {
                         Button(action: onPlayRelease) {
                             Image(systemName: "play.fill")
                                 .font(.title3)
                                 .foregroundStyle(.blue)
-                                .frame(width: 44, height: 44)
+                                .padding(.top, 3)
+                                .frame(width: 44, height: 44, alignment: .top)
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
@@ -72,12 +80,6 @@ struct ReleaseHeaderView: View {
                     }
                 }
                 .padding(.top, 6)
-                
-                ArtistCreditLinksView(
-                    artistCredits: release.artistCredit,
-                    onSelectArtist: onSelectArtist,
-                )
-                .font(AppStyle.secondaryHeaderFont)
                 
                 if [
                     release.appleMusicURL,

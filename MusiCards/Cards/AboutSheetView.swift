@@ -14,27 +14,26 @@ struct AboutSheetView: View {
     var body: some View {
         ZStack(alignment: .topTrailing) {
             AboutView()
-                .frame(width: MacWindowMetrics.contentSize.width - 10)
-                .frame(height: 180)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background {
                     if #available(macOS 26.0, *) {
                         Color.clear
                             .glassEffect(
                                 .regular.interactive(),
                                 in: RoundedRectangle(
-                                    cornerRadius: AppStyle.cornerRadius,
+                                    cornerRadius: DeckStyle.aboutOverlayCornerRadius,
                                     style: .continuous
                                 )
                             )
                     } else {
                         RoundedRectangle(
-                            cornerRadius: AppStyle.cornerRadius,
+                            cornerRadius: DeckStyle.aboutOverlayCornerRadius,
                             style: .continuous
                         )
                         .fill(.regularMaterial)
                         .overlay(
                             RoundedRectangle(
-                                cornerRadius: AppStyle.cornerRadius,
+                                cornerRadius: DeckStyle.aboutOverlayCornerRadius,
                                 style: .continuous
                             )
                             .stroke(
@@ -46,7 +45,7 @@ struct AboutSheetView: View {
                 }
                 .clipShape(
                     RoundedRectangle(
-                        cornerRadius: AppStyle.cornerRadius,
+                        cornerRadius: DeckStyle.aboutOverlayCornerRadius,
                         style: .continuous
                     )
                 )
@@ -56,7 +55,19 @@ struct AboutSheetView: View {
                     x: 0,
                     y: 8
                 )
+
+            Button(action: onDismiss) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 28, height: 28)
+                    .background(.regularMaterial)
+                    .clipShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .padding(12)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 #endif

@@ -10,6 +10,7 @@
 		F50A4F7E2F8EF16E006FD7A7 /* ClassicalMetadataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50A4F7C2F8EF16E006FD7A7 /* ClassicalMetadataStore.swift */; };
 		F50A4F7F2F8EF16E006FD7A7 /* ClassicalTrackFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50A4F7D2F8EF16E006FD7A7 /* ClassicalTrackFormatter.swift */; };
 		F50AC8762F8E5EE200776C7E /* DeckBackgroundView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50AC8752F8E5EE100776C7E /* DeckBackgroundView.swift */; };
+		F5A1B2C42FC0000000000002 /* LibraryConnectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5A1B2C32FC0000000000001 /* LibraryConnectionView.swift */; };
 		F51CEDE02F899A4300E70ACD /* TrackDetailStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51CEDDF2F899A3D00E70ACD /* TrackDetailStore.swift */; };
 		F51CEDE22F89A0EC00E70ACD /* TrackDetailModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51CEDE12F89A0EA00E70ACD /* TrackDetailModels.swift */; };
 		F51CEDE42F89A18900E70ACD /* TrackDetailPagerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51CEDE32F89A18800E70ACD /* TrackDetailPagerView.swift */; };
@@ -73,6 +74,7 @@
 		F50A4F7C2F8EF16E006FD7A7 /* ClassicalMetadataStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClassicalMetadataStore.swift; sourceTree = "<group>"; };
 		F50A4F7D2F8EF16E006FD7A7 /* ClassicalTrackFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClassicalTrackFormatter.swift; sourceTree = "<group>"; };
 		F50AC8752F8E5EE100776C7E /* DeckBackgroundView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckBackgroundView.swift; sourceTree = "<group>"; };
+		F5A1B2C32FC0000000000001 /* LibraryConnectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryConnectionView.swift; sourceTree = "<group>"; };
 		F51CEDDF2F899A3D00E70ACD /* TrackDetailStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackDetailStore.swift; sourceTree = "<group>"; };
 		F51CEDE12F89A0EA00E70ACD /* TrackDetailModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackDetailModels.swift; sourceTree = "<group>"; };
 		F51CEDE32F89A18800E70ACD /* TrackDetailPagerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackDetailPagerView.swift; sourceTree = "<group>"; };
@@ -294,6 +296,7 @@
 			children = (
 				F524BE562FC9C46400D3730B /* AboutSheetView.swift */,
 				F54FE62E2F9C08EC00646913 /* AboutView.swift */,
+				F5A1B2C32FC0000000000001 /* LibraryConnectionView.swift */,
 				F5BB4C202F982A60001CA927 /* BarcodeScannerView.swift */,
 				F520FA8A2F8D75A30020D8E2 /* ArtistCardHeaderView.swift */,
 				F530226A2F8647DD0002C907 /* ArtistCreditLinksView.swift */,
@@ -537,6 +540,7 @@
 				F530226F2F865D440002C907 /* SafariView.swift in Sources */,
 				F59B71492F8536780086AB37 /* SearchReleaseRow.swift in Sources */,
 				F50AC8762F8E5EE200776C7E /* DeckBackgroundView.swift in Sources */,
+				F5A1B2C42FC0000000000002 /* LibraryConnectionView.swift in Sources */,
 				F56054C62FB62968009EEF0A /* MusiCardsSpinner.swift in Sources */,
 				F59B71472F84DBE10086AB37 /* SearchViewModel.swift in Sources */,
 				F50A4F7E2F8EF16E006FD7A7 /* ClassicalMetadataStore.swift in Sources */,

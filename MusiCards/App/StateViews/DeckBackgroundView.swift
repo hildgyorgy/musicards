@@ -12,18 +12,29 @@ struct DeckBackgroundView: View {
 
     @ObservedObject var localLibrary: LocalLibraryStore
     let onSelectMusicFolder: ((URL) -> Void)?
+    let onCreateOrUpdateLibraryIndex: ((URL) -> Void)?
+    let onDisconnectLibrary: (() -> Void)?
+    let onShowAbout: (() -> Void)?
 
     @Environment(\.colorScheme) private var colorScheme
     @State private var isShowingAbout = false
     @State private var isHoveringLogo = false
     @State private var isFolderImporterPresented = false
+    @State private var isLibraryActionsPresented = false
+    @State private var folderImportAction: FolderImportAction?
 
     init(
         localLibrary: LocalLibraryStore,
-        onSelectMusicFolder: ((URL) -> Void)? = nil
+        onSelectMusicFolder: ((URL) -> Void)? = nil,
+        onCreateOrUpdateLibraryIndex: ((URL) -> Void)? = nil,
+        onDisconnectLibrary: (() -> Void)? = nil,
+        onShowAbout: (() -> Void)? = nil
     ) {
         self.localLibrary = localLibrary
         self.onSelectMusicFolder = onSelectMusicFolder
+        self.onCreateOrUpdateLibraryIndex = onCreateOrUpdateLibraryIndex
+        self.onDisconnectLibrary = onDisconnectLibrary
+        self.onShowAbout = onShowAbout
     }
 
     var body: some View {
@@ -61,7 +72,13 @@ struct DeckBackgroundView: View {
                     .padding(.top, 6)
                     .padding(.bottom, 2)
                     .contentShape(Rectangle())
-                    .onTapGesture { isShowingAbout = true }
+                    .onTapGesture {
+                        if let onShowAbout {
+                            onShowAbout()
+                        } else {
+                            isShowingAbout = true
+                        }
+                    }
                     .onHover { isHoveringLogo = $0 }
                     .animation(
                         .spring(response: 0.22, dampingFraction: 0.72),
@@ -94,35 +111,15 @@ struct DeckBackgroundView: View {
             Spacer(minLength: 16)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .sheet(isPresented: $isLibraryActionsPresented) {
+            libraryConnectionView
+        }
         .fileImporter(
             isPresented: $isFolderImporterPresented,
             allowedContentTypes: [.folder],
             allowsMultipleSelection: false,
             onCompletion: handleFolderImport
         )
-        .overlay {
-            if isShowingAbout {
-                Color.clear
-                    .contentShape(Rectangle())
-                    .onTapGesture { isShowingAbout = false }
-            }
-        }
-        .overlay {
-            if isShowingAbout {
-                AboutSheetView { isShowingAbout = false }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .transition(.scale.combined(with: .opacity))
-                    .onTapGesture {}
-            }
-        }
-        .animation(.spring(duration: 0.35), value: isShowingAbout)
-        .onKeyPress(.escape) {
-            if isShowingAbout {
-                isShowingAbout = false
-                return .handled
-            }
-            return .ignored
-        }
     }
     #endif
 
@@ -151,7 +148,7 @@ struct DeckBackgroundView: View {
                     homePrompt(connectionHeading)
 
                     Button {
-                        isFolderImporterPresented = true
+                        isLibraryActionsPresented = true
                     } label: {
                         Text(connectionButtonTitle)
                             .font(.footnote.weight(.semibold))
@@ -203,6 +200,9 @@ struct DeckBackgroundView: View {
         .sheet(isPresented: $isShowingAbout) {
             AboutView()
         }
+        .sheet(isPresented: $isLibraryActionsPresented) {
+            libraryConnectionView
+        }
         .fileImporter(
             isPresented: $isFolderImporterPresented,
             allowedContentTypes: [.folder],
@@ -221,7 +221,7 @@ struct DeckBackgroundView: View {
 
     private var connectionButton: some View {
         Button {
-            isFolderImporterPresented = true
+            isLibraryActionsPresented = true
         } label: {
             Text(connectionButtonTitle)
                 .font(.footnote.weight(.semibold))
@@ -286,11 +286,44 @@ struct DeckBackgroundView: View {
     private func handleFolderImport(
         _ result: Result<[URL], Error>
     ) {
+        defer { folderImportAction = nil }
         guard case .success(let urls) = result,
               let url = urls.first else {
             return
         }
-        onSelectMusicFolder?(url)
+        switch folderImportAction {
+        case .connectExisting:
+            onSelectMusicFolder?(url)
+        case .createOrUpdateIndex:
+            onCreateOrUpdateLibraryIndex?(url)
+        case nil:
+            break
+        }
+    }
+
+    private var libraryConnectionView: some View {
+        LibraryConnectionView(
+            localLibrary: localLibrary,
+            onConnectExisting: {
+                beginFolderImport(.connectExisting)
+            },
+            onCreateOrUpdateIndex: {
+                beginFolderImport(.createOrUpdateIndex)
+            },
+            onDisconnect: {
+                onDisconnectLibrary?()
+                isLibraryActionsPresented = false
+            }
+        )
+    }
+
+    private func beginFolderImport(_ action: FolderImportAction) {
+        folderImportAction = action
+        isLibraryActionsPresented = false
+        Task { @MainActor in
+            await Task.yield()
+            isFolderImporterPresented = true
+        }
     }
 
     #if os(iOS)
@@ -303,4 +336,9 @@ struct DeckBackgroundView: View {
             + 24
     }
     #endif
+}
+
+private enum FolderImportAction {
+    case connectExisting
+    case createOrUpdateIndex
 }

@@ -81,6 +81,7 @@ struct ContentView: View {
     }
 
     @StateObject private var appModel = MusiCardsAppModel()
+    @State private var isShowingAbout = false
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.scenePhase) private var scenePhase
@@ -176,6 +177,15 @@ struct ContentView: View {
                 localLibrary: appModel.localLibrary,
                 onSelectMusicFolder: { url in
                     appModel.selectMusicFolder(url)
+                },
+                onCreateOrUpdateLibraryIndex: { url in
+                    appModel.createOrUpdateLibraryIndex(url)
+                },
+                onDisconnectLibrary: {
+                    appModel.disconnectMusicLibrary()
+                },
+                onShowAbout: {
+                    isShowingAbout = true
                 }
             )
         case .search:
@@ -313,6 +323,16 @@ struct ContentView: View {
                         cardContent(card)
                     }
                 )
+
+                if isShowingAbout {
+                    AboutSheetView {
+                        isShowingAbout = false
+                    }
+                    .padding(.horizontal, DeckStyle.aboutOverlayHorizontalInset)
+                    .padding(.bottom, DeckStyle.aboutOverlayHorizontalInset)
+                    .zIndex(1_000)
+                    .transition(.scale.combined(with: .opacity))
+                }
             #else
                 GeometryReader { viewportProxy in
                     DeckView(
@@ -339,6 +359,12 @@ struct ContentView: View {
                                     localLibrary: appModel.localLibrary,
                                     onSelectMusicFolder: { url in
                                         appModel.selectMusicFolder(url)
+                                    },
+                                    onCreateOrUpdateLibraryIndex: { url in
+                                        appModel.createOrUpdateLibraryIndex(url)
+                                    },
+                                    onDisconnectLibrary: {
+                                        appModel.disconnectMusicLibrary()
                                     }
                                 )
                             }
@@ -362,12 +388,20 @@ struct ContentView: View {
             .easeInOut(duration: 0.15),
             value: appModel.isBlockingNavigationLoad
         )
+        .animation(.spring(duration: 0.35), value: isShowingAbout)
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
                 appModel.localLibrary.refreshIfNeeded()
             }
         }
         #if os(macOS)
+        .onKeyPress(.escape) {
+            if isShowingAbout {
+                isShowingAbout = false
+                return .handled
+            }
+            return .ignored
+        }
         .onReceive(
             NotificationCenter.default.publisher(
                 for: NSApplication.willTerminateNotification
