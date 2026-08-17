@@ -54,6 +54,7 @@ struct ContentView: View {
 
             VStack(alignment: .leading, spacing: AppDesign.sectionGap) {
                 sourceSection
+                sourceIndexSection
                 destinationSection
                 previewSection
                 syncSection
@@ -262,6 +263,38 @@ struct ContentView: View {
                     .truncationMode(.middle)
                     .textSelection(.enabled)
             }
+        }
+    }
+
+    private var sourceIndexSection: some View {
+        HStack(alignment: .center, spacing: AppDesign.contentGap) {
+            Button {
+                model.createSourceLibraryIndex()
+            } label: {
+                AppRailSymbol(
+                    systemName: "doc.text.magnifyingglass",
+                    isEnabled: model.canCreateSourceIndex,
+                    isActive: model.isIndexingSource
+                )
+            }
+            .buttonStyle(AppRailButtonStyle())
+            .disabled(!model.canCreateSourceIndex)
+            .help("Create Index in Source Library")
+
+            VStack(alignment: .leading, spacing: AppDesign.detailSpacing) {
+                AppSectionHeader("Library Index")
+
+                Text("Create index in source library")
+                    .font(.title3)
+                    .fontWeight(.semibold)
+
+                Text(model.sourceIndexStatusText)
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 

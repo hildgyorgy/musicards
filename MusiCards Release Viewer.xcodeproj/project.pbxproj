@@ -154,6 +154,11 @@
 			path = Shared;
 			sourceTree = "<group>";
 		};
+		F5C0DE052FD0000000000005 /* RemoteLibrary */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = RemoteLibrary;
+			sourceTree = "<group>";
+		};
 		F5C70002302D000100000002 /* MusiCardsTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = MusiCardsTests;
@@ -206,6 +211,7 @@
 				F5E510E12FC4BDF300E797D6 /* Deck */,
 				F5C0DE012FD0000000000001 /* Playback */,
 				F5C0DE022FD0000000000002 /* LocalLibrary */,
+				F5C0DE052FD0000000000005 /* RemoteLibrary */,
 				F59F29112F923B1E00A50F8C /* MusiCards.icon */,
 			);
 			path = MusiCards;
@@ -412,6 +418,7 @@
 				F5A09F5E2FBC746A00E5404B /* MusiCardsMac */,
 				F5C0DE012FD0000000000001 /* Playback */,
 				F5C0DE022FD0000000000002 /* LocalLibrary */,
+				F5C0DE052FD0000000000005 /* RemoteLibrary */,
 				F5C0DE042FD0000000000004 /* Shared */,
 				F5E510E12FC4BDF300E797D6 /* Deck */,
 			);

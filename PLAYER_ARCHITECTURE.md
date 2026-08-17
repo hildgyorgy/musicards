@@ -256,3 +256,22 @@ root with:
 xcodebuild -project "MusiCards Release Viewer.xcodeproj" \
   -scheme MusiCards -destination "platform=macOS" test
 ```
+
+## Remote library foundation — 2026-08-17
+
+- The first remote-library adapter is intentionally Navidrome-only at the
+  product level. Its transport follows the current OpenSubsonic protocol so
+  the implementation stays clean without promising compatibility with old,
+  unmaintained Subsonic servers.
+- Connection verification uses HTTPS, POST requests and salted token
+  authentication. Raw passwords are never placed in URLs or persisted in a
+  server profile; legacy plaintext authentication and TLS bypasses are not
+  supported.
+- Passwords are stored separately in the system Keychain. A persisted server
+  profile contains only its display name, base URL and username.
+- A connection is accepted only when `ping` succeeds and the server identifies
+  itself as both OpenSubsonic-compatible and Navidrome. This gives later
+  streaming work a small, explicit compatibility boundary.
+- This phase adds no remote playback or new connection UI. The playback engine
+  remains source-neutral so a later Navidrome source can feed the same queue,
+  metadata and renderer used by local files.

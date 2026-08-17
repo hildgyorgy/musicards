@@ -65,6 +65,8 @@ final class SyncViewModel {
     var hasChecked = false
     var showSyncConfirmation = false
     var isSyncing = false
+    var isIndexingSource = false
+    var sourceIndexSummary: LocalLibraryManifestGenerationSummary?
 
     var progressLines: [String] = []
     var showProgress = false
@@ -90,6 +92,7 @@ final class SyncViewModel {
     @ObservationIgnored private var progressTracker =
         RsyncProgressTracker()
     @ObservationIgnored private var activeEngine: SyncEngine?
+    @ObservationIgnored private var activeSourceIndexTask: Task<Void, Never>?
     @ObservationIgnored private var sleepActivity: NSObjectProtocol?
     @ObservationIgnored private var remoteStatusRequestID = UUID()
 
@@ -119,7 +122,30 @@ final class SyncViewModel {
     }
 
     var isBusy: Bool {
-        isChecking || isSyncing
+        isChecking || isSyncing || isIndexingSource
+    }
+
+    var canCreateSourceIndex: Bool {
+        !isBusy && !configuration.sourcePath.isEmpty
+    }
+
+    var sourceIndexStatusText: String {
+        if isIndexingSource {
+            return progressTitle
+        }
+
+        guard let summary = sourceIndexSummary else {
+            return "Creates or updates library.json in the source folder"
+        }
+
+        var parts = [
+            "\(summary.indexedAlbumCount) releases",
+            "\(summary.indexedTrackCount) tracks"
+        ]
+        if summary.skippedFolderCount > 0 {
+            parts.append("\(summary.skippedFolderCount) folders skipped")
+        }
+        return parts.joined(separator: " · ")
     }
 
     var canCheck: Bool {
@@ -397,6 +423,68 @@ final class SyncViewModel {
         }
     }
 
+    func createSourceLibraryIndex() {
+        guard canCreateSourceIndex else { return }
+
+        let sourceURL = URL(
+            fileURLWithPath: configuration.sourcePath,
+            isDirectory: true
+        )
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(
+            atPath: sourceURL.path,
+            isDirectory: &isDirectory
+        ), isDirectory.boolValue else {
+            errorMessage =
+                "The source music folder is not available. " +
+                "Choose it again before creating the index."
+            return
+        }
+
+        isIndexingSource = true
+        errorMessage = nil
+        progressLines = ["— Scanning source music library —"]
+        progressTitle = "Finding audio files…"
+        showProgress = true
+
+        let task = Task { [weak self] in
+            guard let self else { return }
+
+            defer {
+                isIndexingSource = false
+                activeSourceIndexTask = nil
+            }
+
+            do {
+                let summary = try await updateSourceLibraryIndex()
+                try Task.checkCancellation()
+                sourceIndexSummary = summary
+
+                let result = summary.indexWasUpdated
+                    ? "Library index created"
+                    : "Library index is already up to date"
+                progressLines.append(
+                    "\(result) · " +
+                    "\(summary.indexedAlbumCount) releases · " +
+                    "\(summary.indexedTrackCount) tracks"
+                )
+                if let warning = summary.warningMessage {
+                    progressLines.append(warning)
+                }
+                progressTitle = result
+            } catch is CancellationError {
+                progressLines.append("Index creation was stopped by the user.")
+                progressTitle = "Index creation stopped"
+            } catch {
+                let message = error.localizedDescription
+                errorMessage = message
+                progressLines.append(message)
+                progressTitle = "Index creation failed"
+            }
+        }
+        activeSourceIndexTask = task
+    }
+
     func performSync() {
         guard canSync else { return }
         guard validateSelectedPaths() else { return }
@@ -579,6 +667,12 @@ final class SyncViewModel {
     func stopCurrentOperation() {
         guard isBusy else { return }
 
+        if isIndexingSource {
+            progressTitle = "Stopping library scan…"
+            activeSourceIndexTask?.cancel()
+            return
+        }
+
         progressTitle = isSyncing
             ? "Stopping synchronization…"
             : "Stopping check…"
@@ -587,6 +681,7 @@ final class SyncViewModel {
 
     func selectSource(path: String) {
         configuration.sourcePath = path.withTrailingSlash
+        sourceIndexSummary = nil
         saveAndInvalidatePreview()
     }
 
