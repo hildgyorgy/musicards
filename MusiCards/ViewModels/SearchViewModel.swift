@@ -38,17 +38,41 @@ final class SearchViewModel: ObservableObject {
 
     private var searchTask: Task<Void, Never>?
     private var suppressNextQueryChange = false
-    private let musicBrainzService: MusicBrainzService
-    private let localLibrary: LocalLibraryStore
+    private var libraryAvailabilityObservation: AnyCancellable?
+    private let musicBrainzService: any MusicBrainzSearchServing
+    private let libraryManager: LibraryManager
+    private let searchDebounceNanoseconds: UInt64
+    private var searchGeneration: UInt64 = 0
+    private var activeReleaseSearchQuery: String?
+    private var libraryReleaseRows: [SearchReleaseRow] = []
+    private var musicBrainzReleaseRows: [SearchReleaseRow] = []
+    private var visibleReleaseLimit = 20
+    private var hasMoreMusicBrainzReleaseResults = true
 
-    init(service: MusicBrainzService, localLibrary: LocalLibraryStore) {
+    init(
+        service: any MusicBrainzSearchServing,
+        libraryManager: LibraryManager,
+        searchDebounceNanoseconds: UInt64 = 350_000_000
+    ) {
         self.musicBrainzService = service
-        self.localLibrary = localLibrary
+        self.libraryManager = libraryManager
+        self.searchDebounceNanoseconds = searchDebounceNanoseconds
+        libraryAvailabilityObservation = libraryManager.objectWillChange.sink {
+            @MainActor [weak self] in
+            // ObservableObject publishes immediately before its state changes.
+            // Re-rank on the next main-actor turn so source switches and a
+            // newly ready Navidrome catalog are already visible to queries.
+            Task { @MainActor [weak self] in
+                await Task.yield()
+                self?.activeLibraryDidChange()
+            }
+        }
     }
 
     // Search mode pagination
     private var currentOffset = 0
     private let pageSize = 20
+    private let librarySearchLimit = 50
 
     // Release group mode pagination
     private var versionsOffset = 0
@@ -88,11 +112,14 @@ final class SearchViewModel: ObservableObject {
             }
         
         searchTask?.cancel()
+        searchGeneration &+= 1
+        let generation = searchGeneration
         currentOffset = 0
         hasMoreResults = true
         isLoadingMore = false
         searchError = nil
         isSearching = false
+        resetReleaseSearchMergeState()
 
         let q = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -105,28 +132,36 @@ final class SearchViewModel: ObservableObject {
         isSearching = true
 
         searchTask = Task {
-            try? await Task.sleep(nanoseconds: 350_000_000)
-            if Task.isCancelled { return }
-            await performSearch()
+            try? await Task.sleep(nanoseconds: searchDebounceNanoseconds)
+            guard !Task.isCancelled, generation == searchGeneration else {
+                return
+            }
+            await performSearch(generation: generation)
         }
     }
 
     func switchToSearch() {
+        searchTask?.cancel()
+        searchGeneration &+= 1
         mode = .search
         searchQuery = ""
         releaseResults = []
         artistRows = []
         searchError = nil
         isSearching = false
+        isLoadingMore = false
         // Reset version pagination
         versionsOffset = 0
         hasMoreVersions = false
         isLoadingMoreVersions = false
         currentReleaseGroupID = nil
+        resetReleaseSearchMergeState()
     }
 
     func searchByBarcode(_ barcode: String) {
         searchTask?.cancel()
+        searchGeneration &+= 1
+        let generation = searchGeneration
         currentOffset = 0
         hasMoreResults = true
         isLoadingMore = false
@@ -136,11 +171,14 @@ final class SearchViewModel: ObservableObject {
         searchQuery = ""
         artistRows = []
         releaseResults = []
+        resetReleaseSearchMergeState()
 
         let normalized = barcode.filter(\.isNumber)
 
         searchTask = Task {
-            defer { isSearching = false }
+            defer {
+                if generation == searchGeneration { isSearching = false }
+            }
             do {
                 let results = try await musicBrainzService.searchReleases(
                     query: "barcode:\(normalized)",
@@ -148,6 +186,7 @@ final class SearchViewModel: ObservableObject {
                     offset: 0
                 )
 
+                guard generation == searchGeneration else { return }
                 releaseResults = []
                 artistRows = []
                 currentOffset = results.count
@@ -162,6 +201,7 @@ final class SearchViewModel: ObservableObject {
             } catch is CancellationError {
                 return
             } catch {
+                guard generation == searchGeneration else { return }
                 releaseResults = []
                 artistRows = []
                 hasMoreResults = false
@@ -260,6 +300,8 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
 
     func retrySearch() {
         searchTask?.cancel()
+        searchGeneration &+= 1
+        let generation = searchGeneration
         searchError = nil
         isLoadingMore = false
         hasMoreResults = true
@@ -269,13 +311,14 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
             currentOffset = 0
             releaseResults = []
             artistRows = []
+            resetReleaseSearchMergeState()
 
             let q = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
             guard q.count >= 3 else { return }
 
             isSearching = true
             searchTask = Task {
-                await performSearch()
+                await performSearch(generation: generation)
             }
 
         case .releaseGroupResults(let releaseGroupID):
@@ -301,39 +344,61 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
         MBTextFormatter.lifeSpanTextOrEmpty(from: lifeSpan)
     }
 
-    private func performSearch() async {
+    private func performSearch(generation: UInt64) async {
         let q = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        guard q.count >= 3 else {
+        guard q.count >= 3, generation == searchGeneration else {
             isSearching = false
             return
         }
 
-        defer { isSearching = false }
         searchError = nil
 
         do {
             if q.contains(",") || MBIdentifiers.isBareBarcode(q) || MBIdentifiers.isMBID(q) {
+                activeReleaseSearchQuery = q
+                musicBrainzReleaseRows = []
+                updateLibraryReleaseResults(query: q)
+                artistRows = []
+                if !libraryReleaseRows.isEmpty {
+                    // The owned results are useful immediately; the global
+                    // MusicBrainz request continues without hiding them.
+                    isSearching = false
+                    isLoadingMore = true
+                }
+
                 let results = try await musicBrainzService.searchReleases(
                     query: q,
                     limit: pageSize,
                     offset: currentOffset
                 )
-                let sorted = playableReleasesFirst(
-                    sortRawReleases(results, query: q)
-                )
-                releaseResults = []
-                artistRows = []
+                try Task.checkCancellation()
+                guard generation == searchGeneration,
+                      q == activeReleaseSearchQuery else {
+                    return
+                }
+                let sorted = sortRawReleases(results, query: q)
                 currentOffset = results.count
-                hasMoreResults = results.count == pageSize
-                await prepareReleaseRowsSequentially(from: sorted, append: false)
+                hasMoreMusicBrainzReleaseResults = results.count == pageSize
+                let rows = makeReleaseRows(from: sorted)
+                guard generation == searchGeneration,
+                      q == activeReleaseSearchQuery else {
+                    return
+                }
+                musicBrainzReleaseRows = rows
+                publishMergedReleaseResults()
+                isSearching = false
+                isLoadingMore = false
 
             } else {
+                resetReleaseSearchMergeState()
                 let results = try await musicBrainzService.searchArtists(
                     query: q,
                     limit: pageSize,
                     offset: currentOffset
                 )
+                try Task.checkCancellation()
+                guard generation == searchGeneration else { return }
 
                 let rows = results.map {
                     SearchArtistRow(
@@ -347,6 +412,7 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
                 releaseResults = []
                 currentOffset = rows.count
                 hasMoreResults = rows.count == pageSize
+                isSearching = false
             }
 
             searchError = nil
@@ -354,10 +420,24 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
         } catch is CancellationError {
             return
         } catch {
-            releaseResults = []
-            artistRows = []
-            hasMoreResults = false
-            searchError = error
+            guard generation == searchGeneration else { return }
+            isSearching = false
+            isLoadingMore = false
+            if libraryReleaseRows.isEmpty {
+                releaseResults = []
+                artistRows = []
+                searchError = error
+            } else {
+                // Match the web behavior: an online failure must not discard
+                // already available active-library results.
+                searchError = nil
+            }
+            hasMoreMusicBrainzReleaseResults = false
+            if activeReleaseSearchQuery != nil {
+                publishMergedReleaseResults()
+            } else {
+                hasMoreResults = false
+            }
         }
     }
 
@@ -482,10 +562,7 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
     func loadMoreIfNeededForRelease(currentItem: SearchReleaseRow) {
         guard mode == .search else { return }
         guard !isLoadingMore, hasMoreResults else { return }
-
-        let threshold = max(releaseResults.count - 5, 0)
-        guard let index = releaseResults.firstIndex(where: { $0.id == currentItem.id }),
-              index >= threshold else { return }
+        guard releaseResults.last?.id == currentItem.id else { return }
 
         isLoadingMore = true
 
@@ -513,7 +590,15 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
 
     private func loadMoreReleases() async {
         let q = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !q.isEmpty else { return }
+        let generation = searchGeneration
+        guard !q.isEmpty, q == activeReleaseSearchQuery else { return }
+
+        let nextVisibleLimit = visibleReleaseLimit + pageSize
+        guard hasMoreMusicBrainzReleaseResults else {
+            visibleReleaseLimit = nextVisibleLimit
+            publishMergedReleaseResults()
+            return
+        }
 
         do {
             let results = try await musicBrainzService.searchReleases(
@@ -521,15 +606,26 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
                 limit: pageSize,
                 offset: currentOffset
             )
-            let sorted = playableReleasesFirst(
-                sortRawReleases(results, query: q)
-            )
+            try Task.checkCancellation()
+            guard generation == searchGeneration,
+                  q == activeReleaseSearchQuery else {
+                return
+            }
+            let sorted = sortRawReleases(results, query: q)
             currentOffset += results.count
-            hasMoreResults = results.count == pageSize
-            await prepareReleaseRowsSequentially(from: sorted, append: true)
+            hasMoreMusicBrainzReleaseResults = results.count == pageSize
+            let rows = makeReleaseRows(from: sorted)
+            guard generation == searchGeneration,
+                  q == activeReleaseSearchQuery else {
+                return
+            }
+            visibleReleaseLimit = nextVisibleLimit
+            appendUniqueMusicBrainzReleaseRows(rows)
+            publishMergedReleaseResults()
         } catch is CancellationError {
             return
         } catch {
+            hasMoreMusicBrainzReleaseResults = false
             hasMoreResults = false
         }
     }
@@ -571,8 +667,127 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
         releaseResults.append(row)
         releaseResults = stablePlayableFirst(
             releaseResults,
-            isPlayable: { localLibrary.containsRelease($0.id) }
+            isPlayable: { libraryManager.containsRelease($0.id) }
         )
+    }
+
+    private func activeLibraryDidChange() {
+        if mode == .search,
+           let query = activeReleaseSearchQuery,
+           query == searchQuery.trimmingCharacters(
+               in: .whitespacesAndNewlines
+           ) {
+            updateLibraryReleaseResults(query: query)
+            return
+        }
+
+        let reordered = stablePlayableFirst(
+            releaseResults,
+            isPlayable: { libraryManager.containsRelease($0.id) }
+        )
+        guard reordered.map(\.id) != releaseResults.map(\.id) else { return }
+        releaseResults = reordered
+    }
+
+    private func updateLibraryReleaseResults(query: String) {
+        libraryReleaseRows = libraryManager.searchCatalog(
+            query: query,
+            limit: librarySearchLimit
+        ).map(makeLibraryReleaseRow)
+        publishMergedReleaseResults()
+    }
+
+    private func makeLibraryReleaseRow(
+        _ release: LibraryCatalogRelease
+    ) -> SearchReleaseRow {
+        SearchReleaseRow(
+            id: release.releaseID,
+            title: release.title,
+            artistLine: release.artistName,
+            metaLine: MBTextFormatter.releaseMetaLine(
+                year: MBTextFormatter.year(from: release.date),
+                country: release.country,
+                label: release.label,
+                format: release.format
+            ),
+            disambiguation: "",
+            hasCoverArt: false
+        )
+    }
+
+    private func publishMergedReleaseResults() {
+        let merged = Self.mergeLibraryFirst(
+            libraryRows: libraryReleaseRows,
+            musicBrainzRows: musicBrainzReleaseRows
+        )
+        releaseResults = Array(merged.prefix(visibleReleaseLimit))
+        hasMoreResults = hasMoreMusicBrainzReleaseResults
+            || merged.count > visibleReleaseLimit
+    }
+
+    private func appendUniqueMusicBrainzReleaseRows(
+        _ rows: [SearchReleaseRow]
+    ) {
+        var seen = Set(
+            musicBrainzReleaseRows.map { Self.canonicalReleaseID($0.id) }
+        )
+        for row in rows {
+            if seen.insert(Self.canonicalReleaseID(row.id)).inserted {
+                musicBrainzReleaseRows.append(row)
+            }
+        }
+    }
+
+    private func resetReleaseSearchMergeState() {
+        activeReleaseSearchQuery = nil
+        libraryReleaseRows = []
+        musicBrainzReleaseRows = []
+        visibleReleaseLimit = pageSize
+        hasMoreMusicBrainzReleaseResults = true
+    }
+
+    nonisolated static func mergeLibraryFirst(
+        libraryRows: [SearchReleaseRow],
+        musicBrainzRows: [SearchReleaseRow]
+    ) -> [SearchReleaseRow] {
+        var remoteByID = [String: SearchReleaseRow]()
+        for row in musicBrainzRows {
+            let key = canonicalReleaseID(row.id)
+            if remoteByID[key] == nil { remoteByID[key] = row }
+        }
+
+        var seen = Set<String>()
+        var merged: [SearchReleaseRow] = []
+        for libraryRow in libraryRows {
+            let key = canonicalReleaseID(libraryRow.id)
+            guard seen.insert(key).inserted else { continue }
+            if let enriched = remoteByID[key] {
+                merged.append(
+                    SearchReleaseRow(
+                        id: libraryRow.id,
+                        title: enriched.title,
+                        artistLine: enriched.artistLine,
+                        metaLine: enriched.metaLine,
+                        disambiguation: enriched.disambiguation,
+                        hasCoverArt: enriched.hasCoverArt
+                    )
+                )
+            } else {
+                merged.append(libraryRow)
+            }
+        }
+
+        for row in musicBrainzRows {
+            let key = canonicalReleaseID(row.id)
+            if seen.insert(key).inserted { merged.append(row) }
+        }
+        return merged
+    }
+
+    nonisolated private static func canonicalReleaseID(
+        _ value: String
+    ) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 
     private func appendUniqueArtistRows(_ rows: [SearchArtistRow]) {
@@ -586,7 +801,7 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
     ) -> [MBReleaseSearchResult] {
         stablePlayableFirst(
             releases,
-            isPlayable: { localLibrary.containsRelease($0.id) }
+            isPlayable: { libraryManager.containsRelease($0.id) }
         )
     }
 
@@ -595,7 +810,7 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
     ) -> [SearchArtistRow] {
         stablePlayableFirst(
             artists,
-            isPlayable: { localLibrary.containsArtist(named: $0.name) }
+            isPlayable: { libraryManager.containsArtist(named: $0.name) }
         )
     }
 
@@ -658,6 +873,27 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
             if aPrefix != bPrefix { return aPrefix }
 
             return false
+        }
+    }
+
+    private nonisolated func makeReleaseRows(
+        from releases: [MBReleaseSearchResult]
+    ) -> [SearchReleaseRow] {
+        releases.map { release in
+            makeReleaseRow(
+                id: release.id,
+                title: release.title,
+                artistCredit: release.artistCredit,
+                date: release.date,
+                country: release.country,
+                labelInfo: release.labelInfo,
+                media: release.media,
+                disambiguation: release.disambiguation,
+                // Search rows must never wait for Cover Art Archive. The
+                // thumbnail view resolves the image lazily and keeps its
+                // placeholder when the release has no cover.
+                hasCoverArt: true
+            )
         }
     }
 

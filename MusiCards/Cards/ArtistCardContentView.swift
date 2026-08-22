@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct ArtistCardContentView: View {
-    @ObservedObject var localLibrary: LocalLibraryStore
+    @ObservedObject var libraryManager: LibraryManager
     let artist: MBArtistDetail?
     let releaseGroups: [MBReleaseGroupSummary]
     let wikipedia: (title: String, extract: String)?
@@ -101,7 +101,7 @@ struct ArtistCardContentView: View {
                                                         .font(.caption2)
                                                         .foregroundStyle(Color.blue)
                                                         .accessibilityLabel(
-                                                            "Release group available in local library"
+                                                            "Release group available in music library"
                                                         )
                                                 }
                                             }
@@ -186,7 +186,7 @@ struct ArtistCardContentView: View {
 
     private func isPlayable(_ group: MBReleaseGroupSummary) -> Bool {
         guard let artistName = artist?.name else { return false }
-        return localLibrary.containsReleaseGroup(
+        return libraryManager.containsReleaseGroup(
             title: group.title,
             artistName: artistName
         )

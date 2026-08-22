@@ -20,7 +20,7 @@ nonisolated struct LocalLibraryManifestGenerationSummary: Sendable {
 }
 
 enum LocalLibraryManifestGenerator {
-    nonisolated private static let currentIndexVersion = 2
+    nonisolated static let currentIndexVersion = 2
 
     nonisolated static func generate(
         in rootURL: URL,

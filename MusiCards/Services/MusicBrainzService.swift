@@ -5,6 +5,31 @@
 
 import Foundation
 
+protocol MusicBrainzSearchServing {
+    func searchReleases(
+        query: String,
+        limit: Int,
+        offset: Int
+    ) async throws -> [MBReleaseSearchResult]
+    func searchArtists(
+        query: String,
+        limit: Int,
+        offset: Int
+    ) async throws -> [MBArtistSearchResult]
+    func fetchReleasesForReleaseGroup(
+        id: String,
+        limit: Int,
+        offset: Int
+    ) async throws -> (releases: [MBReleaseSearchResult], hasMore: Bool)
+    func searchRecordings(
+        trackTitle: String,
+        artistName: String?,
+        limit: Int,
+        offset: Int
+    ) async throws -> [MBRecordingSearchResult]
+    func loadRelease(id: String) async throws -> MBRelease
+}
+
 private actor RateLimiter {
     private var lastRequestTime: Date = .distantPast
     private let minimumInterval: TimeInterval = 1.05
@@ -370,3 +395,5 @@ struct MusicBrainzService {
         return try JSONDecoder().decode(MBWork.self, from: data)
     }
 }
+
+extension MusicBrainzService: MusicBrainzSearchServing {}

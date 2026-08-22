@@ -5,10 +5,16 @@
 
 import Combine
 import Foundation
+import OSLog
 import SwiftData
 
 @MainActor
 final class LocalLibraryStore: ObservableObject {
+    nonisolated private static let logger = Logger(
+        subsystem: "com.hildgyorgy.MusiCards",
+        category: "LocalLibrary"
+    )
+
     @Published private(set) var summary = LocalLibrarySummary()
     @Published private(set) var folderNames: [String] = []
     @Published private(set) var isScanning = false
@@ -27,13 +33,27 @@ final class LocalLibraryStore: ObservableObject {
                 for: LocalLibraryRootRecord.self,
                 LocalAudioFileRecord.self
             )
-        } catch {
-            let memoryConfiguration = ModelConfiguration(isStoredInMemoryOnly: true)
-            container = try! ModelContainer(
-                for: LocalLibraryRootRecord.self,
-                LocalAudioFileRecord.self,
-                configurations: memoryConfiguration
+        } catch let persistentStoreError {
+            let nsError = persistentStoreError as NSError
+            Self.logger.error(
+                "Persistent library store initialization failed; falling back to an in-memory store domain=\(nsError.domain, privacy: .public) code=\(nsError.code, privacy: .public) detail=\(nsError.localizedDescription, privacy: .private)"
             )
+            let memoryConfiguration = ModelConfiguration(isStoredInMemoryOnly: true)
+            do {
+                container = try ModelContainer(
+                    for: LocalLibraryRootRecord.self,
+                    LocalAudioFileRecord.self,
+                    configurations: memoryConfiguration
+                )
+            } catch {
+                let fallbackError = error as NSError
+                Self.logger.critical(
+                    "In-memory library store initialization failed domain=\(fallbackError.domain, privacy: .public) code=\(fallbackError.code, privacy: .public) detail=\(fallbackError.localizedDescription, privacy: .private)"
+                )
+                fatalError(
+                    "Could not initialize the in-memory LocalLibraryStore fallback."
+                )
+            }
             statusMessage = "The library index could not be opened; using a temporary index."
         }
         context = ModelContext(container)
@@ -165,6 +185,13 @@ final class LocalLibraryStore: ObservableObject {
         lookup.containsRelease(releaseID)
     }
 
+    func searchCatalog(
+        query: String,
+        limit: Int
+    ) -> [LibraryCatalogRelease] {
+        lookup.searchCatalog(query: query, limit: limit)
+    }
+
     func containsArtist(named artistName: String) -> Bool {
         lookup.containsArtist(named: artistName)
     }
@@ -199,6 +226,10 @@ final class LocalLibraryStore: ObservableObject {
             recordingID: recordingID,
             allowsRecordingFallback: allowsRecordingFallback
         )
+    }
+
+    func audioFile(id: String) -> LocalAudioFileSnapshot? {
+        lookup.audioFile(id: id)
     }
 
     func url(for file: LocalAudioFileSnapshot) -> URL? {

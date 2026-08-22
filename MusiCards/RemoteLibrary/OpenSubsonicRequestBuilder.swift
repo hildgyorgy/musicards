@@ -1,6 +1,6 @@
 import Foundation
 
-struct OpenSubsonicRequestBuilder: Sendable {
+nonisolated struct OpenSubsonicRequestBuilder: Sendable {
     let clientName: String
     let apiVersion: String
 
@@ -14,8 +14,82 @@ struct OpenSubsonicRequestBuilder: Sendable {
         password: String,
         salt: String
     ) throws -> URLRequest {
-        guard var components = URLComponents(url: profile.baseURL, resolvingAgainstBaseURL: false),
-              components.scheme?.lowercased() == "https" else {
+        try authenticatedRequest(
+            endpoint: "ping",
+            profile: profile,
+            password: password,
+            salt: salt
+        )
+    }
+
+    func albumListRequest(
+        profile: NavidromeServerProfile,
+        password: String,
+        salt: String,
+        offset: Int,
+        size: Int
+    ) throws -> URLRequest {
+        try authenticatedRequest(
+            endpoint: "getAlbumList2",
+            profile: profile,
+            password: password,
+            salt: salt,
+            additionalParameters: [
+                "offset": String(offset),
+                "size": String(size),
+                "type": "alphabeticalByName"
+            ]
+        )
+    }
+
+    func albumRequest(
+        profile: NavidromeServerProfile,
+        password: String,
+        salt: String,
+        albumID: String
+    ) throws -> URLRequest {
+        try authenticatedRequest(
+            endpoint: "getAlbum",
+            profile: profile,
+            password: password,
+            salt: salt,
+            additionalParameters: ["id": albumID]
+        )
+    }
+
+    func streamRequest(
+        profile: NavidromeServerProfile,
+        password: String,
+        salt: String,
+        songID: String
+    ) throws -> URLRequest {
+        try authenticatedRequest(
+            endpoint: "stream",
+            profile: profile,
+            password: password,
+            salt: salt,
+            additionalParameters: [
+                "format": "raw",
+                "id": songID
+            ],
+            accept: "audio/*, application/octet-stream"
+        )
+    }
+
+    private func authenticatedRequest(
+        endpoint endpointName: String,
+        profile: NavidromeServerProfile,
+        password: String,
+        salt: String,
+        additionalParameters: [String: String] = [:],
+        accept: String = "application/json"
+    ) throws -> URLRequest {
+        guard var components = URLComponents(
+            url: profile.baseURL,
+            resolvingAgainstBaseURL: false
+        ),
+        let scheme = components.scheme?.lowercased(),
+        scheme == "https" || scheme == "http" else {
             throw NavidromeConnectionError.secureConnectionRequired
         }
         guard components.host != nil,
@@ -30,13 +104,15 @@ struct OpenSubsonicRequestBuilder: Sendable {
         while path.count > 1, path.hasSuffix("/") {
             path.removeLast()
         }
-        components.path = path.hasSuffix("/rest") ? path + "/ping" : path + "/rest/ping"
+        components.path = path.hasSuffix("/rest")
+            ? path + "/\(endpointName)"
+            : path + "/rest/\(endpointName)"
 
         guard let endpoint = components.url else {
             throw NavidromeConnectionError.invalidBaseURL
         }
 
-        let parameters = [
+        var parameters = [
             "c": clientName,
             "f": "json",
             "s": salt,
@@ -44,10 +120,11 @@ struct OpenSubsonicRequestBuilder: Sendable {
             "u": profile.username,
             "v": apiVersion
         ]
+        parameters.merge(additionalParameters) { _, additional in additional }
 
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue(accept, forHTTPHeaderField: "Accept")
         request.setValue("application/x-www-form-urlencoded; charset=utf-8", forHTTPHeaderField: "Content-Type")
         request.httpBody = Self.formEncoded(parameters)
         return request

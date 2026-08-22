@@ -10,7 +10,7 @@ import SwiftUI
 struct TracksCardContentView: View {
     let release: MBRelease?
     let onSelectArtist: (String) -> Void
-    @ObservedObject var localLibrary: LocalLibraryStore
+    @ObservedObject var libraryManager: LibraryManager
     @ObservedObject var playbackController: PlaybackController
     let onPlayTrack: (String?, String?) -> Void
     @ObservedObject var detailStore: TrackDetailStore
@@ -64,6 +64,11 @@ struct TracksCardContentView: View {
                 for medium in release.media ?? [] {
                     await classicalMetadataStore.preload(for: medium.tracks ?? [])
                 }
+            }
+            .task(id: "\(libraryManager.source.rawValue)::\(release.id)") {
+                await libraryManager.prepareTrackAvailability(
+                    forRelease: release.id
+                )
             }
         }  else {
             EmptyStateView.tracks
@@ -252,12 +257,14 @@ struct TracksCardContentView: View {
 
     private func isTrackPlayable(_ row: TrackRow) -> Bool {
         guard let releaseID = release?.id else { return false }
-        return localLibrary.containsTrack(
-            releaseID: releaseID,
-            releaseTrackID: row.releaseTrackID,
-            recordingID: row.recordingID,
-            allowsRecordingFallback: release?
-                .hasUniqueOccurrence(ofRecordingID: row.recordingID) == true
+        return libraryManager.containsTrack(
+            LibraryTrackIdentity(
+                releaseID: releaseID,
+                releaseTrackID: row.releaseTrackID,
+                recordingID: row.recordingID,
+                allowsRecordingFallback: release?
+                    .hasUniqueOccurrence(ofRecordingID: row.recordingID) == true
+            )
         )
     }
 

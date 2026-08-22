@@ -11,6 +11,7 @@ struct MCPPCMRenderer {
     _Atomic uint64_t readCursor;
     _Atomic uint64_t writeCursor;
     _Atomic uint64_t currentFrame;
+    _Atomic uint64_t underrunCount;
     _Atomic bool isPlaying;
     _Atomic bool reachedEndOfStream;
     _Atomic bool didFinish;
@@ -49,6 +50,7 @@ MCPPCMRenderer *MCPPCMRendererCreate(
     atomic_init(&renderer->readCursor, 0);
     atomic_init(&renderer->writeCursor, 0);
     atomic_init(&renderer->currentFrame, 0);
+    atomic_init(&renderer->underrunCount, 0);
     atomic_init(&renderer->isPlaying, false);
     atomic_init(&renderer->reachedEndOfStream, false);
     atomic_init(&renderer->didFinish, false);
@@ -205,6 +207,15 @@ uint64_t MCPPCMRendererCurrentFrame(const MCPPCMRenderer *renderer) {
         );
 }
 
+uint64_t MCPPCMRendererUnderrunCount(const MCPPCMRenderer *renderer) {
+    return renderer == NULL
+        ? 0
+        : atomic_load_explicit(
+            &renderer->underrunCount,
+            memory_order_acquire
+        );
+}
+
 bool MCPPCMRendererDidFinish(const MCPPCMRenderer *renderer) {
     return renderer != NULL
         && atomic_load_explicit(
@@ -307,6 +318,13 @@ OSStatus MCPPCMRenderCallback(
         &renderer->reachedEndOfStream,
         memory_order_acquire
     );
+    if (!reachedEndOfStream && framesToCopy < inNumberFrames) {
+        atomic_fetch_add_explicit(
+            &renderer->underrunCount,
+            1,
+            memory_order_relaxed
+        );
+    }
     if (reachedEndOfStream && framesToCopy < inNumberFrames) {
         atomic_store_explicit(
             &renderer->isPlaying,

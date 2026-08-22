@@ -2,7 +2,7 @@ import CryptoKit
 import Foundation
 import Security
 
-enum OpenSubsonicAuthentication {
+nonisolated enum OpenSubsonicAuthentication {
     static func token(password: String, salt: String) -> String {
         let digest = Insecure.MD5.hash(data: Data((password + salt).utf8))
         return digest.map { String(format: "%02x", $0) }.joined()
@@ -20,6 +20,6 @@ enum OpenSubsonicAuthentication {
     }
 }
 
-enum OpenSubsonicAuthenticationError: Error, Equatable, Sendable {
+nonisolated enum OpenSubsonicAuthenticationError: Error, Equatable, Sendable {
     case randomGenerationFailed(OSStatus)
 }

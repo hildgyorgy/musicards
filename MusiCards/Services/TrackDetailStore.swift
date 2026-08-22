@@ -7,9 +7,15 @@
 
 import Foundation
 import Combine
+import OSLog
 
 @MainActor
 final class TrackDetailStore: ObservableObject {
+    nonisolated private static let logger = Logger(
+        subsystem: "com.hildgyorgy.MusiCards",
+        category: "TrackDetails"
+    )
+
     @Published private(set) var cache: [String: TrackDetailData] = [:]
     @Published private(set) var loadingIDs: Set<String> = []
     @Published private(set) var failedIDs: Set<String> = []
@@ -96,7 +102,10 @@ final class TrackDetailStore: ObservableObject {
             } catch {
                 loadingIDs.remove(recordingID)
                 failedIDs.insert(recordingID)
-                print("Track detail load error:", error)
+                let nsError = error as NSError
+                Self.logger.error(
+                    "Track detail load failed domain=\(nsError.domain, privacy: .public) code=\(nsError.code, privacy: .public) detail=\(nsError.localizedDescription, privacy: .private)"
+                )
             }
         }
     }

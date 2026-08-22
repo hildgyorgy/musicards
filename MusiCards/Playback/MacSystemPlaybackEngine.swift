@@ -7,6 +7,9 @@
 import AudioToolbox
 import CoreAudio
 import Foundation
+#if DEBUG
+import OSLog
+#endif
 
 @MainActor
 final class MacSystemPlaybackEngine: PlaybackEngine {
@@ -14,17 +17,16 @@ final class MacSystemPlaybackEngine: PlaybackEngine {
 
     private var outputUnit: AudioUnit?
     private var decodedPCM: DecodedPCM?
+    private var preparingRemoteByteSource: HTTPRandomAccessByteSource?
     private var progressTask: Task<Void, Never>?
     private var isOutputRunning = false
+    private var reportedUnderrunCount: UInt64 = 0
     private var preparationGeneration: UInt64 = 0
+    private var currentSeekCapability: PlaybackSeekCapability = .supported
     private var originalSampleRates: [AudioDeviceID: Float64] = [:]
     private var configuredOutputDeviceID: AudioDeviceID?
 
     func prepare(_ item: PlaybackQueueItem) async throws {
-        guard case .localFile(let url) = item.source else {
-            throw NativePlaybackEngineError("Unsupported audio source")
-        }
-
         preparationGeneration &+= 1
         let generation = preparationGeneration
         await stopPlayback()
@@ -32,18 +34,63 @@ final class MacSystemPlaybackEngine: PlaybackEngine {
             throw CancellationError()
         }
         disposeOutputUnit()
+        disposeDecoder()
         decodedPCM = nil
+        currentSeekCapability = .supported
 
-        let decodedPCM = try await Task.detached(priority: .userInitiated) {
-            try LocalAudioFileDecoder.decode(url: url)
-        }.value
+        let decodedPCM: DecodedPCM
+        switch item.source {
+        case .localFile(let url):
+            decodedPCM = try await Task.detached(priority: .userInitiated) {
+                try LocalAudioFileDecoder.decode(url: url)
+            }.value
+        case .remoteAudio(let asset):
+            #if DEBUG
+            RemotePlaybackDiagnostics.logger.notice(
+                "Remote prepare started codecHint=\(asset.suffix ?? "unknown", privacy: .public)"
+            )
+            #endif
+            let byteSource = try asset.byteSourceProvider.makeByteSource()
+            preparingRemoteByteSource = byteSource
+            do {
+                decodedPCM = try await Task.detached(
+                    priority: .userInitiated
+                ) {
+                    try RemoteAudioFileDecoder.decode(
+                        asset: asset,
+                        byteSource: byteSource
+                    )
+                }.value
+            } catch {
+                if preparingRemoteByteSource === byteSource {
+                    preparingRemoteByteSource = nil
+                }
+                byteSource.cancel()
+                throw error
+            }
+            if preparingRemoteByteSource === byteSource {
+                preparingRemoteByteSource = nil
+            }
+        case .libraryAsset:
+            throw NativePlaybackEngineError("Unsupported audio source")
+        }
         guard generation == preparationGeneration, !Task.isCancelled else {
+            decodedPCM.cancel()
             throw CancellationError()
         }
 
         matchDefaultOutputSampleRate(decodedPCM.sampleRate)
         try configureOutputUnit(for: decodedPCM)
         self.decodedPCM = decodedPCM
+        currentSeekCapability = item.source.seekCapability
+        reportedUnderrunCount = 0
+        #if DEBUG
+        if decodedPCM.isRemote {
+            RemotePlaybackDiagnostics.logger.notice(
+                "Remote prepare completed; decoder session is recoverable"
+            )
+        }
+        #endif
         eventHandler?(.prepared(duration: duration(of: decodedPCM)))
     }
 
@@ -90,7 +137,12 @@ final class MacSystemPlaybackEngine: PlaybackEngine {
 
     func stop() async {
         preparationGeneration &+= 1
+        preparingRemoteByteSource?.cancel()
+        preparingRemoteByteSource = nil
         await stopPlayback()
+        disposeOutputUnit()
+        disposeDecoder()
+        currentSeekCapability = .supported
     }
 
     private func stopPlayback() async {
@@ -101,14 +153,19 @@ final class MacSystemPlaybackEngine: PlaybackEngine {
         stopOutputUnit()
         progressTask?.cancel()
         progressTask = nil
-        if let decodedPCM {
-            try? await seekDecoder(decodedPCM, to: 0)
-        }
     }
 
     func seek(to position: TimeInterval) async throws {
         guard let decodedPCM else {
             throw NativePlaybackEngineError("No decoded track is ready")
+        }
+        guard currentSeekCapability.isSupported else {
+            #if DEBUG
+            RemotePlaybackDiagnostics.logger.notice(
+                "Remote seek rejected by engine before decoder mutation"
+            )
+            #endif
+            throw PlaybackSeekError.unsupported
         }
         let generation = preparationGeneration
 
@@ -119,7 +176,22 @@ final class MacSystemPlaybackEngine: PlaybackEngine {
         let wasPlaying = isOutputRunning
         MCPPCMRendererSetPlaying(decodedPCM.renderer, false)
         stopOutputUnit()
-        try await seekDecoder(decodedPCM, to: boundedFrame)
+        do {
+            try await seekDecoder(decodedPCM, to: boundedFrame)
+        } catch {
+            if isCurrent(decodedPCM, generation: generation) {
+                #if DEBUG
+                RemotePlaybackDiagnostics.logger.notice(
+                    "Seek failed; tearing down decoder before recovery"
+                )
+                #endif
+                preparationGeneration &+= 1
+                disposeOutputUnit()
+                disposeDecoder()
+                currentSeekCapability = .supported
+            }
+            throw error
+        }
         guard isCurrent(decodedPCM, generation: generation) else {
             throw CancellationError()
         }
@@ -349,6 +421,19 @@ final class MacSystemPlaybackEngine: PlaybackEngine {
                     .positionChanged(Double(frame) / decodedPCM.sampleRate)
                 )
 
+                #if DEBUG
+                let underrunCount = MCPPCMRendererUnderrunCount(
+                    decodedPCM.renderer
+                )
+                if decodedPCM.isRemote,
+                   underrunCount > self.reportedUnderrunCount {
+                    self.reportedUnderrunCount = underrunCount
+                    RemotePlaybackDiagnostics.logger.notice(
+                        "Remote PCM underrun count=\(underrunCount, privacy: .public); outputting bounded silence while decoding refills"
+                    )
+                }
+                #endif
+
                 if MCPPCMRendererDidFinish(decodedPCM.renderer) {
                     self.stopOutputUnit()
                     self.eventHandler?(.finished)
@@ -371,6 +456,18 @@ final class MacSystemPlaybackEngine: PlaybackEngine {
             AudioComponentInstanceDispose(outputUnit)
         }
         outputUnit = nil
+    }
+
+    private func disposeDecoder() {
+        #if DEBUG
+        if decodedPCM?.isRemote == true {
+            RemotePlaybackDiagnostics.logger.notice(
+                "Remote decoder teardown requested"
+            )
+        }
+        #endif
+        decodedPCM?.cancel()
+        decodedPCM = nil
     }
 
     private func duration(of decodedPCM: DecodedPCM) -> TimeInterval {

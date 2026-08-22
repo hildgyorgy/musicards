@@ -10,6 +10,8 @@
 		F50A4F7E2F8EF16E006FD7A7 /* ClassicalMetadataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50A4F7C2F8EF16E006FD7A7 /* ClassicalMetadataStore.swift */; };
 		F50A4F7F2F8EF16E006FD7A7 /* ClassicalTrackFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50A4F7D2F8EF16E006FD7A7 /* ClassicalTrackFormatter.swift */; };
 		F50AC8762F8E5EE200776C7E /* DeckBackgroundView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50AC8752F8E5EE100776C7E /* DeckBackgroundView.swift */; };
+		F51B14C7303464DB00697B18 /* MusiCardsPanelShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51B14C6303464D800697B18 /* MusiCardsPanelShell.swift */; };
+		F51B14C93034752D00697B18 /* LibrarySource.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51B14C83034752B00697B18 /* LibrarySource.swift */; };
 		F51CEDE02F899A4300E70ACD /* TrackDetailStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51CEDDF2F899A3D00E70ACD /* TrackDetailStore.swift */; };
 		F51CEDE22F89A0EC00E70ACD /* TrackDetailModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51CEDE12F89A0EA00E70ACD /* TrackDetailModels.swift */; };
 		F51CEDE42F89A18900E70ACD /* TrackDetailPagerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51CEDE32F89A18800E70ACD /* TrackDetailPagerView.swift */; };
@@ -74,6 +76,8 @@
 		F50A4F7C2F8EF16E006FD7A7 /* ClassicalMetadataStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClassicalMetadataStore.swift; sourceTree = "<group>"; };
 		F50A4F7D2F8EF16E006FD7A7 /* ClassicalTrackFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClassicalTrackFormatter.swift; sourceTree = "<group>"; };
 		F50AC8752F8E5EE100776C7E /* DeckBackgroundView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckBackgroundView.swift; sourceTree = "<group>"; };
+		F51B14C6303464D800697B18 /* MusiCardsPanelShell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusiCardsPanelShell.swift; sourceTree = "<group>"; };
+		F51B14C83034752B00697B18 /* LibrarySource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibrarySource.swift; sourceTree = "<group>"; };
 		F51CEDDF2F899A3D00E70ACD /* TrackDetailStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackDetailStore.swift; sourceTree = "<group>"; };
 		F51CEDE12F89A0EA00E70ACD /* TrackDetailModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackDetailModels.swift; sourceTree = "<group>"; };
 		F51CEDE32F89A18800E70ACD /* TrackDetailPagerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackDetailPagerView.swift; sourceTree = "<group>"; };
@@ -164,6 +168,11 @@
 			path = MusiCardsTests;
 			sourceTree = "<group>";
 		};
+		F5D1B0013048000000000001 /* LibraryAccess */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = LibraryAccess;
+			sourceTree = "<group>";
+		};
 		F5E510E12FC4BDF300E797D6 /* Deck */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = Deck;
@@ -211,6 +220,7 @@
 				F5E510E12FC4BDF300E797D6 /* Deck */,
 				F5C0DE012FD0000000000001 /* Playback */,
 				F5C0DE022FD0000000000002 /* LocalLibrary */,
+				F5D1B0013048000000000001 /* LibraryAccess */,
 				F5C0DE052FD0000000000005 /* RemoteLibrary */,
 				F59F29112F923B1E00A50F8C /* MusiCards.icon */,
 			);
@@ -252,6 +262,7 @@
 			isa = PBXGroup;
 			children = (
 				F5F5565C2FC335F400CFE831 /* StateViews */,
+				F51B14C83034752B00697B18 /* LibrarySource.swift */,
 				F5F556592FC303E200CFE831 /* MusiCardID.swift */,
 				F53A32042F840607005A436B /* CardsApp.swift */,
 				F53A32052F840607005A436B /* ContentView.swift */,
@@ -300,6 +311,7 @@
 		F5ECDD562F85CF27006161E3 /* Cards */ = {
 			isa = PBXGroup;
 			children = (
+				F51B14C6303464D800697B18 /* MusiCardsPanelShell.swift */,
 				F524BE562FC9C46400D3730B /* AboutSheetView.swift */,
 				F54FE62E2F9C08EC00646913 /* AboutView.swift */,
 				F5A1B2C32FC0000000000001 /* LibraryConnectionView.swift */,
@@ -418,8 +430,9 @@
 				F5A09F5E2FBC746A00E5404B /* MusiCardsMac */,
 				F5C0DE012FD0000000000001 /* Playback */,
 				F5C0DE022FD0000000000002 /* LocalLibrary */,
-				F5C0DE052FD0000000000005 /* RemoteLibrary */,
 				F5C0DE042FD0000000000004 /* Shared */,
+				F5C0DE052FD0000000000005 /* RemoteLibrary */,
+				F5D1B0013048000000000001 /* LibraryAccess */,
 				F5E510E12FC4BDF300E797D6 /* Deck */,
 			);
 			name = MusiCards;
@@ -531,10 +544,12 @@
 				F5F5565A2FC303E300CFE831 /* MusiCardID.swift in Sources */,
 				F5D185AC2F93F71B00CDDB1C /* ErrorStateView.swift in Sources */,
 				F53A320C2F840607005A436B /* ContentView.swift in Sources */,
+				F51B14C93034752D00697B18 /* LibrarySource.swift in Sources */,
 				F59B714F2F8540170086AB37 /* MusiCardsAppModel.swift in Sources */,
 				F5ECDD4A2F85780C006161E3 /* TracksCardContentView.swift in Sources */,
 				F51CEEB22F8ACE2D00E70ACD /* CoverArtCache.swift in Sources */,
 				F51CEDE22F89A0EC00E70ACD /* TrackDetailModels.swift in Sources */,
+				F51B14C7303464DB00697B18 /* MusiCardsPanelShell.swift in Sources */,
 				F51CEDE42F89A18900E70ACD /* TrackDetailPagerView.swift in Sources */,
 				F59B714B2F8539C60086AB37 /* MusicBrainzService.swift in Sources */,
 				F545EE662FCE36AF006A3A3A /* ShazamRecognitionService.swift in Sources */,

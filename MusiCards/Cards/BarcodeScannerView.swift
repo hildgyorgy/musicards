@@ -6,10 +6,16 @@
 //
 
 #if os(iOS)
+import OSLog
 import SwiftUI
 import VisionKit
 
 struct BarcodeScannerView: UIViewControllerRepresentable {
+    nonisolated private static let logger = Logger(
+        subsystem: "com.hildgyorgy.MusiCards",
+        category: "BarcodeScanner"
+    )
+
     let onCodeScanned: (String) -> Void
 
     func makeCoordinator() -> Coordinator {
@@ -32,7 +38,10 @@ struct BarcodeScannerView: UIViewControllerRepresentable {
         do {
             try controller.startScanning()
         } catch {
-            print("Failed to start barcode scanner:", error)
+            let nsError = error as NSError
+            Self.logger.error(
+                "Failed to start barcode scanner domain=\(nsError.domain, privacy: .public) code=\(nsError.code, privacy: .public) detail=\(nsError.localizedDescription, privacy: .private)"
+            )
         }
 
         return controller
@@ -73,7 +82,10 @@ struct BarcodeScannerView: UIViewControllerRepresentable {
             _ dataScanner: DataScannerViewController,
             becameUnavailableWithError error: DataScannerViewController.ScanningUnavailable
         ) {
-            print("Barcode scanner unavailable:", error)
+            let nsError = error as NSError
+            BarcodeScannerView.logger.error(
+                "Barcode scanner became unavailable domain=\(nsError.domain, privacy: .public) code=\(nsError.code, privacy: .public) detail=\(nsError.localizedDescription, privacy: .private)"
+            )
         }
     }
 }

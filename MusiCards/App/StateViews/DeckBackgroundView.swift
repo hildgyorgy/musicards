@@ -11,10 +11,14 @@ import UniformTypeIdentifiers
 struct DeckBackgroundView: View {
 
     @ObservedObject var localLibrary: LocalLibraryStore
+    @ObservedObject var libraryManager: LibraryManager
+    @ObservedObject var navidromeConnection: NavidromeConnectionStore
+    @Binding var activeLibrarySource: LibrarySource?
     let onSelectMusicFolder: ((URL) -> Void)?
     let onCreateOrUpdateLibraryIndex: ((URL) -> Void)?
     let onDisconnectLibrary: (() -> Void)?
     let onShowAbout: (() -> Void)?
+    let onShowLibraryConnection: (() -> Void)?
 
     @Environment(\.colorScheme) private var colorScheme
     @State private var isShowingAbout = false
@@ -25,16 +29,24 @@ struct DeckBackgroundView: View {
 
     init(
         localLibrary: LocalLibraryStore,
+        libraryManager: LibraryManager,
+        navidromeConnection: NavidromeConnectionStore,
+        activeLibrarySource: Binding<LibrarySource?>,
         onSelectMusicFolder: ((URL) -> Void)? = nil,
         onCreateOrUpdateLibraryIndex: ((URL) -> Void)? = nil,
         onDisconnectLibrary: (() -> Void)? = nil,
-        onShowAbout: (() -> Void)? = nil
+        onShowAbout: (() -> Void)? = nil,
+        onShowLibraryConnection: (() -> Void)? = nil
     ) {
         self.localLibrary = localLibrary
+        self.libraryManager = libraryManager
+        self.navidromeConnection = navidromeConnection
+        self._activeLibrarySource = activeLibrarySource
         self.onSelectMusicFolder = onSelectMusicFolder
         self.onCreateOrUpdateLibraryIndex = onCreateOrUpdateLibraryIndex
         self.onDisconnectLibrary = onDisconnectLibrary
         self.onShowAbout = onShowAbout
+        self.onShowLibraryConnection = onShowLibraryConnection
     }
 
     var body: some View {
@@ -88,7 +100,7 @@ struct DeckBackgroundView: View {
                 VStack(spacing: 12) {
                     homePrompt(connectionHeading)
                     connectionButton
-                    homePrompt("YOUR MUSIC LIBRARY")
+                    activeLibraryPrompt
 
                     if let report = compatibilityReport {
                         homePrompt(report)
@@ -111,9 +123,6 @@ struct DeckBackgroundView: View {
             Spacer(minLength: 16)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .sheet(isPresented: $isLibraryActionsPresented) {
-            libraryConnectionView
-        }
         .fileImporter(
             isPresented: $isFolderImporterPresented,
             allowedContentTypes: [.folder],
@@ -122,6 +131,22 @@ struct DeckBackgroundView: View {
         )
     }
     #endif
+
+    @ViewBuilder
+    private var activeLibraryPrompt: some View {
+        if isLibraryConnected {
+            HStack(spacing: 4) {
+                Text(libraryManager.source == .navidrome ? "NAVIDROME" : "LOCAL")
+                    .bold()
+
+                Text("MUSIC LIBRARY")
+            }
+            .font(.caption)
+            .tracking(1.5)
+        } else {
+            homePrompt("YOUR MUSIC LIBRARY")
+        }
+    }
 
     #if os(iOS)
     private var iosHome: some View {
@@ -171,7 +196,7 @@ struct DeckBackgroundView: View {
                     .buttonStyle(.plain)
                     .accessibilityLabel(connectionAccessibilityLabel)
 
-                    homePrompt("YOUR MUSIC LIBRARY")
+                    activeLibraryPrompt
 
                     if let report = compatibilityReport {
                         homePrompt(report)
@@ -221,7 +246,13 @@ struct DeckBackgroundView: View {
 
     private var connectionButton: some View {
         Button {
+            #if os(macOS)
+            if let onShowLibraryConnection {
+                onShowLibraryConnection()
+            }
+            #else
             isLibraryActionsPresented = true
+            #endif
         } label: {
             Text(connectionButtonTitle)
                 .font(.footnote.weight(.semibold))
@@ -246,17 +277,22 @@ struct DeckBackgroundView: View {
     }
 
     private var isLibraryConnected: Bool {
-        localLibrary.summary.folderCount > 0
-            && localLibrary.connectionErrorMessage == nil
+        switch libraryManager.source {
+        case .local:
+            localLibrary.summary.folderCount > 0
+                && localLibrary.connectionErrorMessage == nil
+        case .navidrome:
+            navidromeConnection.isConfigured
+        }
     }
 
     private var connectionHeading: String {
-        if localLibrary.isScanning { return "CONNECTING…" }
+        if isActiveLibraryLoading { return "CONNECTING…" }
         return isLibraryConnected ? "YOU HAVE SUCCESSFULLY" : "TO PLAY:"
     }
 
     private var connectionButtonTitle: String {
-        if localLibrary.isScanning { return "CONNECTING" }
+        if isActiveLibraryLoading { return "CONNECTING" }
         return isLibraryConnected ? "CONNECTED" : "CONNECT"
     }
 
@@ -267,8 +303,12 @@ struct DeckBackgroundView: View {
     }
 
     private var compatibilityReport: String? {
-        guard isLibraryConnected, !localLibrary.isScanning else { return nil }
-        let summary = localLibrary.summary
+        guard isLibraryConnected, !isActiveLibraryLoading else { return nil }
+        if libraryManager.source == .navidrome,
+           libraryManager.catalogState != .ready {
+            return nil
+        }
+        let summary = libraryManager.catalogSummary
         if let total = summary.totalAlbumCount {
             return "\(summary.identifiedAlbumCount) / \(total) ALBUMS\nIDENTIFIED AS PLAYABLE"
         }
@@ -276,11 +316,32 @@ struct DeckBackgroundView: View {
     }
 
     private var connectionMessage: String? {
-        if let error = localLibrary.connectionErrorMessage {
-            return error.uppercased()
+        switch libraryManager.source {
+        case .local:
+            if let error = localLibrary.connectionErrorMessage {
+                return error.uppercased()
+            }
+            guard localLibrary.isScanning else { return nil }
+            return localLibrary.statusMessage?.uppercased()
+        case .navidrome:
+            if case .failed(let message) = libraryManager.catalogState {
+                return message.uppercased()
+            }
+            if libraryManager.catalogState == .loading {
+                return "LOADING NAVIDROME CATALOG…"
+            }
+            return navidromeConnection.errorMessage?.uppercased()
         }
-        guard localLibrary.isScanning else { return nil }
-        return localLibrary.statusMessage?.uppercased()
+    }
+
+    private var isActiveLibraryLoading: Bool {
+        switch libraryManager.source {
+        case .local:
+            localLibrary.isScanning
+        case .navidrome:
+            navidromeConnection.isConnecting
+                || libraryManager.catalogState == .loading
+        }
     }
 
     private func handleFolderImport(
@@ -299,22 +360,13 @@ struct DeckBackgroundView: View {
         case nil:
             break
         }
-    }
 
-    private var libraryConnectionView: some View {
-        LibraryConnectionView(
-            localLibrary: localLibrary,
-            onConnectExisting: {
-                beginFolderImport(.connectExisting)
-            },
-            onCreateOrUpdateIndex: {
-                beginFolderImport(.createOrUpdateIndex)
-            },
-            onDisconnect: {
-                onDisconnectLibrary?()
-                isLibraryActionsPresented = false
-            }
-        )
+        #if os(iOS)
+        Task { @MainActor in
+            await Task.yield()
+            isLibraryActionsPresented = true
+        }
+        #endif
     }
 
     private func beginFolderImport(_ action: FolderImportAction) {
@@ -327,6 +379,21 @@ struct DeckBackgroundView: View {
     }
 
     #if os(iOS)
+    private var libraryConnectionView: some View {
+        LibraryConnectionView(
+            localLibrary: localLibrary,
+            navidromeConnection: navidromeConnection,
+            activeLibrarySource: $activeLibrarySource,
+            onConnectExisting: {
+                beginFolderImport(.connectExisting)
+            },
+            onCreateOrUpdateIndex: nil,
+            onDisconnect: {
+                onDisconnectLibrary?()
+            }
+        )
+    }
+
     private var explorePromptBottomInset: CGFloat {
         let collapsedCardPeeks = CGFloat(MusiCardID.allCases.count - 2)
             * DeckStyle.peek

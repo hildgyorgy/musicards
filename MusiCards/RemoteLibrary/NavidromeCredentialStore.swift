@@ -67,7 +67,20 @@ struct NavidromeCredentialStore: Sendable {
     }
 }
 
-enum NavidromeCredentialStoreError: Error, Equatable, Sendable {
+enum NavidromeCredentialStoreError: LocalizedError, Equatable, Sendable {
     case keychain(OSStatus)
     case invalidStoredPassword
+
+    var errorDescription: String? {
+        switch self {
+        case .keychain(let status):
+            if let message = SecCopyErrorMessageString(status, nil) as String? {
+                "The password could not be stored securely: \(message)"
+            } else {
+                "The password could not be stored securely (\(status))."
+            }
+        case .invalidStoredPassword:
+            "The stored Navidrome password is unreadable."
+        }
+    }
 }

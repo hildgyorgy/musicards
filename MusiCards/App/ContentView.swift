@@ -6,10 +6,16 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 #if os(macOS)
 import AppKit
 #endif
+
+private enum FolderImportAction {
+    case connectExisting
+    case createOrUpdateIndex
+}
 
 struct ContentView: View {
 
@@ -82,6 +88,9 @@ struct ContentView: View {
 
     @StateObject private var appModel = MusiCardsAppModel()
     @State private var isShowingAbout = false
+    @State private var isShowingLibraryConnection = false
+    @State private var isFolderImporterPresented = false
+    @State private var folderImportAction: FolderImportAction?
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.scenePhase) private var scenePhase
@@ -127,7 +136,7 @@ struct ContentView: View {
                     release: appModel.selectedRelease,
                     coverImage: appModel.selectedReleaseCover,
                     isPlayable: appModel.selectedRelease.map {
-                        appModel.localLibrary.containsRelease($0.id)
+                        appModel.libraryManager.containsRelease($0.id)
                     } ?? false,
                     onPlayRelease: {
                         appModel.playSelectedRelease()
@@ -175,6 +184,9 @@ struct ContentView: View {
         case .home:
             DeckBackgroundView(
                 localLibrary: appModel.localLibrary,
+                libraryManager: appModel.libraryManager,
+                navidromeConnection: appModel.navidromeConnection,
+                activeLibrarySource: $appModel.activeLibrarySource,
                 onSelectMusicFolder: { url in
                     appModel.selectMusicFolder(url)
                 },
@@ -186,12 +198,15 @@ struct ContentView: View {
                 },
                 onShowAbout: {
                     isShowingAbout = true
+                },
+                onShowLibraryConnection: {
+                    isShowingLibraryConnection = true
                 }
             )
         case .search:
             SearchCardContentView(
                 viewModel: appModel.searchViewModel,
-                localLibrary: appModel.localLibrary,
+                libraryManager: appModel.libraryManager,
                 recentArtists: appModel.recentArtists,
                 recentReleases: appModel.recentReleases,
                 nowPlayingRelease: appModel.nowPlayingRelease,
@@ -255,7 +270,7 @@ struct ContentView: View {
                 onSelectArtist: { artistID in
                     appModel.selectArtist(id: artistID)
                 },
-                localLibrary: appModel.localLibrary,
+                libraryManager: appModel.libraryManager,
                 playbackController: appModel.playbackController,
                 onPlayTrack: { releaseTrackID, recordingID in
                     appModel.playIndexedTrack(
@@ -271,7 +286,7 @@ struct ContentView: View {
                 MusiCardsSpinner()
             } else {
                 ArtistCardContentView(
-                    localLibrary: appModel.localLibrary,
+                    libraryManager: appModel.libraryManager,
                     artist: appModel.selectedArtist,
                     releaseGroups: appModel.artistReleaseGroups,
                     wikipedia: appModel.artistWikipedia,
@@ -323,6 +338,12 @@ struct ContentView: View {
                         cardContent(card)
                     }
                 )
+                .fileImporter(
+                    isPresented: $isFolderImporterPresented,
+                    allowedContentTypes: [.folder],
+                    allowsMultipleSelection: false,
+                    onCompletion: handleFolderImport
+                )
 
                 if isShowingAbout {
                     AboutSheetView {
@@ -333,6 +354,34 @@ struct ContentView: View {
                     .zIndex(1_000)
                     .transition(.scale.combined(with: .opacity))
                 }
+
+            if isShowingLibraryConnection {
+                MusiCardsPanelShell(
+                    onDismiss: {
+                        isShowingLibraryConnection = false
+                    }
+                ) {
+                    LibraryConnectionView(
+                        localLibrary: appModel.localLibrary,
+                        navidromeConnection: appModel.navidromeConnection,
+                        activeLibrarySource: $appModel.activeLibrarySource,
+                        onConnectExisting: {
+                            beginFolderImport(.connectExisting)
+                        },
+                        onCreateOrUpdateIndex: {
+                            beginFolderImport(.createOrUpdateIndex)
+                        },
+                        onDisconnect: {
+                            appModel.disconnectMusicLibrary()
+                        }
+                    )
+                }
+                .padding(.horizontal, DeckStyle.aboutOverlayHorizontalInset)
+                .padding(.bottom, DeckStyle.aboutOverlayHorizontalInset)
+                .zIndex(1_000)
+                .transition(.scale.combined(with: .opacity))
+            }
+
             #else
                 GeometryReader { viewportProxy in
                     DeckView(
@@ -357,6 +406,9 @@ struct ContentView: View {
                                 boxBackground
                                 DeckBackgroundView(
                                     localLibrary: appModel.localLibrary,
+                                    libraryManager: appModel.libraryManager,
+                                    navidromeConnection: appModel.navidromeConnection,
+                                    activeLibrarySource: $appModel.activeLibrarySource,
                                     onSelectMusicFolder: { url in
                                         appModel.selectMusicFolder(url)
                                     },
@@ -391,7 +443,7 @@ struct ContentView: View {
         .animation(.spring(duration: 0.35), value: isShowingAbout)
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
-                appModel.localLibrary.refreshIfNeeded()
+                appModel.refreshActiveLibraryIfNeeded()
             }
         }
         #if os(macOS)
@@ -410,5 +462,36 @@ struct ContentView: View {
             appModel.restoreAudioOutputConfiguration()
         }
         #endif
+    }
+
+    private func beginFolderImport(_ action: FolderImportAction) {
+        folderImportAction = action
+
+        Task { @MainActor in
+            await Task.yield()
+            isFolderImporterPresented = true
+        }
+    }
+
+    private func handleFolderImport(
+        _ result: Result<[URL], Error>
+    ) {
+        defer { folderImportAction = nil }
+
+        guard case .success(let urls) = result,
+              let url = urls.first else {
+            return
+        }
+
+        switch folderImportAction {
+        case .connectExisting:
+            appModel.selectMusicFolder(url)
+
+        case .createOrUpdateIndex:
+            appModel.createOrUpdateLibraryIndex(url)
+
+        case nil:
+            break
+        }
     }
 }

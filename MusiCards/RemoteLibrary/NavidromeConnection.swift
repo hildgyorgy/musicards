@@ -1,6 +1,6 @@
 import Foundation
 
-struct NavidromeServerProfile: Codable, Equatable, Identifiable, Sendable {
+nonisolated struct NavidromeServerProfile: Codable, Equatable, Identifiable, Sendable {
     let id: UUID
     var name: String
     var baseURL: URL
@@ -12,14 +12,81 @@ struct NavidromeServerProfile: Codable, Equatable, Identifiable, Sendable {
         self.baseURL = baseURL
         self.username = username
     }
+
+    static func validated(
+        id: UUID = UUID(),
+        name: String,
+        serverURL: String,
+        username: String
+    ) throws -> NavidromeServerProfile {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedUsername = username.trimmingCharacters(in: .whitespacesAndNewlines)
+        var trimmedURL = serverURL.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !trimmedUsername.isEmpty else {
+            throw NavidromeProfileValidationError.usernameRequired
+        }
+        guard !trimmedURL.isEmpty else {
+            throw NavidromeProfileValidationError.serverURLRequired
+        }
+
+        if !trimmedURL.contains("://") {
+            trimmedURL = "https://\(trimmedURL)"
+        }
+
+        guard let components = URLComponents(string: trimmedURL),
+              let scheme = components.scheme?.lowercased(),
+              scheme == "https" || scheme == "http",
+              let host = components.host,
+              !host.isEmpty,
+              components.user == nil,
+              components.password == nil,
+              components.query == nil,
+              components.fragment == nil,
+              let baseURL = components.url else {
+            throw NavidromeProfileValidationError.invalidServerURL
+        }
+
+        return NavidromeServerProfile(
+            id: id,
+            name: trimmedName.isEmpty ? host : trimmedName,
+            baseURL: baseURL,
+            username: trimmedUsername
+        )
+    }
 }
 
-struct NavidromeServerIdentity: Equatable, Sendable {
+nonisolated struct NavidromeServerIdentity: Codable, Equatable, Sendable {
     let serverVersion: String?
     let protocolVersion: String
 }
 
-enum NavidromeConnectionError: LocalizedError, Equatable, Sendable {
+nonisolated struct NavidromeCatalogCredentials: Sendable {
+    let profile: NavidromeServerProfile
+    let password: String
+}
+
+nonisolated enum NavidromeProfileValidationError: LocalizedError, Equatable, Sendable {
+    case serverURLRequired
+    case usernameRequired
+    case secureConnectionRequired
+    case invalidServerURL
+
+    var errorDescription: String? {
+        switch self {
+        case .serverURLRequired:
+            "Enter the Navidrome server URL."
+        case .usernameRequired:
+            "Enter your Navidrome username."
+        case .secureConnectionRequired:
+            "A remote Navidrome server must use HTTPS."
+        case .invalidServerURL:
+            "The Navidrome server URL is not valid."
+        }
+    }
+}
+
+nonisolated enum NavidromeConnectionError: LocalizedError, Equatable, Sendable {
     case secureConnectionRequired
     case invalidBaseURL
     case invalidResponse
@@ -48,7 +115,7 @@ enum NavidromeConnectionError: LocalizedError, Equatable, Sendable {
     }
 }
 
-enum NavidromeServerVerifier {
+nonisolated enum NavidromeServerVerifier {
     static func identity(from response: OpenSubsonicPingResponse) throws -> NavidromeServerIdentity {
         if response.status == .failed {
             throw NavidromeConnectionError.serverRejected(

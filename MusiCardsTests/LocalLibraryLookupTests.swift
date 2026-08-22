@@ -135,6 +135,62 @@ final class LocalLibraryLookupTests: XCTestCase {
         )
     }
 
+    func testCatalogSearchMatchesArtistReleaseTrackAndNormalization() {
+        let nevermindID = "189002e7-3285-4e2e-92a3-7f6c30d407a2"
+        let lookup = LocalLibraryLookup(files: [
+            file(
+                path: "Nirvana/Nevermind/01 Smells Like Teen Spirit.flac",
+                artist: "Nirvána",
+                album: "Nevermind",
+                releaseID: nevermindID,
+                recordingID: "recording-1",
+                releaseTrackID: "track-1"
+            ),
+            file(
+                path: "Nirvana/Nevermind/12 Something in the Way.flac",
+                artist: "Nirvána",
+                album: "Nevermind",
+                releaseID: nevermindID,
+                recordingID: "recording-12",
+                releaseTrackID: "track-12"
+            ),
+            file(
+                path: "Other/Album/01 Song.flac",
+                artist: "Other Artist",
+                album: "Other Album",
+                releaseID: "other-release",
+                recordingID: "other-recording",
+                releaseTrackID: "other-track"
+            ),
+            file(
+                path: "Nirvana/Live/01 Nevermind.flac",
+                artist: "Nirvana",
+                album: "Live",
+                releaseID: "live-release",
+                recordingID: "live-recording",
+                releaseTrackID: "live-track"
+            )
+        ])
+
+        XCTAssertEqual(
+            lookup.searchCatalog(query: "Nirvána, Nevermind").map(\.releaseID),
+            [nevermindID, "live-release"]
+        )
+        XCTAssertTrue(
+            lookup.searchCatalog(query: "Nirvana, Never-mind")
+                .map(\.releaseID)
+                .contains(nevermindID)
+        )
+        XCTAssertEqual(
+            lookup.searchCatalog(query: "Nirvana, Teen Spirit").map(\.releaseID),
+            [nevermindID]
+        )
+        XCTAssertEqual(
+            lookup.searchCatalog(query: nevermindID.uppercased()).map(\.releaseID),
+            [nevermindID]
+        )
+    }
+
     private func file(
         path: String,
         artist: String = "Artist",

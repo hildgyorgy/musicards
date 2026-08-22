@@ -30,7 +30,7 @@ struct ReleaseThumbnailView: View {
                     .fill(Color.gray.opacity(0.15))
             }
         }
-        .task(id: releaseID) {
+        .task(id: "\(releaseID)::\(hasCoverArt)") {
             guard hasCoverArt else {
                 image = nil
                 return

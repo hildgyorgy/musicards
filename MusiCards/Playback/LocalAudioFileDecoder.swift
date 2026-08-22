@@ -6,6 +6,9 @@
 #if os(macOS) || os(iOS)
 import AudioToolbox
 import Foundation
+#if DEBUG
+import OSLog
+#endif
 
 struct NativePlaybackEngineError: LocalizedError {
     let operation: String
@@ -22,11 +25,28 @@ struct NativePlaybackEngineError: LocalizedError {
     }
 }
 
+nonisolated protocol DecodedPCMResourceOwner: AnyObject, Sendable {
+    func cancel()
+    func disposeAfterExtAudioFile()
+    func beginSeek()
+    func endSeek(succeeded: Bool)
+    func takeReadError() -> Error?
+    func didProduceFirstPCM()
+}
+
+extension DecodedPCMResourceOwner {
+    nonisolated func beginSeek() {}
+    nonisolated func endSeek(succeeded: Bool) {}
+    nonisolated func takeReadError() -> Error? { nil }
+    nonisolated func didProduceFirstPCM() {}
+}
+
 nonisolated final class DecodedPCM: @unchecked Sendable {
     let renderer: OpaquePointer
     let sampleRate: Double
     let channelCount: UInt32
     let frameCount: UInt64
+    let isRemote: Bool
 
     private let file: ExtAudioFileRef
     private let feederQueue = DispatchQueue(
@@ -37,11 +57,14 @@ nonisolated final class DecodedPCM: @unchecked Sendable {
     private let decodeBuffer: UnsafeMutablePointer<Float>
     private let decodeChunkFrames: UInt32
     private let bytesPerFrame: UInt32
+    private let frameCapacity: UInt64
     private let didAccessSecurityScope: Bool
-    private let sourceURL: URL
+    private let sourceURL: URL?
+    private let resourceOwner: (any DecodedPCMResourceOwner)?
     private let errorLock = NSLock()
     private var feederError: Error?
     private var didReachEndOfStream = false
+    private var didReportFirstPCM = false
 
     init(
         renderer: OpaquePointer,
@@ -52,54 +75,81 @@ nonisolated final class DecodedPCM: @unchecked Sendable {
         decodeBuffer: UnsafeMutablePointer<Float>,
         decodeChunkFrames: UInt32,
         didAccessSecurityScope: Bool,
-        sourceURL: URL
+        sourceURL: URL?,
+        resourceOwner: (any DecodedPCMResourceOwner)? = nil
     ) {
         self.renderer = renderer
         self.sampleRate = sampleRate
         self.channelCount = channelCount
         self.frameCount = frameCount
+        self.isRemote = resourceOwner != nil
         self.file = file
         self.decodeBuffer = decodeBuffer
         self.decodeChunkFrames = decodeChunkFrames
         self.bytesPerFrame = channelCount * UInt32(MemoryLayout<Float>.size)
+        self.frameCapacity = UInt64(
+            MCPPCMRendererWritableFrames(renderer)
+        )
         self.didAccessSecurityScope = didAccessSecurityScope
         self.sourceURL = sourceURL
+        self.resourceOwner = resourceOwner
         self.feederTimer = DispatchSource.makeTimerSource(queue: feederQueue)
 
         feederTimer.setEventHandler { [weak self] in
             self?.fillAvailableSpace()
         }
-        feederTimer.schedule(deadline: .now(), repeating: .milliseconds(10))
+        feederTimer.schedule(deadline: .distantFuture)
         feederTimer.resume()
     }
 
     deinit {
+        resourceOwner?.cancel()
         feederTimer.cancel()
         feederQueue.sync {}
         ExtAudioFileDispose(file)
+        resourceOwner?.disposeAfterExtAudioFile()
         decodeBuffer.deallocate()
         MCPPCMRendererDestroy(renderer)
-        if didAccessSecurityScope {
+        if didAccessSecurityScope, let sourceURL {
             sourceURL.stopAccessingSecurityScopedResource()
         }
     }
 
-    func prime() throws {
+    func prime(minimumFrames: UInt64? = nil) throws {
+        let targetFrames = min(
+            minimumFrames ?? frameCapacity,
+            frameCapacity
+        )
         feederQueue.sync {
-            while !didReachEndOfStream,
-                  MCPPCMRendererWritableFrames(renderer) >= decodeChunkFrames {
-                fillOnce()
-                if currentFeederError() != nil { break }
-            }
+            fill(toMinimumBufferedFrames: targetFrames)
         }
         if let error = currentFeederError() {
             throw error
         }
+        feederTimer.schedule(
+            deadline: .now(),
+            repeating: .milliseconds(10)
+        )
+    }
+
+    func cancel() {
+        #if DEBUG
+        if isRemote {
+            RemotePlaybackDiagnostics.logger.notice(
+                "Remote feeder cancellation requested"
+            )
+        }
+        #endif
+        resourceOwner?.cancel()
+        feederTimer.cancel()
     }
 
     func seek(to frame: UInt64) throws {
         let boundedFrame = min(frame, frameCount)
         try feederQueue.sync {
+            resourceOwner?.beginSeek()
+            var seekSucceeded = false
+            defer { resourceOwner?.endSeek(succeeded: seekSucceeded) }
             let status = ExtAudioFileSeek(file, Int64(boundedFrame))
             guard status == noErr else {
                 throw NativePlaybackEngineError(
@@ -110,7 +160,21 @@ nonisolated final class DecodedPCM: @unchecked Sendable {
             errorLock.withLock { feederError = nil }
             didReachEndOfStream = false
             MCPPCMRendererReset(renderer, boundedFrame)
-            fillAvailableSpace()
+            fill(
+                toMinimumBufferedFrames: min(
+                    UInt64(ceil(sampleRate)),
+                    frameCapacity
+                )
+            )
+            if let error = currentFeederError() {
+                throw error
+            }
+            guard resourceOwner == nil || bufferedFrameCount > 0 else {
+                throw NativePlaybackEngineError(
+                    "Seeking produced no playable PCM frames"
+                )
+            }
+            seekSucceeded = true
         }
     }
 
@@ -124,6 +188,14 @@ nonisolated final class DecodedPCM: @unchecked Sendable {
     private func fillAvailableSpace() {
         while !didReachEndOfStream,
               MCPPCMRendererWritableFrames(renderer) >= decodeChunkFrames {
+            fillOnce()
+            if currentFeederError() != nil { return }
+        }
+    }
+
+    private func fill(toMinimumBufferedFrames targetFrames: UInt64) {
+        while !didReachEndOfStream,
+              bufferedFrameCount < targetFrames {
             fillOnce()
             if currentFeederError() != nil { return }
         }
@@ -148,7 +220,11 @@ nonisolated final class DecodedPCM: @unchecked Sendable {
         guard status == noErr else {
             didReachEndOfStream = true
             setFeederError(
-                NativePlaybackEngineError("PCM decoding failed", status: status)
+                resourceOwner?.takeReadError()
+                    ?? NativePlaybackEngineError(
+                        "PCM decoding failed",
+                        status: status
+                    )
             )
             MCPPCMRendererMarkEndOfStream(renderer)
             return
@@ -170,6 +246,9 @@ nonisolated final class DecodedPCM: @unchecked Sendable {
                 NativePlaybackEngineError("The PCM feeder could not keep its buffer state")
             )
             MCPPCMRendererMarkEndOfStream(renderer)
+        } else if !didReportFirstPCM {
+            didReportFirstPCM = true
+            resourceOwner?.didProduceFirstPCM()
         }
     }
 
@@ -179,6 +258,10 @@ nonisolated final class DecodedPCM: @unchecked Sendable {
 
     private func currentFeederError() -> Error? {
         errorLock.withLock { feederError }
+    }
+
+    private var bufferedFrameCount: UInt64 {
+        frameCapacity - UInt64(MCPPCMRendererWritableFrames(renderer))
     }
 }
 

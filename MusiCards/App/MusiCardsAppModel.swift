@@ -8,6 +8,7 @@
 import Foundation
 import SwiftUI
 import Combine
+import OSLog
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -17,6 +18,11 @@ import MediaPlayer
 
 @MainActor
 final class MusiCardsAppModel: ObservableObject {
+    nonisolated private static let shazamLogger = Logger(
+        subsystem: "com.hildgyorgy.MusiCards",
+        category: "Shazam"
+    )
+
     @Published var deckSelection = DeckSelection<MusiCardID>(
         activeID: .home,
         activeSlotIndex: 0
@@ -37,7 +43,7 @@ final class MusiCardsAppModel: ObservableObject {
     @Published var recentReleases: [SearchReleaseRow] = []
     @Published var nowPlayingRelease: SearchReleaseRow?
     @Published private(set) var hasCurrentPlaybackItem = false
-    
+
     @Published var isShazamListening: Bool = false
     @Published var shazamStatusMessage: String?
 
@@ -45,11 +51,21 @@ final class MusiCardsAppModel: ObservableObject {
     @Published var isLoadingMoreReleaseGroups: Bool = false
     @Published var hasMoreReleaseGroups: Bool = false
 
+    @Published var activeLibrarySource: LibrarySource? {
+        didSet {
+            libraryManager.setActiveSource(activeLibrarySource)
+            LibrarySourcePreference.save(activeLibrarySource)
+        }
+    }
+
     let searchViewModel: SearchViewModel
     let trackDetailStore: TrackDetailStore
     let classicalMetadataStore: ClassicalMetadataStore
     let playbackController: PlaybackController
     let localLibrary: LocalLibraryStore
+    let libraryManager: LibraryManager
+    let navidromeConnection: NavidromeConnectionStore
+    private let releasePlaybackQueueBuilder: ReleasePlaybackQueueBuilder
 
     private var localPlaybackNowPlayingCoordinator:
         PlatformNowPlayingCoordinator?
@@ -76,15 +92,33 @@ final class MusiCardsAppModel: ObservableObject {
         let service = musicBrainzService
         let playbackEngine = playbackEngine ?? PlaybackEngineFactory.makeDefault()
         let localLibrary = LocalLibraryStore()
+        let navidromeConnection = NavidromeConnectionStore()
+        let navidromeLibraryProvider = NavidromeLibraryProvider(
+            connectionStore: navidromeConnection
+        )
+        let libraryManager = LibraryManager(
+            localProvider: LocalLibraryProvider(store: localLibrary),
+            navidromeProvider: navidromeLibraryProvider
+        )
+        let playbackController = PlaybackController(
+            engine: playbackEngine,
+            assetResolver: libraryManager
+        )
+        let releasePlaybackQueueBuilder = ReleasePlaybackQueueBuilder(
+            libraryManager: libraryManager
+        )
 
+        self.navidromeConnection = navidromeConnection
         self.localLibrary = localLibrary
+        self.libraryManager = libraryManager
+        self.releasePlaybackQueueBuilder = releasePlaybackQueueBuilder
         self.searchViewModel = SearchViewModel(
             service: service,
-            localLibrary: localLibrary
+            libraryManager: libraryManager
         )
         self.trackDetailStore = TrackDetailStore(service: service)
         self.classicalMetadataStore = ClassicalMetadataStore(service: service)
-        self.playbackController = PlaybackController(engine: playbackEngine)
+        self.playbackController = playbackController
         self.localPlaybackNowPlayingCoordinator =
             PlatformNowPlayingCoordinator(controller: self.playbackController)
         self.playbackItemObservation = self.playbackController.$currentIndex
@@ -93,6 +127,13 @@ final class MusiCardsAppModel: ObservableObject {
             .sink { [weak self] hasCurrentItem in
                 self?.hasCurrentPlaybackItem = hasCurrentItem
             }
+
+        let restoredLibrarySource = LibrarySourcePreference.restoredSource(
+            navidromeIsConfigured: navidromeConnection.isConfigured
+        )
+        self.activeLibrarySource = restoredLibrarySource
+        libraryManager.setActiveSource(restoredLibrarySource)
+        LibrarySourcePreference.save(restoredLibrarySource)
 
         loadRecents()
 #if os(iOS)
@@ -119,137 +160,89 @@ final class MusiCardsAppModel: ObservableObject {
         playbackController.restoreOutputConfiguration()
     }
 
+    func refreshActiveLibraryIfNeeded() {
+        Task {
+            await libraryManager.refreshActiveCatalogIfNeeded()
+        }
+    }
+
     func playIndexedTrack(
         releaseTrackID: String?,
         recordingID: String?
     ) {
-        guard let release = selectedRelease,
-              let selectedFile = localLibrary.audioFile(
-                releaseID: release.id,
-                releaseTrackID: releaseTrackID,
-                recordingID: recordingID,
-                allowsRecordingFallback: release
-                    .hasUniqueOccurrence(ofRecordingID: recordingID)
-              ),
-              let selectedURL = localLibrary.url(for: selectedFile) else {
+        guard let release = selectedRelease else {
             return
         }
+        let selection = ReleasePlaybackSelection(
+            releaseTrackID: releaseTrackID,
+            recordingID: recordingID
+        )
+        let playbackSource = libraryManager.source
 
         let request = playbackController.beginQueueRequest()
         Task {
             guard await playbackController.prepareForQueueReplacement(request)
             else { return }
-            let artworkData = await LocalAudioMetadataLoader.artworkData(
-                from: selectedURL
-            )
-            guard !Task.isCancelled else { return }
-            let artist = MBTextFormatter.artistLine(from: release.artistCredit)
-            var items: [PlaybackQueueItem] = []
-            var selectedIndex = 0
-
-            for (mediumIndex, medium) in (release.media ?? []).enumerated() {
-                for track in medium.tracks ?? [] {
-                    guard let file = localLibrary.audioFile(
-                        releaseID: release.id,
-                        releaseTrackID: track.id,
-                        recordingID: track.recording?.id,
-                        allowsRecordingFallback: release
-                            .hasUniqueOccurrence(
-                                ofRecordingID: track.recording?.id
-                            )
-                    ), let url = localLibrary.url(for: file) else {
-                        continue
-                    }
-
-                    if trackMatchesSelection(
-                        track,
-                        releaseTrackID: releaseTrackID,
-                        recordingID: recordingID
-                    ) {
-                        selectedIndex = items.count
-                    }
-                    let playbackTrack = PlaybackTrack(
-                        id: file.id,
-                        releaseTrackID: file.releaseTrackMBID ?? track.id,
-                        recordingID: file.recordingMBID,
-                        releaseID: file.releaseMBID,
-                        title: track.title,
-                        artist: artist.isEmpty ? file.artist : artist,
-                        albumTitle: release.title,
-                        duration: file.duration ?? track.length.map {
-                            Double($0) / 1_000
-                        },
-                        artworkData: artworkData,
-                        mediumFormat: medium.format,
-                        discNumber: medium.position ?? mediumIndex + 1,
-                        trackNumber: track.position,
-                        audioFormat: PlaybackAudioFormat(
-                            codec: file.codec,
-                            bitDepth: file.bitDepth,
-                            sampleRate: file.sampleRate,
-                            bitrate: file.bitrate,
-                            channelCount: file.channelCount
-                        )
-                    )
-                    items.append(
-                        PlaybackQueueItem(
-                            track: playbackTrack,
-                            source: .localFile(url)
-                        )
-                    )
-                }
-            }
-
-            guard !items.isEmpty else {
+            guard let queue = await releasePlaybackQueueBuilder.buildQueue(
+                for: release,
+                selection: selection,
+                source: playbackSource,
+                artworkData: playbackArtworkData()
+            ) else {
                 playbackController.abandonQueueRequest(request)
                 return
             }
             guard await playbackController.replaceQueue(
-                with: items,
-                startingAt: selectedIndex,
+                with: queue.items,
+                startingAt: queue.selectedIndex,
                 request: request
             ) else { return }
             await playbackController.play()
         }
     }
 
-    func playSelectedRelease() {
-        guard let release = selectedRelease else { return }
-
-        for medium in release.media ?? [] {
-            for track in medium.tracks ?? [] {
-                let recordingID = track.recording?.id
-                let allowsRecordingFallback = release.hasUniqueOccurrence(
-                    ofRecordingID: recordingID
-                )
-
-                guard localLibrary.containsTrack(
-                    releaseID: release.id,
-                    releaseTrackID: track.id,
-                    recordingID: recordingID,
-                    allowsRecordingFallback: allowsRecordingFallback
-                ) else {
-                    continue
-                }
-
-                playIndexedTrack(
-                    releaseTrackID: track.id,
-                    recordingID: recordingID
-                )
-                return
-            }
-        }
+    private func playbackArtworkData() -> Data? {
+        #if canImport(UIKit)
+        selectedReleaseCover?.pngData()
+        #elseif canImport(AppKit)
+        selectedReleaseCover?.tiffRepresentation
+        #else
+        nil
+        #endif
     }
 
-    private func trackMatchesSelection(
-        _ track: MBTrack,
-        releaseTrackID: String?,
-        recordingID: String?
-    ) -> Bool {
-        if let releaseTrackID {
-            return track.id == releaseTrackID
+    func playSelectedRelease() {
+        guard let release = selectedRelease else { return }
+        let playbackSource = libraryManager.source
+        let request = playbackController.beginQueueRequest()
+        Task {
+            guard await playbackController.prepareForQueueReplacement(request)
+            else { return }
+            await libraryManager.prepareTrackAvailability(
+                forRelease: release.id,
+                from: playbackSource
+            )
+            guard let selection = releasePlaybackQueueBuilder
+                .firstPlayableSelection(
+                    in: release,
+                    source: playbackSource
+                ),
+                  let queue = await releasePlaybackQueueBuilder.buildQueue(
+                    for: release,
+                    selection: selection,
+                    source: playbackSource,
+                    artworkData: playbackArtworkData()
+                  ) else {
+                playbackController.abandonQueueRequest(request)
+                return
+            }
+            guard await playbackController.replaceQueue(
+                with: queue.items,
+                startingAt: queue.selectedIndex,
+                request: request
+            ) else { return }
+            await playbackController.play()
         }
-        return track.recording?.id == recordingID
     }
 
     var isBlockingNavigationLoad: Bool {
@@ -506,7 +499,9 @@ final class MusiCardsAppModel: ObservableObject {
             do {
                 let match = try await shazamService.recognize()
 
-                print("Shazam match:", match.artist, "-", match.title)
+                Self.shazamLogger.debug(
+                    "Shazam match artist=\(match.artist, privacy: .private) title=\(match.title, privacy: .private)"
+                )
 
                 searchViewModel.searchByRecognizedTrack(match)
 
@@ -514,7 +509,10 @@ final class MusiCardsAppModel: ObservableObject {
                 shazamStatusMessage = nil
                 
             } catch {
-                print("Shazam error:", error)
+                let nsError = error as NSError
+                Self.shazamLogger.error(
+                    "Shazam recognition failed domain=\(nsError.domain, privacy: .public) code=\(nsError.code, privacy: .public) detail=\(nsError.localizedDescription, privacy: .private)"
+                )
 
                 shazamStatusMessage = shazamMessage(for: error)
 

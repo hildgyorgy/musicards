@@ -232,6 +232,10 @@ struct PlayerCardContentView: View {
                 return "ICLOUD"
             }
             return "LOCAL"
+        case .remoteAudio(let asset):
+            return asset.displayName
+        case .libraryAsset(let reference):
+            return reference.displayName
         }
     }
 

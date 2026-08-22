@@ -39,6 +39,7 @@ void MCPPCMRendererReset(
 );
 
 uint64_t MCPPCMRendererCurrentFrame(const MCPPCMRenderer *renderer);
+uint64_t MCPPCMRendererUnderrunCount(const MCPPCMRenderer *renderer);
 bool MCPPCMRendererDidFinish(const MCPPCMRenderer *renderer);
 
 OSStatus MCPPCMRenderCallback(

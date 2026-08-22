@@ -9,7 +9,7 @@ import SwiftUI
 
 struct SearchCardContentView: View {
     @ObservedObject var viewModel: SearchViewModel
-    @ObservedObject var localLibrary: LocalLibraryStore
+    @ObservedObject var libraryManager: LibraryManager
 
     let recentArtists: [SearchArtistRow]
     let recentReleases: [SearchReleaseRow]
@@ -165,8 +165,8 @@ struct SearchCardContentView: View {
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
 
-                        if localLibrary.containsArtist(named: artist.name) {
-                            playableIndicator(label: "Artist available in local library")
+                        if libraryManager.containsArtist(named: artist.name) {
+                            playableIndicator(label: "Artist available in music library")
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -221,8 +221,8 @@ struct SearchCardContentView: View {
 
             Spacer(minLength: 0)
 
-            if localLibrary.containsRelease(release.id) {
-                playableIndicator(label: "Release available in local library")
+            if libraryManager.containsRelease(release.id) {
+                playableIndicator(label: "Release available in music library")
             }
         }
     }
@@ -301,8 +301,8 @@ struct SearchCardContentView: View {
                 .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            if localLibrary.containsArtist(named: artist.name) {
-                playableIndicator(label: "Artist available in local library")
+            if libraryManager.containsArtist(named: artist.name) {
+                playableIndicator(label: "Artist available in music library")
             }
         }
         .padding(.vertical, 0)

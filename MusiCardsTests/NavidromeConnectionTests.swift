@@ -75,12 +75,189 @@ final class NavidromeConnectionTests: XCTestCase {
         XCTAssertEqual(request.url?.path, "/navidrome/rest/ping")
     }
 
-    func testPingRequestRejectsInsecureHTTP() {
-        XCTAssertThrowsError(
-            try pingRequest(baseURL: URL(string: "http://music.example.com")!)
-        ) { error in
-            XCTAssertEqual(error as? NavidromeConnectionError, .secureConnectionRequired)
-        }
+    func testAlbumListRequestUsesAlphabeticalPagination() throws {
+        let profile = NavidromeServerProfile(
+            name: "Test Server",
+            baseURL: URL(string: "https://music.example.com/navidrome")!,
+            username: "listener"
+        )
+        let request = try OpenSubsonicRequestBuilder().albumListRequest(
+            profile: profile,
+            password: "password",
+            salt: "abcdef",
+            offset: 500,
+            size: 500
+        )
+
+        XCTAssertEqual(
+            request.url?.path,
+            "/navidrome/rest/getAlbumList2"
+        )
+        let body = try XCTUnwrap(
+            request.httpBody.flatMap { String(data: $0, encoding: .utf8) }
+        )
+        XCTAssertTrue(body.contains("type=alphabeticalByName"))
+        XCTAssertTrue(body.contains("offset=500"))
+        XCTAssertTrue(body.contains("size=500"))
+    }
+
+    func testAlbumDetailRequestUsesServerAlbumID() throws {
+        let profile = NavidromeServerProfile(
+            name: "Test Server",
+            baseURL: URL(string: "https://music.example.com")!,
+            username: "listener"
+        )
+        let request = try OpenSubsonicRequestBuilder().albumRequest(
+            profile: profile,
+            password: "password",
+            salt: "abcdef",
+            albumID: "album/id"
+        )
+
+        XCTAssertEqual(request.url?.path, "/rest/getAlbum")
+        let body = try XCTUnwrap(
+            request.httpBody.flatMap { String(data: $0, encoding: .utf8) }
+        )
+        XCTAssertTrue(body.contains("id=album%2Fid"))
+    }
+
+    func testRawStreamRequestUsesSongIDWithoutTranscodingParameters() throws {
+        let profile = NavidromeServerProfile(
+            name: "Test Server",
+            baseURL: URL(string: "http://music.example.com/navidrome")!,
+            username: "listener"
+        )
+        let request = try OpenSubsonicRequestBuilder().streamRequest(
+            profile: profile,
+            password: "super secret",
+            salt: "abcdef",
+            songID: "song/id"
+        )
+
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.url?.path, "/navidrome/rest/stream")
+        XCTAssertNil(request.url?.query)
+        XCTAssertEqual(
+            request.value(forHTTPHeaderField: "Accept"),
+            "audio/*, application/octet-stream"
+        )
+
+        let body = try XCTUnwrap(
+            request.httpBody.flatMap { String(data: $0, encoding: .utf8) }
+        )
+        XCTAssertTrue(body.contains("id=song%2Fid"))
+        XCTAssertTrue(body.contains("format=raw"))
+        XCTAssertFalse(body.localizedCaseInsensitiveContains("bitrate"))
+        XCTAssertFalse(body.localizedCaseInsensitiveContains("transcod"))
+        XCTAssertFalse(body.contains("super"))
+        XCTAssertFalse(body.contains("secret"))
+        XCTAssertFalse(body.contains("p="))
+    }
+
+    func testAlbumResponsesDecodeReleaseMusicBrainzID() throws {
+        let data = Data(
+            """
+            {
+              "subsonic-response": {
+                "status": "ok",
+                "albumList2": {
+                  "album": [{
+                    "id": "album-1",
+                    "name": "Release",
+                    "artist": "Artist 1 feat. Artist 2",
+                    "artists": [{
+                      "id": "artist-1",
+                      "name": "Artist 1"
+                    }, {
+                      "id": "artist-2",
+                      "name": "Artist 2"
+                    }],
+                    "musicBrainzId": "189002e7-3285-4e2e-92a3-7f6c30d407a2"
+                  }]
+                }
+              }
+            }
+            """.utf8
+        )
+
+        let envelope = try JSONDecoder().decode(
+            OpenSubsonicAlbumListEnvelope.self,
+            from: data
+        )
+
+        XCTAssertEqual(
+            envelope.response.albumList?.albums.first?.musicBrainzID,
+            "189002e7-3285-4e2e-92a3-7f6c30d407a2"
+        )
+        XCTAssertEqual(
+            envelope.response.albumList?.albums.first?.artist,
+            "Artist 1 feat. Artist 2"
+        )
+        XCTAssertEqual(
+            envelope.response.albumList?.albums.first?.artists.map(\.name),
+            ["Artist 1", "Artist 2"]
+        )
+    }
+
+    func testAlbumDetailDecodesSongRecordingMusicBrainzIDs() throws {
+        let data = Data(
+            """
+            {
+              "subsonic-response": {
+                "status": "ok",
+                "album": {
+                  "id": "album-1",
+                  "name": "Release",
+                  "musicBrainzId": "189002e7-3285-4e2e-92a3-7f6c30d407a2",
+                  "song": [{
+                    "id": "song-1",
+                    "musicBrainzId": "bf99cae5-3b83-437a-a266-7126bd5653bf",
+                    "title": "Hi-Res Track",
+                    "suffix": "flac",
+                    "contentType": "audio/flac",
+                    "size": 123456789,
+                    "duration": 321,
+                    "bitRate": 4512,
+                    "samplingRate": 96000,
+                    "bitDepth": 24,
+                    "channelCount": 2
+                  }]
+                }
+              }
+            }
+            """.utf8
+        )
+
+        let envelope = try JSONDecoder().decode(
+            OpenSubsonicAlbumEnvelope.self,
+            from: data
+        )
+
+        XCTAssertEqual(
+            envelope.response.album?.songs.first?.musicBrainzID,
+            "bf99cae5-3b83-437a-a266-7126bd5653bf"
+        )
+        let song = try XCTUnwrap(envelope.response.album?.songs.first)
+        XCTAssertEqual(song.title, "Hi-Res Track")
+        XCTAssertEqual(song.suffix, "flac")
+        XCTAssertEqual(song.contentType, "audio/flac")
+        XCTAssertEqual(song.size, 123_456_789)
+        XCTAssertEqual(song.duration, 321)
+        XCTAssertEqual(song.bitRate, 4_512)
+        XCTAssertEqual(song.samplingRate, 96_000)
+        XCTAssertEqual(song.bitDepth, 24)
+        XCTAssertEqual(song.channelCount, 2)
+    }
+
+    func testAuthenticatedRequestsSupportHTTP() throws {
+        let request = try pingRequest(
+            baseURL: URL(string: "http://music.example.com")!
+        )
+
+        XCTAssertEqual(
+            request.url?.absoluteString,
+            "http://music.example.com/rest/ping"
+        )
     }
 
     func testVerifierAcceptsModernNavidromeResponse() throws {

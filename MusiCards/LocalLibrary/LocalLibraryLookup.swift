@@ -11,10 +11,12 @@ import Foundation
 /// testable while the SwiftData store remains responsible only for persistence.
 nonisolated struct LocalLibraryLookup {
     private let tracksByReleaseID: [String: [LocalAudioFileSnapshot]]
+    private let tracksByID: [String: LocalAudioFileSnapshot]
     private let tracksByReleaseTrackKey: [String: LocalAudioFileSnapshot]
     private let legacyTracksByRecordingKey: [String: LocalAudioFileSnapshot]
     private let normalizedArtistCredits: Set<String>
     private let normalizedArtistCreditsByAlbumTitle: [String: Set<String>]
+    private let catalogReleases: [LibraryCatalogRelease]
 
     init(files: [LocalAudioFileSnapshot] = []) {
         let files = files.sorted {
@@ -22,7 +24,7 @@ nonisolated struct LocalLibraryLookup {
                 == .orderedAscending
         }
 
-        tracksByReleaseID = Dictionary(
+        let groupedTracksByReleaseID = Dictionary(
             grouping: files.compactMap {
                 file -> (String, LocalAudioFileSnapshot)? in
                 guard let releaseID = Self.nonemptyMBID(file.releaseMBID) else {
@@ -32,6 +34,12 @@ nonisolated struct LocalLibraryLookup {
             },
             by: { $0.0 }
         ).mapValues { $0.map(\.1) }
+        tracksByReleaseID = groupedTracksByReleaseID
+
+        tracksByID = Dictionary(
+            files.map { ($0.id, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
 
         normalizedArtistCredits = Set(
             files.compactMap { file in
@@ -76,6 +84,20 @@ nonisolated struct LocalLibraryLookup {
         legacyTracksByRecordingKey = legacyCandidates.compactMapValues {
             $0.count == 1 ? $0[0] : nil
         }
+        catalogReleases = groupedTracksByReleaseID.keys.sorted().compactMap {
+            releaseID in
+            guard let releaseFiles = groupedTracksByReleaseID[releaseID],
+                  let first = releaseFiles.first else {
+                return nil
+            }
+            return LibraryCatalogRelease(
+                releaseID: releaseID,
+                title: first.albumTitle,
+                artistName: first.artist,
+                format: first.codec.isEmpty ? nil : first.codec,
+                trackTitles: releaseFiles.map(\.title)
+            )
+        }
     }
 
     var releaseCount: Int {
@@ -84,6 +106,21 @@ nonisolated struct LocalLibraryLookup {
 
     func containsRelease(_ releaseID: String) -> Bool {
         tracksByReleaseID[Self.normalizedMBID(releaseID)]?.isEmpty == false
+    }
+
+    func searchCatalog(
+        query: String,
+        limit: Int = 50
+    ) -> [LibraryCatalogRelease] {
+        LibraryCatalogSearch.search(
+            catalogReleases,
+            query: query,
+            limit: limit
+        )
+    }
+
+    func audioFile(id: String) -> LocalAudioFileSnapshot? {
+        tracksByID[id]
     }
 
     func containsArtist(named artistName: String) -> Bool {
@@ -147,14 +184,7 @@ nonisolated struct LocalLibraryLookup {
     }
 
     private static func normalizedLibraryText(_ value: String) -> String {
-        value
-            .folding(
-                options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive],
-                locale: Locale(identifier: "en_US_POSIX")
-            )
-            .split(whereSeparator: { !$0.isLetter && !$0.isNumber })
-            .map(String.init)
-            .joined(separator: " ")
+        LibraryCatalogSearch.normalizedText(value)
     }
 
     private static func artistCredit(

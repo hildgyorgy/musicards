@@ -7,9 +7,14 @@
 
 import Foundation
 import Combine
+import OSLog
 
 @MainActor
 final class ClassicalMetadataStore: ObservableObject {
+    nonisolated private static let logger = Logger(
+        subsystem: "com.hildgyorgy.MusiCards",
+        category: "ClassicalMetadata"
+    )
 
     // MARK: - Published state
 
@@ -73,7 +78,10 @@ final class ClassicalMetadataStore: ObservableObject {
                 composerNames[recordingID] = name
             }
         } catch {
-            print("ClassicalMetadataStore error:", error)
+            let nsError = error as NSError
+            Self.logger.error(
+                "Classical metadata load failed domain=\(nsError.domain, privacy: .public) code=\(nsError.code, privacy: .public) detail=\(nsError.localizedDescription, privacy: .private)"
+            )
         }
     }
 

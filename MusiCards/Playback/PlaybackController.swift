@@ -5,6 +5,9 @@
 
 import Combine
 import Foundation
+#if DEBUG
+import OSLog
+#endif
 
 struct PlaybackQueueRequest: Equatable, Sendable {
     fileprivate let generation: UInt64
@@ -19,11 +22,16 @@ final class PlaybackController: ObservableObject {
     @Published private(set) var preparedDuration: TimeInterval?
 
     private let engine: PlaybackEngine
+    private let assetResolver: (any PlaybackAssetResolving)?
     private var preparedItemID: PlaybackQueueItem.ID?
     private var playbackGeneration: UInt64 = 0
 
-    init(engine: PlaybackEngine) {
+    init(
+        engine: PlaybackEngine,
+        assetResolver: (any PlaybackAssetResolving)? = nil
+    ) {
         self.engine = engine
+        self.assetResolver = assetResolver
         engine.eventHandler = { [weak self] event in
             self?.handle(event)
         }
@@ -44,6 +52,10 @@ final class PlaybackController: ObservableObject {
     var hasNext: Bool {
         guard let currentIndex else { return false }
         return currentIndex < queue.index(before: queue.endIndex)
+    }
+
+    var canSeek: Bool {
+        currentItem?.source.seekCapability.isSupported == true
     }
 
     func beginQueueRequest() -> PlaybackQueueRequest {
@@ -118,7 +130,12 @@ final class PlaybackController: ObservableObject {
                 status = .loading
                 position = 0
                 preparedDuration = currentItem.track.duration
-                try await engine.prepare(currentItem)
+                let resolvedItem = try await resolvedItem(currentItem)
+                guard isCurrent(generation: generation, itemID: itemID),
+                      !Task.isCancelled else {
+                    return
+                }
+                try await engine.prepare(resolvedItem)
                 guard isCurrent(generation: generation, itemID: itemID),
                       !Task.isCancelled else {
                     await engine.stop()
@@ -161,6 +178,7 @@ final class PlaybackController: ObservableObject {
 
     func stop() async {
         _ = advancePlaybackGeneration()
+        preparedItemID = nil
         position = 0
         status = queue.isEmpty ? .idle : .stopped
         await engine.stop()
@@ -173,6 +191,14 @@ final class PlaybackController: ObservableObject {
 
     func seek(to requestedPosition: TimeInterval) async {
         guard currentItem != nil else { return }
+        guard canSeek else {
+            #if DEBUG
+            RemotePlaybackDiagnostics.logger.notice(
+                "Remote seek rejected before decoder mutation capability=unsupported"
+            )
+            #endif
+            return
+        }
 
         let upperBound = preparedDuration ?? currentItem?.track.duration
         let position = min(max(requestedPosition, 0), upperBound ?? requestedPosition)
@@ -181,6 +207,7 @@ final class PlaybackController: ObservableObject {
             try await engine.seek(to: position)
             self.position = position
         } catch {
+            preparedItemID = nil
             fail(with: error)
         }
     }
@@ -233,12 +260,35 @@ final class PlaybackController: ObservableObject {
                 }
             }
         case .failed(let failure):
+            preparedItemID = nil
             status = .failed(failure)
         }
     }
 
     private func fail(with error: Error) {
         status = .failed(PlaybackFailure(error))
+    }
+
+    private func resolvedItem(
+        _ item: PlaybackQueueItem
+    ) async throws -> PlaybackQueueItem {
+        switch item.source {
+        case .localFile, .remoteAudio:
+            return item
+        case .libraryAsset(let reference):
+            guard let assetResolver else {
+                throw PlaybackAssetResolutionError.providerUnavailable(
+                    reference.source
+                )
+            }
+            let source = try await assetResolver.resolvePlaybackAsset(reference)
+            switch source {
+            case .localFile, .remoteAudio:
+                return item.replacingSource(source)
+            case .libraryAsset:
+                throw PlaybackAssetResolutionError.assetUnavailable
+            }
+        }
     }
 
     @discardableResult

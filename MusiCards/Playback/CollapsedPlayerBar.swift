@@ -83,6 +83,11 @@ struct CollapsedPlayerBar: View {
                     interactiveSeekBar
                         .accessibilityLabel("Playback position")
                         .accessibilityValue(formatTime(displayedPosition))
+                        .accessibilityHint(
+                            controller.canSeek
+                                ? "Drag to seek"
+                                : "Seeking is unavailable for this track"
+                        )
                 }
             }
         }
@@ -147,7 +152,7 @@ struct CollapsedPlayerBar: View {
 
                 #if os(macOS)
                 MacSeekInteractionView(
-                    isEnabled: duration != nil,
+                    isEnabled: duration != nil && controller.canSeek,
                     onBegan: beginSeek,
                     onChanged: updateSeek,
                     onEnded: finishSeek
@@ -181,11 +186,11 @@ struct CollapsedPlayerBar: View {
             }
         }
         .frame(height: seekHitHeight)
-        .allowsHitTesting(duration != nil)
+        .allowsHitTesting(duration != nil && controller.canSeek)
     }
 
     private func beginSeek(at fraction: CGFloat) {
-        guard duration != nil else { return }
+        guard duration != nil, controller.canSeek else { return }
         isScrubbing = true
         updateSeek(to: fraction)
     }

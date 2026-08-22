@@ -6,7 +6,7 @@ final class LocalLibraryManifestTests: XCTestCase {
         let data = Data(
             """
             [{
-              "index_version": 2,
+              "index_version": \(LocalLibraryManifestGenerator.currentIndexVersion),
               "library_album_count": 916,
               "album_name": "Verse",
               "artist_name": "Patricia Barber",
@@ -83,5 +83,36 @@ final class LocalLibraryManifestTests: XCTestCase {
         )
 
         XCTAssertThrowsError(try LocalLibraryManifestLoader.decode(data))
+    }
+
+    func testPythonAndSwiftIndexVersionsStayInSync() throws {
+        let projectRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let pythonToolURL = projectRoot
+            .appendingPathComponent("Tools/generate_library.py")
+        let source = try String(contentsOf: pythonToolURL, encoding: .utf8)
+        let declaration = try NSRegularExpression(
+            pattern: #"(?m)^\s*INDEX_VERSION\s*=\s*(\d+)\s*(?:#.*)?$"#
+        )
+        let sourceRange = NSRange(source.startIndex..., in: source)
+        let matches = declaration.matches(in: source, range: sourceRange)
+
+        XCTAssertEqual(
+            matches.count,
+            1,
+            "Tools/generate_library.py must declare exactly one integer INDEX_VERSION."
+        )
+        let match = try XCTUnwrap(matches.first)
+        let versionRange = try XCTUnwrap(
+            Range(match.range(at: 1), in: source)
+        )
+        let pythonVersion = try XCTUnwrap(Int(source[versionRange]))
+
+        XCTAssertEqual(
+            pythonVersion,
+            LocalLibraryManifestGenerator.currentIndexVersion,
+            "The Swift index generator and Tools/generate_library.py must update INDEX_VERSION together."
+        )
     }
 }
