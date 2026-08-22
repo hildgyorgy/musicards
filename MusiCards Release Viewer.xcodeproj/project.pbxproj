@@ -920,6 +920,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 2.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = hu.hildgyorgy.musicards;
+				"PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" = hu.hildgyorgy.MusiCardsMac;
 				PRODUCT_NAME = MusiCards;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
@@ -974,6 +975,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 2.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = hu.hildgyorgy.musicards;
+				"PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" = hu.hildgyorgy.MusiCardsMac;
 				PRODUCT_NAME = MusiCards;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
