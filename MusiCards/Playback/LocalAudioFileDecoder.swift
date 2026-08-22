@@ -41,6 +41,123 @@ extension DecodedPCMResourceOwner {
     nonisolated func didProduceFirstPCM() {}
 }
 
+nonisolated enum PCMDecoderSampleFormat: Equatable, Sendable {
+    case interleavedFloat32
+    case interleavedSignedInteger(bitDepth: Int)
+}
+
+nonisolated struct PCMDecoderFormat: Equatable, Sendable {
+    let sampleRate: Double
+    let channelCount: UInt32
+    let sampleFormat: PCMDecoderSampleFormat
+}
+
+nonisolated protocol PCMDecoderBackend: AnyObject, Sendable {
+    var format: PCMDecoderFormat { get }
+    var frameCount: UInt64 { get }
+    var isRemote: Bool { get }
+    func read(
+        into buffer: UnsafeMutableRawPointer,
+        frameCapacity: UInt32
+    ) throws -> UInt32
+    func seek(to frame: UInt64) throws
+    func cancel()
+    func beginSeek()
+    func endSeek(succeeded: Bool)
+    func takeReadError() -> Error?
+    func didProduceFirstPCM()
+}
+
+nonisolated final class ExtAudioFilePCMDecoderBackend:
+    PCMDecoderBackend, @unchecked Sendable
+{
+    let format: PCMDecoderFormat
+    let frameCount: UInt64
+    let isRemote: Bool
+
+    private let file: ExtAudioFileRef
+    private let resourceOwner: (any DecodedPCMResourceOwner)?
+    private let bytesPerFrame: UInt32
+    private let lock = NSLock()
+    private var didDispose = false
+
+    init(
+        file: ExtAudioFileRef,
+        format: PCMDecoderFormat,
+        frameCount: UInt64,
+        resourceOwner: (any DecodedPCMResourceOwner)? = nil
+    ) {
+        self.file = file
+        self.format = format
+        self.frameCount = frameCount
+        self.isRemote = resourceOwner != nil
+        self.resourceOwner = resourceOwner
+        let bytesPerSample: UInt32
+        switch format.sampleFormat {
+        case .interleavedFloat32:
+            bytesPerSample = UInt32(MemoryLayout<Float>.size)
+        case .interleavedSignedInteger(let bitDepth):
+            bytesPerSample = UInt32(max((bitDepth + 7) / 8, 1))
+        }
+        self.bytesPerFrame = format.channelCount * bytesPerSample
+    }
+
+    deinit { dispose() }
+
+    func read(
+        into buffer: UnsafeMutableRawPointer,
+        frameCapacity: UInt32
+    ) throws -> UInt32 {
+        var framesToRead = frameCapacity
+        var bufferList = AudioBufferList(
+            mNumberBuffers: 1,
+            mBuffers: AudioBuffer(
+                mNumberChannels: format.channelCount,
+                mDataByteSize: frameCapacity * bytesPerFrame,
+                mData: buffer
+            )
+        )
+        let status = ExtAudioFileRead(file, &framesToRead, &bufferList)
+        guard status == noErr else {
+            throw NativePlaybackEngineError(
+                "PCM decoding failed",
+                status: status
+            )
+        }
+        return framesToRead
+    }
+
+    func seek(to frame: UInt64) throws {
+        let status = ExtAudioFileSeek(file, Int64(frame))
+        guard status == noErr else {
+            throw NativePlaybackEngineError(
+                "Could not seek in the selected audio file",
+                status: status
+            )
+        }
+    }
+
+    func cancel() { resourceOwner?.cancel() }
+    func beginSeek() { resourceOwner?.beginSeek() }
+    func endSeek(succeeded: Bool) {
+        resourceOwner?.endSeek(succeeded: succeeded)
+    }
+    func takeReadError() -> Error? { resourceOwner?.takeReadError() }
+    func didProduceFirstPCM() { resourceOwner?.didProduceFirstPCM() }
+
+    private func dispose() {
+        let shouldDispose = lock.withLock {
+            guard !didDispose else { return false }
+            didDispose = true
+            return true
+        }
+        guard shouldDispose else { return }
+        resourceOwner?.cancel()
+        ExtAudioFileDispose(file)
+        resourceOwner?.disposeAfterExtAudioFile()
+    }
+}
+
 nonisolated final class DecodedPCM: @unchecked Sendable {
     let renderer: OpaquePointer
     let sampleRate: Double
@@ -48,7 +165,7 @@ nonisolated final class DecodedPCM: @unchecked Sendable {
     let frameCount: UInt64
     let isRemote: Bool
 
-    private let file: ExtAudioFileRef
+    private let decoder: any PCMDecoderBackend
     private let feederQueue = DispatchQueue(
         label: "com.hildgyorgy.MusiCards.audio-feeder",
         qos: .userInitiated
@@ -60,7 +177,6 @@ nonisolated final class DecodedPCM: @unchecked Sendable {
     private let frameCapacity: UInt64
     private let didAccessSecurityScope: Bool
     private let sourceURL: URL?
-    private let resourceOwner: (any DecodedPCMResourceOwner)?
     private let errorLock = NSLock()
     private var feederError: Error?
     private var didReachEndOfStream = false
@@ -71,19 +187,18 @@ nonisolated final class DecodedPCM: @unchecked Sendable {
         sampleRate: Double,
         channelCount: UInt32,
         frameCount: UInt64,
-        file: ExtAudioFileRef,
+        decoder: any PCMDecoderBackend,
         decodeBuffer: UnsafeMutablePointer<Float>,
         decodeChunkFrames: UInt32,
         didAccessSecurityScope: Bool,
-        sourceURL: URL?,
-        resourceOwner: (any DecodedPCMResourceOwner)? = nil
+        sourceURL: URL?
     ) {
         self.renderer = renderer
         self.sampleRate = sampleRate
         self.channelCount = channelCount
         self.frameCount = frameCount
-        self.isRemote = resourceOwner != nil
-        self.file = file
+        self.isRemote = decoder.isRemote
+        self.decoder = decoder
         self.decodeBuffer = decodeBuffer
         self.decodeChunkFrames = decodeChunkFrames
         self.bytesPerFrame = channelCount * UInt32(MemoryLayout<Float>.size)
@@ -92,7 +207,6 @@ nonisolated final class DecodedPCM: @unchecked Sendable {
         )
         self.didAccessSecurityScope = didAccessSecurityScope
         self.sourceURL = sourceURL
-        self.resourceOwner = resourceOwner
         self.feederTimer = DispatchSource.makeTimerSource(queue: feederQueue)
 
         feederTimer.setEventHandler { [weak self] in
@@ -103,11 +217,9 @@ nonisolated final class DecodedPCM: @unchecked Sendable {
     }
 
     deinit {
-        resourceOwner?.cancel()
+        decoder.cancel()
         feederTimer.cancel()
         feederQueue.sync {}
-        ExtAudioFileDispose(file)
-        resourceOwner?.disposeAfterExtAudioFile()
         decodeBuffer.deallocate()
         MCPPCMRendererDestroy(renderer)
         if didAccessSecurityScope, let sourceURL {
@@ -140,23 +252,17 @@ nonisolated final class DecodedPCM: @unchecked Sendable {
             )
         }
         #endif
-        resourceOwner?.cancel()
+        decoder.cancel()
         feederTimer.cancel()
     }
 
     func seek(to frame: UInt64) throws {
         let boundedFrame = min(frame, frameCount)
         try feederQueue.sync {
-            resourceOwner?.beginSeek()
+            decoder.beginSeek()
             var seekSucceeded = false
-            defer { resourceOwner?.endSeek(succeeded: seekSucceeded) }
-            let status = ExtAudioFileSeek(file, Int64(boundedFrame))
-            guard status == noErr else {
-                throw NativePlaybackEngineError(
-                    "Could not seek in the selected audio file",
-                    status: status
-                )
-            }
+            defer { decoder.endSeek(succeeded: seekSucceeded) }
+            try decoder.seek(to: boundedFrame)
             errorLock.withLock { feederError = nil }
             didReachEndOfStream = false
             MCPPCMRendererReset(renderer, boundedFrame)
@@ -169,7 +275,7 @@ nonisolated final class DecodedPCM: @unchecked Sendable {
             if let error = currentFeederError() {
                 throw error
             }
-            guard resourceOwner == nil || bufferedFrameCount > 0 else {
+            guard !isRemote || bufferedFrameCount > 0 else {
                 throw NativePlaybackEngineError(
                     "Seeking produced no playable PCM frames"
                 )
@@ -208,23 +314,15 @@ nonisolated final class DecodedPCM: @unchecked Sendable {
         )
         guard framesToRead > 0 else { return }
 
-        var bufferList = AudioBufferList(
-            mNumberBuffers: 1,
-            mBuffers: AudioBuffer(
-                mNumberChannels: channelCount,
-                mDataByteSize: framesToRead * bytesPerFrame,
-                mData: decodeBuffer
+        do {
+            framesToRead = try decoder.read(
+                into: UnsafeMutableRawPointer(decodeBuffer),
+                frameCapacity: framesToRead
             )
-        )
-        let status = ExtAudioFileRead(file, &framesToRead, &bufferList)
-        guard status == noErr else {
+        } catch {
             didReachEndOfStream = true
             setFeederError(
-                resourceOwner?.takeReadError()
-                    ?? NativePlaybackEngineError(
-                        "PCM decoding failed",
-                        status: status
-                    )
+                decoder.takeReadError() ?? error
             )
             MCPPCMRendererMarkEndOfStream(renderer)
             return
@@ -248,7 +346,7 @@ nonisolated final class DecodedPCM: @unchecked Sendable {
             MCPPCMRendererMarkEndOfStream(renderer)
         } else if !didReportFirstPCM {
             didReportFirstPCM = true
-            resourceOwner?.didProduceFirstPCM()
+            decoder.didProduceFirstPCM()
         }
     }
 
@@ -346,12 +444,21 @@ enum LocalAudioFileDecoder {
 
         let sampleCapacity = Int(decodeChunkFrames) * Int(channelCount)
         let decodeBuffer = UnsafeMutablePointer<Float>.allocate(capacity: sampleCapacity)
+        let decoder = ExtAudioFilePCMDecoderBackend(
+            file: file,
+            format: PCMDecoderFormat(
+                sampleRate: sourceFormat.mSampleRate,
+                channelCount: channelCount,
+                sampleFormat: .interleavedFloat32
+            ),
+            frameCount: frameCount
+        )
         let decodedPCM = DecodedPCM(
             renderer: renderer,
             sampleRate: sourceFormat.mSampleRate,
             channelCount: channelCount,
             frameCount: frameCount,
-            file: file,
+            decoder: decoder,
             decodeBuffer: decodeBuffer,
             decodeChunkFrames: decodeChunkFrames,
             didAccessSecurityScope: didAccess,

@@ -104,17 +104,26 @@ nonisolated enum RemoteAudioFileDecoder {
             let decodeBuffer = UnsafeMutablePointer<Float>.allocate(
                 capacity: sampleCapacity
             )
+            let decoder = ExtAudioFilePCMDecoderBackend(
+                file: extendedFile,
+                format: PCMDecoderFormat(
+                    sampleRate: sourceFormat.mSampleRate,
+                    channelCount: channelCount,
+                    sampleFormat: .interleavedFloat32
+                ),
+                frameCount: frameCount,
+                resourceOwner: resource
+            )
             let decodedPCM = DecodedPCM(
                 renderer: renderer,
                 sampleRate: sourceFormat.mSampleRate,
                 channelCount: channelCount,
                 frameCount: frameCount,
-                file: extendedFile,
+                decoder: decoder,
                 decodeBuffer: decodeBuffer,
                 decodeChunkFrames: decodeChunkFrames,
                 didAccessSecurityScope: false,
-                sourceURL: nil,
-                resourceOwner: resource
+                sourceURL: nil
             )
             ownershipTransferredToDecodedPCM = true
             let startupFrames = UInt64(
