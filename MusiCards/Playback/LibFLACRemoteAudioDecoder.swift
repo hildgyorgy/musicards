@@ -5,17 +5,6 @@ import OSLog
 #endif
 
 nonisolated enum LibFLACRemoteAudioDecoder {
-    static let experimentalUserDefaultsKey =
-        "MusiCards.ExperimentalRemoteLibFLAC"
-
-    static var isExperimentEnabled: Bool {
-        #if DEBUG
-        UserDefaults.standard.bool(forKey: experimentalUserDefaultsKey)
-        #else
-        false
-        #endif
-    }
-
     static func decode(
         asset: RemotePlaybackAsset,
         byteSource: HTTPRandomAccessByteSource
@@ -36,7 +25,7 @@ nonisolated enum LibFLACRemoteAudioDecoder {
             backend.format.channelCount
         ) else {
             throw NativePlaybackEngineError(
-                "Not enough memory to create the experimental FLAC playback buffer"
+                "Not enough memory to create the FLAC playback buffer"
             )
         }
 
@@ -68,7 +57,7 @@ nonisolated enum LibFLACRemoteAudioDecoder {
             let elapsed = elapsedSeconds(since: startedAt)
             let statistics = byteSource.statistics
             RemotePlaybackDiagnostics.logger.notice(
-                "Experimental libFLAC ready sampleRate=\(backend.format.sampleRate, privacy: .public) channels=\(backend.format.channelCount, privacy: .public) bitsPerSample=\(backend.bitsPerSample, privacy: .public) totalFrames=\(backend.frameCount, privacy: .public) startup=\(elapsed, privacy: .public)s requests=\(statistics.rangeRequestCount, privacy: .public) bytes=\(statistics.networkByteCount, privacy: .public)"
+                "libFLAC ready sampleRate=\(backend.format.sampleRate, privacy: .public) channels=\(backend.format.channelCount, privacy: .public) bitsPerSample=\(backend.bitsPerSample, privacy: .public) totalFrames=\(backend.frameCount, privacy: .public) startup=\(elapsed, privacy: .public)s requests=\(statistics.rangeRequestCount, privacy: .public) bytes=\(statistics.networkByteCount, privacy: .public)"
             )
             #endif
             return decodedPCM
@@ -168,7 +157,7 @@ private nonisolated final class LibFLACCallbackContext:
     ) -> Int {
         guard pendingFrameCount == 0 else {
             record(NativePlaybackEngineError(
-                "The experimental FLAC decoder produced overlapping PCM frames"
+                "The FLAC decoder produced overlapping PCM frames"
             ))
             return -1
         }
@@ -239,7 +228,7 @@ private nonisolated final class LibFLACCallbackContext:
             if let callbackError { return callbackError }
             if let decoderErrorStatus {
                 return NativePlaybackEngineError(
-                    "The experimental FLAC decoder reported error \(decoderErrorStatus)"
+                    "The FLAC decoder reported error \(decoderErrorStatus)"
                 )
             }
             return nil
@@ -255,7 +244,7 @@ private nonisolated final class LibFLACCallbackContext:
     }
 }
 
-private nonisolated final class LibFLACPCMDecoderBackend:
+nonisolated final class LibFLACPCMDecoderBackend:
     PCMDecoderBackend, @unchecked Sendable
 {
     let format: PCMDecoderFormat
@@ -276,7 +265,7 @@ private nonisolated final class LibFLACPCMDecoderBackend:
         guard let decoder = MCPFLACDecoderCreate() else {
             byteSource.cancel()
             throw NativePlaybackEngineError(
-                "Could not create the experimental FLAC decoder"
+                "Could not create the FLAC decoder"
             )
         }
 
@@ -293,13 +282,21 @@ private nonisolated final class LibFLACPCMDecoderBackend:
             mcpFLACError,
             contextPointer
         )
-        guard initStatus == 0,
-              MCPFLACDecoderProcessMetadata(decoder) else {
+        guard initStatus == 0 else {
             MCPFLACDecoderDestroy(decoder)
             byteSource.cancel()
             throw context.takeError()
                 ?? NativePlaybackEngineError(
-                    "Could not initialize the experimental FLAC decoder"
+                    "Could not initialize the FLAC decoder (status \(initStatus))"
+                )
+        }
+
+        guard MCPFLACDecoderProcessMetadata(decoder) else {
+            MCPFLACDecoderDestroy(decoder)
+            byteSource.cancel()
+            throw context.takeError()
+                ?? NativePlaybackEngineError(
+                    "Could not process FLAC metadata"
                 )
         }
 
@@ -311,7 +308,7 @@ private nonisolated final class LibFLACPCMDecoderBackend:
             MCPFLACDecoderDestroy(decoder)
             byteSource.cancel()
             throw NativePlaybackEngineError(
-                "The experimental FLAC decoder supports only mono/stereo 16-bit or 24-bit files with known duration"
+                "The FLAC decoder supports only mono/stereo 16-bit or 24-bit files with known duration"
             )
         }
 
@@ -370,7 +367,7 @@ private nonisolated final class LibFLACPCMDecoderBackend:
         guard MCPFLACDecoderSeekAbsolute(decoder, frame) else {
             throw context.takeError()
                 ?? NativePlaybackEngineError(
-                    "Could not seek in the experimental FLAC decoder"
+                    "Could not seek in the FLAC decoder"
                 )
         }
         if let error = context.takeError() { throw error }

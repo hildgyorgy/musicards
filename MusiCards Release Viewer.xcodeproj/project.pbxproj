@@ -7,8 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		F60000000000000000000001 /* FLAC in Frameworks */ = {isa = PBXBuildFile; productRef = F60000000000000000000002 /* FLAC */; };
-		F60000000000000000000004 /* ogg in Frameworks */ = {isa = PBXBuildFile; productRef = F60000000000000000000005 /* ogg */; };
 		F50A4F7E2F8EF16E006FD7A7 /* ClassicalMetadataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50A4F7C2F8EF16E006FD7A7 /* ClassicalMetadataStore.swift */; };
 		F50A4F7F2F8EF16E006FD7A7 /* ClassicalTrackFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50A4F7D2F8EF16E006FD7A7 /* ClassicalTrackFormatter.swift */; };
 		F50AC8762F8E5EE200776C7E /* DeckBackgroundView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50AC8752F8E5EE100776C7E /* DeckBackgroundView.swift */; };
@@ -55,6 +53,8 @@
 		F5ECDD4E2F85A98B006161E3 /* SearchCardHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5ECDD4D2F85A989006161E3 /* SearchCardHeaderView.swift */; };
 		F5ECDD502F85C6FB006161E3 /* SearchArtistRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5ECDD4F2F85C6FA006161E3 /* SearchArtistRow.swift */; };
 		F5F5565A2FC303E300CFE831 /* MusiCardID.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5F556592FC303E200CFE831 /* MusiCardID.swift */; };
+		F60000000000000000000001 /* FLAC in Frameworks */ = {isa = PBXBuildFile; productRef = F60000000000000000000002 /* FLAC */; };
+		F60000000000000000000004 /* ogg in Frameworks */ = {isa = PBXBuildFile; productRef = F60000000000000000000005 /* ogg */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -430,10 +430,6 @@
 			);
 			buildRules = (
 			);
-			packageProductDependencies = (
-				F60000000000000000000002 /* FLAC */,
-				F60000000000000000000005 /* ogg */,
-			);
 			fileSystemSynchronizedGroups = (
 				F5A09F5E2FBC746A00E5404B /* MusiCardsMac */,
 				F5C0DE012FD0000000000001 /* Playback */,
@@ -444,6 +440,10 @@
 				F5E510E12FC4BDF300E797D6 /* Deck */,
 			);
 			name = MusiCards;
+			packageProductDependencies = (
+				F60000000000000000000002 /* FLAC */,
+				F60000000000000000000005 /* ogg */,
+			);
 			productName = MusiCards;
 			productReference = F5E5213F2F8292AD00D2CEAE /* MusiCards.app */;
 			productType = "com.apple.product-type.application";
@@ -482,11 +482,11 @@
 				Base,
 			);
 			mainGroup = F5E521362F8292AD00D2CEAE;
+			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				F60000000000000000000003 /* XCRemoteSwiftPackageReference "flac-binary-xcframework" */,
 				F60000000000000000000006 /* XCRemoteSwiftPackageReference "ogg-binary-xcframework" */,
 			);
-			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 100;
 			productRefGroup = F5E521402F8292AD00D2CEAE /* Products */;
 			projectDirPath = "";
@@ -499,38 +499,6 @@
 			);
 		};
 /* End PBXProject section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		F60000000000000000000002 /* FLAC */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = F60000000000000000000003 /* XCRemoteSwiftPackageReference "flac-binary-xcframework" */;
-			productName = FLAC;
-		};
-		F60000000000000000000005 /* ogg */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = F60000000000000000000006 /* XCRemoteSwiftPackageReference "ogg-binary-xcframework" */;
-			productName = ogg;
-		};
-/* End XCSwiftPackageProductDependency section */
-
-/* Begin XCRemoteSwiftPackageReference section */
-		F60000000000000000000003 /* XCRemoteSwiftPackageReference "flac-binary-xcframework" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/sbooth/flac-binary-xcframework";
-			requirement = {
-				kind = upToNextMinorVersion;
-				minimumVersion = 0.2.0;
-			};
-		};
-		F60000000000000000000006 /* XCRemoteSwiftPackageReference "ogg-binary-xcframework" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/sbooth/ogg-binary-xcframework";
-			requirement = {
-				kind = upToNextMinorVersion;
-				minimumVersion = 0.1.3;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
 
 /* Begin PBXResourcesBuildPhase section */
 		F5B632B230260A6100A44573 /* Resources */ = {
@@ -1069,6 +1037,38 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		F60000000000000000000003 /* XCRemoteSwiftPackageReference "flac-binary-xcframework" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sbooth/flac-binary-xcframework";
+			requirement = {
+				kind = upToNextMinorVersion;
+				minimumVersion = 0.2.0;
+			};
+		};
+		F60000000000000000000006 /* XCRemoteSwiftPackageReference "ogg-binary-xcframework" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sbooth/ogg-binary-xcframework";
+			requirement = {
+				kind = upToNextMinorVersion;
+				minimumVersion = 0.1.3;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		F60000000000000000000002 /* FLAC */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F60000000000000000000003 /* XCRemoteSwiftPackageReference "flac-binary-xcframework" */;
+			productName = FLAC;
+		};
+		F60000000000000000000005 /* ogg */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F60000000000000000000006 /* XCRemoteSwiftPackageReference "ogg-binary-xcframework" */;
+			productName = ogg;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = F5E521372F8292AD00D2CEAE /* Project object */;
 }

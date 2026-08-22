@@ -163,6 +163,8 @@ nonisolated final class ExtAudioFilePCMDecoderBackend:
 }
 
 nonisolated final class DecodedPCM: @unchecked Sendable {
+    private static let feederQueueKey = DispatchSpecificKey<Void>()
+
     let renderer: OpaquePointer
     let sampleRate: Double
     let channelCount: UInt32
@@ -214,6 +216,7 @@ nonisolated final class DecodedPCM: @unchecked Sendable {
         self.didAccessSecurityScope = didAccessSecurityScope
         self.sourceURL = sourceURL
         self.feederTimer = DispatchSource.makeTimerSource(queue: feederQueue)
+        feederQueue.setSpecific(key: Self.feederQueueKey, value: ())
 
         feederTimer.setEventHandler { [weak self] in
             self?.fillAvailableSpace()
@@ -225,7 +228,9 @@ nonisolated final class DecodedPCM: @unchecked Sendable {
     deinit {
         decoder.cancel()
         feederTimer.cancel()
-        feederQueue.sync {}
+        if DispatchQueue.getSpecific(key: Self.feederQueueKey) == nil {
+            feederQueue.sync {}
+        }
         decodeBuffer.deallocate()
         MCPPCMRendererDestroy(renderer)
         if didAccessSecurityScope, let sourceURL {

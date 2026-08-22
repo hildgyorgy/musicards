@@ -75,8 +75,12 @@ final class AudioUnitPlaybackCore {
                             .hasPrefix("audio/flac") == true
                         || asset.contentType?.lowercased()
                             .hasPrefix("audio/x-flac") == true
-                    if isFLAC,
-                       LibFLACRemoteAudioDecoder.isExperimentEnabled {
+#if DEBUG
+                    RemotePlaybackDiagnostics.logger.notice(
+                        "Remote decoder selection codec=\(isFLAC ? "FLAC" : "ALAC", privacy: .public) backend=\(isFLAC ? "libFLAC" : "ExtAudioFile", privacy: .public) seek=supported"
+                    )
+#endif
+                    if isFLAC {
                         return try LibFLACRemoteAudioDecoder.decode(
                             asset: asset,
                             byteSource: byteSource

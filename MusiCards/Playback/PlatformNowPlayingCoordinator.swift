@@ -98,8 +98,7 @@ final class PlatformNowPlayingCoordinator {
 
         updateRemoteCommandAvailability(
             hasItem: true,
-            canSeek: duration != nil
-                && item.source.seekCapability.isSupported,
+            canSeek: duration != nil && controller?.canSeek == true,
             hasPrevious: currentIndex > queue.startIndex,
             hasNext: currentIndex < queue.index(before: queue.endIndex),
             status: status

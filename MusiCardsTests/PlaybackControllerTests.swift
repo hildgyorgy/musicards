@@ -394,6 +394,7 @@ final class PlaybackControllerTests: XCTestCase {
 @MainActor
 private final class PlaybackEngineSpy: PlaybackEngine {
     var eventHandler: ((PlaybackEngineEvent) -> Void)?
+    var canSeek = false
     var preparedIDs: [String] = []
     var preparedSources: [PlaybackSource] = []
     var playCount = 0
@@ -406,6 +407,7 @@ private final class PlaybackEngineSpy: PlaybackEngine {
     func prepare(_ item: PlaybackQueueItem) async throws {
         preparedIDs.append(item.id)
         preparedSources.append(item.source)
+        canSeek = item.source.seekCapability.isSupported
         eventHandler?(.prepared(duration: item.track.duration))
     }
 
