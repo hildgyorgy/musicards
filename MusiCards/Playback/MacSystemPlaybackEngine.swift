@@ -7,200 +7,66 @@
 import AudioToolbox
 import CoreAudio
 import Foundation
-#if DEBUG
-import OSLog
-#endif
 
 @MainActor
 final class MacSystemPlaybackEngine: PlaybackEngine {
-    var eventHandler: ((PlaybackEngineEvent) -> Void)?
+    var eventHandler: ((PlaybackEngineEvent) -> Void)? {
+        get { core.eventHandler }
+        set { core.eventHandler = newValue }
+    }
 
-    private var outputUnit: AudioUnit?
-    private var decodedPCM: DecodedPCM?
-    private var preparingRemoteByteSource: HTTPRandomAccessByteSource?
-    private var progressTask: Task<Void, Never>?
-    private var isOutputRunning = false
-    private var reportedUnderrunCount: UInt64 = 0
-    private var preparationGeneration: UInt64 = 0
-    private var currentSeekCapability: PlaybackSeekCapability = .supported
+    private let core = AudioUnitPlaybackCore()
     private var originalSampleRates: [AudioDeviceID: Float64] = [:]
     private var configuredOutputDeviceID: AudioDeviceID?
 
     func prepare(_ item: PlaybackQueueItem) async throws {
-        preparationGeneration &+= 1
-        let generation = preparationGeneration
-        await stopPlayback()
-        guard generation == preparationGeneration else {
-            throw CancellationError()
-        }
-        disposeOutputUnit()
-        disposeDecoder()
-        decodedPCM = nil
-        currentSeekCapability = .supported
-
-        let decodedPCM: DecodedPCM
-        switch item.source {
-        case .localFile(let url):
-            decodedPCM = try await Task.detached(priority: .userInitiated) {
-                try LocalAudioFileDecoder.decode(url: url)
-            }.value
-        case .remoteAudio(let asset):
-            #if DEBUG
-            RemotePlaybackDiagnostics.logger.notice(
-                "Remote prepare started codecHint=\(asset.suffix ?? "unknown", privacy: .public)"
-            )
-            #endif
-            let byteSource = try asset.byteSourceProvider.makeByteSource()
-            preparingRemoteByteSource = byteSource
-            do {
-                decodedPCM = try await Task.detached(
-                    priority: .userInitiated
-                ) {
-                    try RemoteAudioFileDecoder.decode(
-                        asset: asset,
-                        byteSource: byteSource
-                    )
-                }.value
-            } catch {
-                if preparingRemoteByteSource === byteSource {
-                    preparingRemoteByteSource = nil
-                }
-                byteSource.cancel()
-                throw error
-            }
-            if preparingRemoteByteSource === byteSource {
-                preparingRemoteByteSource = nil
-            }
-        case .libraryAsset:
-            throw NativePlaybackEngineError("Unsupported audio source")
-        }
-        guard generation == preparationGeneration, !Task.isCancelled else {
-            decodedPCM.cancel()
-            throw CancellationError()
-        }
+        let generation = try await core.beginPreparation()
+        let decodedPCM = try await core.decode(item, generation: generation)
 
         matchDefaultOutputSampleRate(decodedPCM.sampleRate)
         try configureOutputUnit(for: decodedPCM)
-        self.decodedPCM = decodedPCM
-        currentSeekCapability = item.source.seekCapability
-        reportedUnderrunCount = 0
-        #if DEBUG
-        if decodedPCM.isRemote {
-            RemotePlaybackDiagnostics.logger.notice(
-                "Remote prepare completed; decoder session is recoverable"
-            )
-        }
-        #endif
-        eventHandler?(.prepared(duration: duration(of: decodedPCM)))
+        core.completePreparation(
+            decodedPCM: decodedPCM,
+            seekCapability: item.source.seekCapability
+        )
     }
 
     func play() async throws {
-        guard let decodedPCM else {
+        guard let decodedPCM = core.decodedPCM else {
             throw NativePlaybackEngineError("No decoded track is ready")
         }
-        let generation = preparationGeneration
+        let generation = core.preparationGeneration
 
         if MCPPCMRendererDidFinish(decodedPCM.renderer) {
-            try await seekDecoder(decodedPCM, to: 0)
+            try await core.seekDecoder(decodedPCM, to: 0)
         }
-        guard isCurrent(decodedPCM, generation: generation),
-              let outputUnit else {
+        guard core.isCurrent(decodedPCM, generation: generation),
+              let outputUnit = core.outputUnit else {
             throw CancellationError()
         }
 
         MCPPCMRendererSetPlaying(decodedPCM.renderer, true)
-
-        if !isOutputRunning {
-            let status = AudioOutputUnitStart(outputUnit)
-            guard status == noErr else {
-                MCPPCMRendererSetPlaying(decodedPCM.renderer, false)
-                throw NativePlaybackEngineError(
-                    "Could not start the Mac audio output",
-                    status: status
-                )
-            }
-            isOutputRunning = true
-        }
-
-        startProgressUpdates()
+        try core.startOutputUnit(
+            outputUnit,
+            failureMessage: "Could not start the Mac audio output"
+        )
+        core.startProgressUpdates()
         eventHandler?(.started)
     }
 
     func pause() async {
-        guard let decodedPCM else { return }
-        MCPPCMRendererSetPlaying(decodedPCM.renderer, false)
-        stopOutputUnit()
-        progressTask?.cancel()
-        progressTask = nil
-        eventHandler?(.paused)
+        core.pause()
     }
 
     func stop() async {
-        preparationGeneration &+= 1
-        preparingRemoteByteSource?.cancel()
-        preparingRemoteByteSource = nil
-        await stopPlayback()
-        disposeOutputUnit()
-        disposeDecoder()
-        currentSeekCapability = .supported
-    }
-
-    private func stopPlayback() async {
-        if let decodedPCM {
-            MCPPCMRendererSetPlaying(decodedPCM.renderer, false)
-        }
-
-        stopOutputUnit()
-        progressTask?.cancel()
-        progressTask = nil
+        await core.stop()
     }
 
     func seek(to position: TimeInterval) async throws {
-        guard let decodedPCM else {
-            throw NativePlaybackEngineError("No decoded track is ready")
+        try await core.seek(to: position) { [weak self] in
+            guard let self else { throw CancellationError() }
+            try await self.play()
         }
-        guard currentSeekCapability.isSupported else {
-            #if DEBUG
-            RemotePlaybackDiagnostics.logger.notice(
-                "Remote seek rejected by engine before decoder mutation"
-            )
-            #endif
-            throw PlaybackSeekError.unsupported
-        }
-        let generation = preparationGeneration
-
-        let requestedFrame = position * decodedPCM.sampleRate
-        let boundedFrame = UInt64(
-            min(max(requestedFrame, 0), Double(decodedPCM.frameCount))
-        )
-        let wasPlaying = isOutputRunning
-        MCPPCMRendererSetPlaying(decodedPCM.renderer, false)
-        stopOutputUnit()
-        do {
-            try await seekDecoder(decodedPCM, to: boundedFrame)
-        } catch {
-            if isCurrent(decodedPCM, generation: generation) {
-                #if DEBUG
-                RemotePlaybackDiagnostics.logger.notice(
-                    "Seek failed; tearing down decoder before recovery"
-                )
-                #endif
-                preparationGeneration &+= 1
-                disposeOutputUnit()
-                disposeDecoder()
-                currentSeekCapability = .supported
-            }
-            throw error
-        }
-        guard isCurrent(decodedPCM, generation: generation) else {
-            throw CancellationError()
-        }
-        if wasPlaying {
-            try await play()
-        }
-        eventHandler?(
-            .positionChanged(Double(boundedFrame) / decodedPCM.sampleRate)
-        )
     }
 
     func restoreOutputConfiguration() {
@@ -233,7 +99,7 @@ final class MacSystemPlaybackEngine: PlaybackEngine {
         }
 
         var unit: AudioUnit?
-        try check(
+        try AudioUnitPlaybackCore.check(
             AudioComponentInstanceNew(component, &unit),
             operation: "Could not create the Mac output Audio Unit"
         )
@@ -245,60 +111,15 @@ final class MacSystemPlaybackEngine: PlaybackEngine {
         }
 
         do {
-            var format = AudioStreamBasicDescription(
-                mSampleRate: decodedPCM.sampleRate,
-                mFormatID: kAudioFormatLinearPCM,
-                mFormatFlags: kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked,
-                mBytesPerPacket: decodedPCM.channelCount * UInt32(MemoryLayout<Float>.size),
-                mFramesPerPacket: 1,
-                mBytesPerFrame: decodedPCM.channelCount * UInt32(MemoryLayout<Float>.size),
-                mChannelsPerFrame: decodedPCM.channelCount,
-                mBitsPerChannel: 32,
-                mReserved: 0
+            try AudioUnitPlaybackCore.configureRenderPath(
+                on: unit,
+                for: decodedPCM,
+                formatFailureMessage:
+                    "Could not set the PCM format on the Mac output",
+                initializationFailureMessage:
+                    "Could not initialize the Mac audio output"
             )
-
-            try withUnsafePointer(to: &format) { pointer in
-                try check(
-                    AudioUnitSetProperty(
-                        unit,
-                        kAudioUnitProperty_StreamFormat,
-                        kAudioUnitScope_Input,
-                        0,
-                        pointer,
-                        UInt32(MemoryLayout<AudioStreamBasicDescription>.size)
-                    ),
-                    operation: "Could not set the PCM format on the Mac output"
-                )
-            }
-
-            var callback = AURenderCallbackStruct(
-                // Install the C renderer directly. Wrapping it in a Swift
-                // closure created inside this @MainActor type makes Swift 6
-                // enforce the main executor when Core Audio invokes the
-                // callback on its realtime IO thread.
-                inputProc: MCPPCMRenderCallback,
-                inputProcRefCon: UnsafeMutableRawPointer(decodedPCM.renderer)
-            )
-
-            try withUnsafePointer(to: &callback) { pointer in
-                try check(
-                    AudioUnitSetProperty(
-                        unit,
-                        kAudioUnitProperty_SetRenderCallback,
-                        kAudioUnitScope_Input,
-                        0,
-                        pointer,
-                        UInt32(MemoryLayout<AURenderCallbackStruct>.size)
-                    ),
-                    operation: "Could not install the realtime PCM renderer"
-                )
-            }
-
-            try check(
-                AudioUnitInitialize(unit),
-                operation: "Could not initialize the Mac audio output"
-            )
-            outputUnit = unit
+            core.installOutputUnit(unit)
         } catch {
             AudioComponentInstanceDispose(unit)
             throw error
@@ -401,99 +222,5 @@ final class MacSystemPlaybackEngine: PlaybackEngine {
         ) == noErr
     }
 
-    private func startProgressUpdates() {
-        progressTask?.cancel()
-        progressTask = Task { [weak self] in
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 100_000_000)
-                guard let self, let decodedPCM = self.decodedPCM else {
-                    return
-                }
-
-                if let error = decodedPCM.takeFeederError() {
-                    self.stopOutputUnit()
-                    self.eventHandler?(.failed(PlaybackFailure(error)))
-                    return
-                }
-
-                let frame = MCPPCMRendererCurrentFrame(decodedPCM.renderer)
-                self.eventHandler?(
-                    .positionChanged(Double(frame) / decodedPCM.sampleRate)
-                )
-
-                #if DEBUG
-                let underrunCount = MCPPCMRendererUnderrunCount(
-                    decodedPCM.renderer
-                )
-                if decodedPCM.isRemote,
-                   underrunCount > self.reportedUnderrunCount {
-                    self.reportedUnderrunCount = underrunCount
-                    RemotePlaybackDiagnostics.logger.notice(
-                        "Remote PCM underrun count=\(underrunCount, privacy: .public); outputting bounded silence while decoding refills"
-                    )
-                }
-                #endif
-
-                if MCPPCMRendererDidFinish(decodedPCM.renderer) {
-                    self.stopOutputUnit()
-                    self.eventHandler?(.finished)
-                    return
-                }
-            }
-        }
-    }
-
-    private func stopOutputUnit() {
-        guard isOutputRunning, let outputUnit else { return }
-        AudioOutputUnitStop(outputUnit)
-        isOutputRunning = false
-    }
-
-    private func disposeOutputUnit() {
-        stopOutputUnit()
-        if let outputUnit {
-            AudioUnitUninitialize(outputUnit)
-            AudioComponentInstanceDispose(outputUnit)
-        }
-        outputUnit = nil
-    }
-
-    private func disposeDecoder() {
-        #if DEBUG
-        if decodedPCM?.isRemote == true {
-            RemotePlaybackDiagnostics.logger.notice(
-                "Remote decoder teardown requested"
-            )
-        }
-        #endif
-        decodedPCM?.cancel()
-        decodedPCM = nil
-    }
-
-    private func duration(of decodedPCM: DecodedPCM) -> TimeInterval {
-        Double(decodedPCM.frameCount) / decodedPCM.sampleRate
-    }
-
-    private func isCurrent(
-        _ decodedPCM: DecodedPCM,
-        generation: UInt64
-    ) -> Bool {
-        generation == preparationGeneration && self.decodedPCM === decodedPCM
-    }
-
-    private func seekDecoder(
-        _ decodedPCM: DecodedPCM,
-        to frame: UInt64
-    ) async throws {
-        try await Task.detached(priority: .userInitiated) {
-            try decodedPCM.seek(to: frame)
-        }.value
-    }
-
-    private func check(_ status: OSStatus, operation: String) throws {
-        guard status == noErr else {
-            throw NativePlaybackEngineError(operation, status: status)
-        }
-    }
 }
 #endif
