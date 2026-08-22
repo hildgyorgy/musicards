@@ -27,6 +27,10 @@ final class AudioUnitPlaybackCore {
     private var reportedUnderrunCount: UInt64 = 0
     private var currentSeekCapability: PlaybackSeekCapability = .supported
 
+    var canSeek: Bool {
+        currentSeekCapability.isSupported
+    }
+
     func beginPreparation(
         beforeStopping: () -> Void = {}
     ) async throws -> UInt64 {
@@ -66,10 +70,23 @@ final class AudioUnitPlaybackCore {
                 decodedPCM = try await Task.detached(
                     priority: .userInitiated
                 ) {
-                    try RemoteAudioFileDecoder.decode(
-                        asset: asset,
-                        byteSource: byteSource
-                    )
+                    let isFLAC = asset.suffix?.lowercased() == "flac"
+                        || asset.contentType?.lowercased()
+                            .hasPrefix("audio/flac") == true
+                        || asset.contentType?.lowercased()
+                            .hasPrefix("audio/x-flac") == true
+                    if isFLAC,
+                       LibFLACRemoteAudioDecoder.isExperimentEnabled {
+                        return try LibFLACRemoteAudioDecoder.decode(
+                            asset: asset,
+                            byteSource: byteSource
+                        )
+                    } else {
+                        return try RemoteAudioFileDecoder.decode(
+                            asset: asset,
+                            byteSource: byteSource
+                        )
+                    }
                 }.value
             } catch {
                 if preparingRemoteByteSource === byteSource {
@@ -98,7 +115,8 @@ final class AudioUnitPlaybackCore {
         seekCapability: PlaybackSeekCapability
     ) {
         self.decodedPCM = decodedPCM
-        currentSeekCapability = seekCapability
+        currentSeekCapability = decodedPCM.seekCapabilityOverride
+            ?? seekCapability
         reportedUnderrunCount = 0
         #if DEBUG
         if decodedPCM.isRemote {

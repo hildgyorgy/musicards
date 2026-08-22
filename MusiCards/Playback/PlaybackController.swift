@@ -55,7 +55,10 @@ final class PlaybackController: ObservableObject {
     }
 
     var canSeek: Bool {
-        currentItem?.source.seekCapability.isSupported == true
+        if let preparedItemID, preparedItemID == currentItem?.id {
+            return engine.canSeek
+        }
+        return currentItem?.source.seekCapability.isSupported == true
     }
 
     func beginQueueRequest() -> PlaybackQueueRequest {

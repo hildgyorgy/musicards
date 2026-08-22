@@ -56,6 +56,7 @@ nonisolated protocol PCMDecoderBackend: AnyObject, Sendable {
     var format: PCMDecoderFormat { get }
     var frameCount: UInt64 { get }
     var isRemote: Bool { get }
+    var seekCapabilityOverride: PlaybackSeekCapability? { get }
     func read(
         into buffer: UnsafeMutableRawPointer,
         frameCapacity: UInt32
@@ -74,6 +75,7 @@ nonisolated final class ExtAudioFilePCMDecoderBackend:
     let format: PCMDecoderFormat
     let frameCount: UInt64
     let isRemote: Bool
+    let seekCapabilityOverride: PlaybackSeekCapability?
 
     private let file: ExtAudioFileRef
     private let resourceOwner: (any DecodedPCMResourceOwner)?
@@ -85,12 +87,14 @@ nonisolated final class ExtAudioFilePCMDecoderBackend:
         file: ExtAudioFileRef,
         format: PCMDecoderFormat,
         frameCount: UInt64,
-        resourceOwner: (any DecodedPCMResourceOwner)? = nil
+        resourceOwner: (any DecodedPCMResourceOwner)? = nil,
+        seekCapabilityOverride: PlaybackSeekCapability? = nil
     ) {
         self.file = file
         self.format = format
         self.frameCount = frameCount
         self.isRemote = resourceOwner != nil
+        self.seekCapabilityOverride = seekCapabilityOverride
         self.resourceOwner = resourceOwner
         let bytesPerSample: UInt32
         switch format.sampleFormat {
@@ -164,6 +168,7 @@ nonisolated final class DecodedPCM: @unchecked Sendable {
     let channelCount: UInt32
     let frameCount: UInt64
     let isRemote: Bool
+    let seekCapabilityOverride: PlaybackSeekCapability?
 
     private let decoder: any PCMDecoderBackend
     private let feederQueue = DispatchQueue(
@@ -198,6 +203,7 @@ nonisolated final class DecodedPCM: @unchecked Sendable {
         self.channelCount = channelCount
         self.frameCount = frameCount
         self.isRemote = decoder.isRemote
+        self.seekCapabilityOverride = decoder.seekCapabilityOverride
         self.decoder = decoder
         self.decodeBuffer = decodeBuffer
         self.decodeChunkFrames = decodeChunkFrames

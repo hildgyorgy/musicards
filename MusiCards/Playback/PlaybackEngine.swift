@@ -343,6 +343,7 @@ enum PlaybackEngineEvent: Equatable {
 @MainActor
 protocol PlaybackEngine: AnyObject {
     var eventHandler: ((PlaybackEngineEvent) -> Void)? { get set }
+    var canSeek: Bool { get }
 
     func prepare(_ item: PlaybackQueueItem) async throws
     func play() async throws
@@ -372,6 +373,7 @@ enum PendingPlaybackEngineError: LocalizedError {
 @MainActor
 final class PendingPlaybackEngine: PlaybackEngine {
     var eventHandler: ((PlaybackEngineEvent) -> Void)?
+    var canSeek: Bool { false }
 
     func prepare(_ item: PlaybackQueueItem) async throws {
         throw PendingPlaybackEngineError.sourceLoadingNotImplemented

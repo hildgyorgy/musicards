@@ -10,6 +10,8 @@ import Foundation
 
 @MainActor
 final class MacSystemPlaybackEngine: PlaybackEngine {
+    var canSeek: Bool { core.canSeek }
+
     var eventHandler: ((PlaybackEngineEvent) -> Void)? {
         get { core.eventHandler }
         set { core.eventHandler = newValue }
