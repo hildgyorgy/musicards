@@ -89,7 +89,7 @@ nonisolated struct OpenSubsonicRequestBuilder: Sendable {
             resolvingAgainstBaseURL: false
         ),
         let scheme = components.scheme?.lowercased(),
-        scheme == "https" || scheme == "http" else {
+        scheme == "https" else {
             throw NavidromeConnectionError.secureConnectionRequired
         }
         guard components.host != nil,

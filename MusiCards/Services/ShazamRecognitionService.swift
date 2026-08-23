@@ -89,18 +89,29 @@ final class ShazamRecognitionService: NSObject, SHSessionDelegate {
 
         let inputNode = audioEngine.inputNode
         let recordingFormat = inputNode.outputFormat(forBus: 0)
+        // Build the callback outside this MainActor-isolated type. AVFAudio
+        // invokes it on its realtime audio queue, so it must remain
+        // actor-neutral and must not capture `self`.
+        let shazamSession = session
 
         inputNode.removeTap(onBus: 0)
         inputNode.installTap(
             onBus: 0,
             bufferSize: 2048,
-            format: recordingFormat
-        ) { [weak self] buffer, audioTime in
-            self?.session.matchStreamingBuffer(buffer, at: audioTime)
-        }
+            format: recordingFormat,
+            block: Self.makeRealtimeTapHandler(for: shazamSession)
+        )
 
         audioEngine.prepare()
         try audioEngine.start()
+    }
+
+    private nonisolated static func makeRealtimeTapHandler(
+        for session: SHSession
+    ) -> AVAudioNodeTapBlock {
+        { buffer, audioTime in
+            session.matchStreamingBuffer(buffer, at: audioTime)
+        }
     }
 
     private func stopListening() {
@@ -113,7 +124,13 @@ final class ShazamRecognitionService: NSObject, SHSessionDelegate {
         )
     }
 
-    func session(_ session: SHSession, didFind match: SHMatch) {
+    nonisolated func session(_ session: SHSession, didFind match: SHMatch) {
+        Task { @MainActor [weak self] in
+            self?.handleMatch(match)
+        }
+    }
+
+    private func handleMatch(_ match: SHMatch) {
         stopListening()
 
         guard let item = match.mediaItems.first else {
@@ -142,7 +159,17 @@ final class ShazamRecognitionService: NSObject, SHSessionDelegate {
         finish(with: .success(result))
     }
 
-    func session(_ session: SHSession, didNotFindMatchFor signature: SHSignature, error: Error?) {
+    nonisolated func session(
+        _ session: SHSession,
+        didNotFindMatchFor signature: SHSignature,
+        error: Error?
+    ) {
+        Task { @MainActor [weak self] in
+            self?.handleNoMatch(error: error)
+        }
+    }
+
+    private func handleNoMatch(error: Error?) {
         finish(with: .failure(error ?? ShazamRecognitionError.noMatch))
     }
 

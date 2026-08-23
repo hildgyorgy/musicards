@@ -13,6 +13,8 @@ struct AboutView: View {
         @AppStorage("glassTransparent") private var glassTransparent = false
     #endif
 
+    @State private var isShowingThirdPartyLicenses = false
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
@@ -36,6 +38,22 @@ struct AboutView: View {
                 primaryDivider
 
                 attributionSection
+
+                Button {
+                    isShowingThirdPartyLicenses = true
+                } label: {
+                    HStack {
+                        Text("Third-Party Licenses")
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                    }
+                    .font(.callout.weight(.medium))
+                }
+                .buttonStyle(.plain)
+                .sheet(isPresented: $isShowingThirdPartyLicenses) {
+                    ThirdPartyLicensesView()
+                }
 
                 #if os(macOS)
                     glassStylePicker

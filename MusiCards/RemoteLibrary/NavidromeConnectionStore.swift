@@ -129,6 +129,12 @@ final class NavidromeConnectionStore: ObservableObject {
             serverURL = connection.profile.baseURL.absoluteString
             username = connection.profile.username
             hasStoredPassword = try credentialStore.password(for: connection.profile.id) != nil
+
+            if connection.profile.baseURL.scheme?.lowercased() != "https" {
+                errorMessage = connection.profile.baseURL.scheme?.lowercased() == "http"
+                    ? NavidromeProfileValidationError.secureConnectionRequired.localizedDescription
+                    : NavidromeProfileValidationError.invalidServerURL.localizedDescription
+            }
         } catch {
             errorMessage = "The saved Navidrome connection could not be read."
         }

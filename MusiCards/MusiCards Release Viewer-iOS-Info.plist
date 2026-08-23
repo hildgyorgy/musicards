@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleGetInfoString</key>
+	<string></string>
+
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+	</array>
+
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+
+	<key>NSAppleMusicUsageDescription</key>
+	<string>MusiCards uses Apple Music to detect the currently playing track and find the matching release.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>MusiCards uses the camera to scan music release barcodes</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>MusiCards uses the microphone to identify music.</string>
+</dict>
+</plist>

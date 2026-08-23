@@ -75,6 +75,64 @@ final class NavidromeConnectionTests: XCTestCase {
         XCTAssertEqual(request.url?.path, "/navidrome/rest/ping")
     }
 
+    func testValidatedProfileAcceptsHTTPSWithPort() throws {
+        let profile = try NavidromeServerProfile.validated(
+            name: "Home",
+            serverURL: "https://music.example.com:4533",
+            username: "listener"
+        )
+
+        XCTAssertEqual(profile.baseURL.absoluteString, "https://music.example.com:4533")
+    }
+
+    func testValidatedProfileAcceptsCaseInsensitiveHTTPS() throws {
+        XCTAssertNoThrow(
+            try NavidromeServerProfile.validated(
+                name: "Home",
+                serverURL: "HTTPS://music.example.com",
+                username: "listener"
+            )
+        )
+    }
+
+    func testValidatedProfileAddsHTTPSToMissingScheme() throws {
+        let profile = try NavidromeServerProfile.validated(
+            name: "Home",
+            serverURL: "music.example.com",
+            username: "listener"
+        )
+
+        XCTAssertEqual(profile.baseURL.absoluteString, "https://music.example.com")
+    }
+
+    func testValidatedProfileRejectsNonHTTPSSchemes() {
+        XCTAssertThrowsError(
+            try NavidromeServerProfile.validated(
+                name: "Home",
+                serverURL: "http://music.example.com",
+                username: "listener"
+            )
+        ) { error in
+            XCTAssertEqual(
+                error as? NavidromeProfileValidationError,
+                .secureConnectionRequired
+            )
+        }
+
+        for serverURL in ["ftp://music.example.com", "file:///tmp/music"] {
+            XCTAssertThrowsError(
+                try NavidromeServerProfile.validated(
+                    name: "Home",
+                    serverURL: serverURL,
+                    username: "listener"
+                ),
+                "Expected rejection for \(serverURL)"
+            ) { error in
+                XCTAssertTrue(error is NavidromeProfileValidationError)
+            }
+        }
+    }
+
     func testAlbumListRequestUsesAlphabeticalPagination() throws {
         let profile = NavidromeServerProfile(
             name: "Test Server",
@@ -124,7 +182,7 @@ final class NavidromeConnectionTests: XCTestCase {
     func testRawStreamRequestUsesSongIDWithoutTranscodingParameters() throws {
         let profile = NavidromeServerProfile(
             name: "Test Server",
-            baseURL: URL(string: "http://music.example.com/navidrome")!,
+            baseURL: URL(string: "https://music.example.com/navidrome")!,
             username: "listener"
         )
         let request = try OpenSubsonicRequestBuilder().streamRequest(
@@ -249,15 +307,26 @@ final class NavidromeConnectionTests: XCTestCase {
         XCTAssertEqual(song.channelCount, 2)
     }
 
-    func testAuthenticatedRequestsSupportHTTP() throws {
-        let request = try pingRequest(
-            baseURL: URL(string: "http://music.example.com")!
-        )
+    func testAuthenticatedRequestsRejectHTTP() {
+        XCTAssertThrowsError(
+            try pingRequest(baseURL: URL(string: "http://music.example.com")!)
+        ) { error in
+            XCTAssertEqual(error as? NavidromeConnectionError, .secureConnectionRequired)
+        }
+    }
 
-        XCTAssertEqual(
-            request.url?.absoluteString,
-            "http://music.example.com/rest/ping"
-        )
+    func testRequestBuilderRejectsNonHTTPSSchemes() {
+        for serverURL in [
+            "ftp://music.example.com",
+            "file:///tmp/music"
+        ] {
+            XCTAssertThrowsError(
+                try pingRequest(baseURL: URL(string: serverURL)!),
+                "Expected rejection for \(serverURL)"
+            ) { error in
+                XCTAssertEqual(error as? NavidromeConnectionError, .secureConnectionRequired)
+            }
+        }
     }
 
     func testVerifierAcceptsModernNavidromeResponse() throws {

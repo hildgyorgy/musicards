@@ -35,9 +35,16 @@ nonisolated struct NavidromeServerProfile: Codable, Equatable, Identifiable, Sen
         }
 
         guard let components = URLComponents(string: trimmedURL),
-              let scheme = components.scheme?.lowercased(),
-              scheme == "https" || scheme == "http",
-              let host = components.host,
+              let scheme = components.scheme?.lowercased() else {
+            throw NavidromeProfileValidationError.invalidServerURL
+        }
+        guard scheme == "https" else {
+            if scheme == "http" {
+                throw NavidromeProfileValidationError.secureConnectionRequired
+            }
+            throw NavidromeProfileValidationError.invalidServerURL
+        }
+        guard let host = components.host,
               !host.isEmpty,
               components.user == nil,
               components.password == nil,
@@ -98,7 +105,7 @@ nonisolated enum NavidromeConnectionError: LocalizedError, Equatable, Sendable {
     var errorDescription: String? {
         switch self {
         case .secureConnectionRequired:
-            "A remote music server must use HTTPS."
+            "A remote Navidrome server must use HTTPS."
         case .invalidBaseURL:
             "The server URL is not valid."
         case .invalidResponse:
