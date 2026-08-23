@@ -160,7 +160,9 @@ struct ContentView: View {
             }
         case .artist:
             ArtistCardHeaderView(
-                artist: appModel.selectedArtist
+                artist: appModel.selectedArtist,
+                fallbackName: appModel.selectedArtistName,
+                fallbackLifeSpan: appModel.selectedArtistLifeSpan
             )
         case .player:
             if appModel.deckSelection.activeID == .player {
@@ -282,17 +284,17 @@ struct ContentView: View {
                 classicalMetadataStore: appModel.classicalMetadataStore
             )
         case .artist:
-            if appModel.isLoadingArtistHeader {
-                MusiCardsSpinner()
-            } else {
-                ArtistCardContentView(
+            ArtistCardContentView(
                     libraryManager: appModel.libraryManager,
                     artist: appModel.selectedArtist,
+                    artistName: appModel.selectedArtistName,
                     releaseGroups: appModel.artistReleaseGroups,
                     wikipedia: appModel.artistWikipedia,
+                    discographyError: appModel.discographyError,
                     onSelectReleaseGroup: { group in
                         appModel.selectReleaseGroup(group)
                     },
+                    onRetryDiscography: { appModel.retryDiscography() },
                     isLoadingWikipedia: appModel.isLoadingArtistWikipedia,
                     artistError: appModel.artistError,
                     onRetryArtist: { appModel.retryArtist() },
@@ -302,8 +304,7 @@ struct ContentView: View {
                             currentItem: group
                         )
                     }
-                )
-            }
+            )
         case .player:
             EmptyView()
         }

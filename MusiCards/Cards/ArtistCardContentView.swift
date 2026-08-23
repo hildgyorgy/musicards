@@ -10,9 +10,12 @@ import SwiftUI
 struct ArtistCardContentView: View {
     @ObservedObject var libraryManager: LibraryManager
     let artist: MBArtistDetail?
+    let artistName: String
     let releaseGroups: [MBReleaseGroupSummary]
     let wikipedia: (title: String, extract: String)?
+    let discographyError: Error?
     let onSelectReleaseGroup: (MBReleaseGroupSummary) -> Void
+    let onRetryDiscography: () -> Void
     let isLoadingWikipedia: Bool
     let artistError: Error?
     let onRetryArtist: () -> Void
@@ -32,16 +35,24 @@ struct ArtistCardContentView: View {
         }
 
     private var hasArtistContent: Bool {
-        artist != nil
+        artist != nil || !artistName.isEmpty || !releaseGroups.isEmpty
     }
 
     var body: some View {
         Group {
-            if hasArtistContent {
+            if artistError != nil && !MusiCardsAppModel.hasUsableArtistHeader(
+                artist: artist,
+                name: artistName
+            ) {
+                ErrorStateView.artistRetry {
+                    onRetryArtist()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if hasArtistContent {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
 
-                        // Wikipedia excerpt
+                        // Wikipedia excerpt stays above Discography in the stable card layout.
                         VStack(alignment: .leading, spacing: 8) {
                             if isLoadingWikipedia {
                                 MusiCardsSpinner()
@@ -66,59 +77,67 @@ struct ArtistCardContentView: View {
                             }
                         }
 
-                        // Discography sections
-                        ForEach(groupedDiscographySections(from: releaseGroups)) { section in
-                            Section {
-                                VStack(alignment: .leading, spacing: 0) {
-                                    ForEach(section.items) { group in
-                                        Button {
+                        if let discographyError, releaseGroups.isEmpty {
+                            ErrorStateView.discographyRetry(for: discographyError) {
+                                onRetryDiscography()
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 20)
+                        } else {
+                            // Discography sections
+                            ForEach(groupedDiscographySections(from: releaseGroups)) { section in
+                                Section {
+                                    VStack(alignment: .leading, spacing: 0) {
+                                        ForEach(section.items) { group in
+                                            Button {
 #if os(iOS)
-                                            UIApplication.shared.sendAction(
-                                                #selector(UIResponder.resignFirstResponder),
-                                                to: nil,
-                                                from: nil,
-                                                for: nil
-                                            )
+                                                UIApplication.shared.sendAction(
+                                                    #selector(UIResponder.resignFirstResponder),
+                                                    to: nil,
+                                                    from: nil,
+                                                    for: nil
+                                                )
 #endif
-                                            onSelectReleaseGroup(group)
-                                        } label: {
-                                            HStack(alignment: .firstTextBaseline, spacing: 16) {
-                                                Text(MBTextFormatter.year(from: group.firstReleaseDate))
-                                                    .font(.callout)
-                                                    .foregroundStyle(.secondary)
+                                                onSelectReleaseGroup(group)
+                                            } label: {
+                                                HStack(alignment: .firstTextBaseline, spacing: 16) {
+                                                    Text(MBTextFormatter.year(from: group.firstReleaseDate))
+                                                        .font(.callout)
+                                                        .foregroundStyle(.secondary)
 #if os(iOS)
-                                                    .frame(width: 40, alignment: .leading)
+                                                        .frame(width: 40, alignment: .leading)
                                                 #else
-                                                    .frame(width: 35, alignment: .leading)
+                                                        .frame(width: 35, alignment: .leading)
 #endif
-                                                Text(group.title)
-                                                    .font(.callout)
-                                                    .foregroundStyle(Color.blue)
-                                                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                                                if isPlayable(group) {
-                                                    Image(systemName: "play.fill")
-                                                        .font(.caption2)
+                                                    Text(group.title)
+                                                        .font(.callout)
                                                         .foregroundStyle(Color.blue)
-                                                        .accessibilityLabel(
-                                                            "Release group available in music library"
-                                                        )
+                                                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                                                    if isPlayable(group) {
+                                                        Image(systemName: "play.fill")
+                                                            .font(.caption2)
+                                                            .foregroundStyle(Color.blue)
+                                                            .accessibilityLabel(
+                                                                "Release group available in music library"
+                                                            )
+                                                    }
                                                 }
-                                            }
 #if os(macOS)
-                                            .padding(.leading, 10)
+                                                .padding(.leading, 10)
 #endif
-                                            .padding(.vertical, 4)
-                                        }
-                                        .buttonStyle(.plain)
-                                        .onAppear {
-                                            onLoadMoreIfNeeded(group)
+                                                .padding(.vertical, 4)
+                                            }
+                                            .buttonStyle(.plain)
+                                            .onAppear {
+                                                onLoadMoreIfNeeded(group)
+                                            }
                                         }
                                     }
+                                    .padding(.bottom, 24)
+                                } header: {
+                                    typeSectionHeader(section.title)
                                 }
-                                .padding(.bottom, 24)
-                            } header: {
-                                typeSectionHeader(section.title)
                             }
                         }
 
@@ -128,15 +147,11 @@ struct ArtistCardContentView: View {
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 16)
                         }
+
                     }
                 }
                 .padding(.bottom, 36)
             
-            } else if artistError != nil {
-                ErrorStateView.artistRetry {
-                    onRetryArtist()
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 EmptyStateView.artist
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -185,7 +200,8 @@ struct ArtistCardContentView: View {
     // MARK: - Helpers
 
     private func isPlayable(_ group: MBReleaseGroupSummary) -> Bool {
-        guard let artistName = artist?.name else { return false }
+        let artistName = artist?.name ?? self.artistName
+        guard !artistName.isEmpty else { return false }
         return libraryManager.containsReleaseGroup(
             title: group.title,
             artistName: artistName

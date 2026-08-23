@@ -33,6 +33,42 @@ struct ErrorStateView: View {
 }
 
 extension ErrorStateView {
+    static func searchRetry(
+        for error: Error,
+        _ action: @escaping () -> Void
+    ) -> ErrorStateView {
+        switch musicBrainzErrorCategory(for: error) {
+        case .connectivity:
+            return ErrorStateView(
+                title: "Couldn't reach MusicBrainz",
+                subtitle: "Check your connection and try again",
+                retryTitle: "Try again",
+                onRetry: action
+            )
+        case .timeout:
+            return ErrorStateView(
+                title: "MusicBrainz request timed out",
+                subtitle: "Please try again",
+                retryTitle: "Try again",
+                onRetry: action
+            )
+        case .rateLimited, .serverUnavailable:
+            return ErrorStateView(
+                title: "MusicBrainz is temporarily unavailable",
+                subtitle: "Please try again shortly",
+                retryTitle: "Try again",
+                onRetry: action
+            )
+        case .httpFailure, .dataFailure, .invalidRequest, .unexpected, .cancelled:
+            return ErrorStateView(
+                title: "Couldn't load MusicBrainz results",
+                subtitle: "Please try again",
+                retryTitle: "Try again",
+                onRetry: action
+            )
+        }
+    }
+
     static func searchRetry(_ action: @escaping () -> Void) -> ErrorStateView {
         ErrorStateView(
             title: "Couldn't reach MusicBrainz",
@@ -58,5 +94,41 @@ extension ErrorStateView {
             retryTitle: "Try again",
             onRetry: action
         )
+    }
+
+    static func discographyRetry(
+        for error: Error,
+        _ action: @escaping () -> Void
+    ) -> ErrorStateView {
+        switch musicBrainzErrorCategory(for: error) {
+        case .connectivity:
+            return ErrorStateView(
+                title: "Couldn't load discography",
+                subtitle: "Check your connection and try again",
+                retryTitle: "Try again",
+                onRetry: action
+            )
+        case .timeout:
+            return ErrorStateView(
+                title: "Discography request timed out",
+                subtitle: "Please try again",
+                retryTitle: "Try again",
+                onRetry: action
+            )
+        case .rateLimited, .serverUnavailable:
+            return ErrorStateView(
+                title: "MusicBrainz is temporarily unavailable",
+                subtitle: "Please try again shortly",
+                retryTitle: "Try again",
+                onRetry: action
+            )
+        case .cancelled, .httpFailure, .dataFailure, .invalidRequest, .unexpected:
+            return ErrorStateView(
+                title: "Couldn't load discography",
+                subtitle: "Please try again",
+                retryTitle: "Try again",
+                onRetry: action
+            )
+        }
     }
 }

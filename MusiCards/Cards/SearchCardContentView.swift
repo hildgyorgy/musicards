@@ -42,7 +42,7 @@ struct SearchCardContentView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .padding(.top, 24)
             } else if viewModel.searchError != nil {
-                ErrorStateView.searchRetry {
+                ErrorStateView.searchRetry(for: viewModel.searchError!) {
                     viewModel.retrySearch()
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -58,7 +58,7 @@ struct SearchCardContentView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .padding(.top, 24)
             } else if viewModel.searchError != nil {
-                ErrorStateView.searchRetry {
+                ErrorStateView.searchRetry(for: viewModel.searchError!) {
                     viewModel.retrySearch()
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

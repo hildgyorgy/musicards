@@ -30,20 +30,104 @@ protocol MusicBrainzSearchServing {
     func loadRelease(id: String) async throws -> MBRelease
 }
 
-private actor RateLimiter {
-    private var lastRequestTime: Date = .distantPast
-    private let minimumInterval: TimeInterval = 1.05
+enum MusicBrainzErrorCategory: Equatable {
+    case cancelled
+    case connectivity
+    case timeout
+    case rateLimited
+    case serverUnavailable
+    case httpFailure
+    case dataFailure
+    case invalidRequest
+    case unexpected
+}
 
-    func waitIfNeeded() async {
-        let now = Date()
-        let elapsed = now.timeIntervalSince(lastRequestTime)
+enum MusicBrainzServiceError: Error {
+    case connectivity(URLError)
+    case timeout(URLError)
+    case rateLimited(statusCode: Int)
+    case serverUnavailable(statusCode: Int)
+    case httpFailure(statusCode: Int)
+    case dataFailure(Error)
+    case invalidRequest(URLError)
+    case unexpected(Error)
 
-        if elapsed < minimumInterval {
-            let waitNanoseconds = UInt64((minimumInterval - elapsed) * 1_000_000_000)
-            try? await Task.sleep(nanoseconds: waitNanoseconds)
+    var category: MusicBrainzErrorCategory {
+        switch self {
+        case .connectivity: return .connectivity
+        case .timeout: return .timeout
+        case .rateLimited: return .rateLimited
+        case .serverUnavailable: return .serverUnavailable
+        case .httpFailure: return .httpFailure
+        case .dataFailure: return .dataFailure
+        case .invalidRequest: return .invalidRequest
+        case .unexpected: return .unexpected
+        }
+    }
+
+    static func fromHTTPStatus(_ statusCode: Int) -> MusicBrainzServiceError {
+        switch statusCode {
+        case 429: return .rateLimited(statusCode: statusCode)
+        case 500...599: return .serverUnavailable(statusCode: statusCode)
+        default: return .httpFailure(statusCode: statusCode)
+        }
+    }
+}
+
+func musicBrainzErrorCategory(for error: Error) -> MusicBrainzErrorCategory {
+    if let error = error as? MusicBrainzServiceError {
+        return error.category
+    }
+
+    if let urlError = error as? URLError {
+        switch urlError.code {
+        case .cancelled:
+            return .cancelled
+        case .timedOut:
+            return .timeout
+        case .notConnectedToInternet, .cannotFindHost, .cannotConnectToHost,
+             .networkConnectionLost, .dnsLookupFailed, .secureConnectionFailed,
+             .serverCertificateHasBadDate, .serverCertificateUntrusted,
+             .serverCertificateHasUnknownRoot, .serverCertificateNotYetValid:
+            return .connectivity
+        case .badURL, .unsupportedURL:
+            return .invalidRequest
+        default:
+            return .unexpected
+        }
+    }
+
+    if error is CancellationError {
+        return .cancelled
+    }
+
+    return .unexpected
+}
+
+actor RateLimiter {
+    private(set) var lastAdmission: ContinuousClock.Instant?
+    private let minimumInterval: Duration
+    private let clock = ContinuousClock()
+
+    init(minimumInterval: TimeInterval = 1.05) {
+        self.minimumInterval = .nanoseconds(
+            Int64(minimumInterval * 1_000_000_000)
+        )
+    }
+
+    @discardableResult
+    func waitIfNeeded() async throws -> ContinuousClock.Instant {
+        while let lastAdmission {
+            let elapsed = lastAdmission.duration(to: clock.now)
+            let remaining = minimumInterval - elapsed
+            guard remaining > .zero else { break }
+            try await Task.sleep(for: remaining, clock: clock)
         }
 
-        lastRequestTime = Date()
+        try Task.checkCancellation()
+        let admission = clock.now
+        lastAdmission = admission
+        return admission
     }
 }
 
@@ -53,22 +137,62 @@ struct MusicBrainzService {
     private static let sharedRateLimiter = RateLimiter()
 
     private func data(from url: URL) async throws -> Data {
-        await Self.sharedRateLimiter.waitIfNeeded()
+        try await Self.sharedRateLimiter.waitIfNeeded()
+        try Task.checkCancellation()
 
         var request = URLRequest(url: url)
         request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await URLSession.shared.data(for: request)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch let error as URLError {
+            if error.code == .cancelled { throw CancellationError() }
+            if error.code == .timedOut {
+                throw MusicBrainzServiceError.timeout(error)
+            }
+            switch error.code {
+            case .notConnectedToInternet, .cannotFindHost, .cannotConnectToHost,
+                 .networkConnectionLost, .dnsLookupFailed, .secureConnectionFailed,
+                 .serverCertificateHasBadDate, .serverCertificateUntrusted,
+                 .serverCertificateHasUnknownRoot, .serverCertificateNotYetValid:
+                throw MusicBrainzServiceError.connectivity(error)
+            case .badURL, .unsupportedURL:
+                throw MusicBrainzServiceError.invalidRequest(error)
+            default:
+                throw MusicBrainzServiceError.unexpected(error)
+            }
+        } catch {
+            throw MusicBrainzServiceError.unexpected(error)
+        }
 
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw URLError(.badServerResponse)
+            throw MusicBrainzServiceError.unexpected(
+                URLError(.badServerResponse)
+            )
         }
 
         guard (200...299).contains(httpResponse.statusCode) else {
-            throw URLError(.badServerResponse)
+            throw MusicBrainzServiceError.fromHTTPStatus(httpResponse.statusCode)
         }
 
         return data
+    }
+
+    private func decode<T: Decodable>(
+        _ type: T.Type,
+        from data: Data
+    ) throws -> T {
+        do {
+            return try JSONDecoder().decode(type, from: data)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            throw MusicBrainzServiceError.dataFailure(error)
+        }
     }
 
     func searchReleases(
@@ -98,11 +222,11 @@ struct MusicBrainzService {
         ]
 
         guard let url = components?.url else {
-            throw URLError(.badURL)
+            throw MusicBrainzServiceError.invalidRequest(URLError(.badURL))
         }
 
         let data = try await data(from: url)
-        let response = try JSONDecoder().decode(MBReleaseSearchResponse.self, from: data)
+        let response = try decode(MBReleaseSearchResponse.self, from: data)
         return response.releases
     }
 
@@ -110,11 +234,11 @@ struct MusicBrainzService {
         let urlString = "https://musicbrainz.org/ws/2/release/\(id)?fmt=json&inc=recordings+artist-credits+recording-level-rels+artist-rels+label-rels+labels+release-groups+annotation+url-rels"
 
         guard let url = URL(string: urlString) else {
-            throw URLError(.badURL)
+            throw MusicBrainzServiceError.invalidRequest(URLError(.badURL))
         }
 
         let data = try await data(from: url)
-        return try JSONDecoder().decode(MBRelease.self, from: data)
+        return try decode(MBRelease.self, from: data)
     }
 
     func searchArtists(
@@ -131,11 +255,11 @@ struct MusicBrainzService {
         ]
 
         guard let url = components?.url else {
-            throw URLError(.badURL)
+            throw MusicBrainzServiceError.invalidRequest(URLError(.badURL))
         }
 
         let data = try await data(from: url)
-        let response = try JSONDecoder().decode(MBArtistSearchResponse.self, from: data)
+        let response = try decode(MBArtistSearchResponse.self, from: data)
         return response.artists
     }
 
@@ -143,11 +267,11 @@ struct MusicBrainzService {
         let urlString = "https://musicbrainz.org/ws/2/artist/\(id)?fmt=json&inc=url-rels"
 
         guard let url = URL(string: urlString) else {
-            throw URLError(.badURL)
+            throw MusicBrainzServiceError.invalidRequest(URLError(.badURL))
         }
 
         let data = try await data(from: url)
-        return try JSONDecoder().decode(MBArtistDetail.self, from: data)
+        return try decode(MBArtistDetail.self, from: data)
     }
 
     nonisolated static func releaseSearchQuery(from input: String) -> String {
@@ -235,11 +359,11 @@ struct MusicBrainzService {
         ]
 
         guard let url = components?.url else {
-            throw URLError(.badURL)
+            throw MusicBrainzServiceError.invalidRequest(URLError(.badURL))
         }
 
         let data = try await data(from: url)
-        let response = try JSONDecoder().decode(MBReleaseSearchResponse.self, from: data)
+        let response = try decode(MBReleaseSearchResponse.self, from: data)
         return response.releases
     }
 
@@ -247,11 +371,11 @@ struct MusicBrainzService {
         let urlString = "https://musicbrainz.org/ws/2/release/\(mbid)?fmt=json&inc=artist-credits+labels+media"
 
         guard let url = URL(string: urlString) else {
-            throw URLError(.badURL)
+            throw MusicBrainzServiceError.invalidRequest(URLError(.badURL))
         }
 
         let data = try await data(from: url)
-        let release = try JSONDecoder().decode(MBRelease.self, from: data)
+        let release = try decode(MBRelease.self, from: data)
 
         let result = MBReleaseSearchResult(
             id: release.id,
@@ -280,9 +404,11 @@ struct MusicBrainzService {
             URLQueryItem(name: "limit", value: "\(limit)"),
             URLQueryItem(name: "offset", value: "\(offset)")
         ]
-        guard let url = components?.url else { throw URLError(.badURL) }
+        guard let url = components?.url else {
+            throw MusicBrainzServiceError.invalidRequest(URLError(.badURL))
+        }
         let data = try await data(from: url)
-        let result = try JSONDecoder().decode(MBReleaseGroupBrowseResponse.self, from: data)
+        let result = try decode(MBReleaseGroupBrowseResponse.self, from: data)
         let nextOffset = offset + result.releaseGroups.count
         let hasMore = nextOffset < result.count
         return (result.releaseGroups, hasMore)
@@ -294,10 +420,21 @@ struct MusicBrainzService {
         let wikidataAPI = URL(string: "https://www.wikidata.org/wiki/Special:EntityData/\(qid).json")!
         let wikidataData = try await data(from: wikidataAPI)
 
-        let json = try JSONSerialization.jsonObject(with: wikidataData) as? [String: Any]
+        let json: [String: Any]
+        do {
+            guard let object = try JSONSerialization.jsonObject(with: wikidataData) as? [String: Any]
+            else { throw MusicBrainzServiceError.dataFailure(URLError(.cannotParseResponse)) }
+            json = object
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch let error as MusicBrainzServiceError {
+            throw error
+        } catch {
+            throw MusicBrainzServiceError.dataFailure(error)
+        }
 
         guard
-            let entities = json?["entities"] as? [String: Any],
+            let entities = json["entities"] as? [String: Any],
             let entity = entities[qid] as? [String: Any],
             let sitelinks = entity["sitelinks"] as? [String: Any],
             let enwiki = sitelinks["enwiki"] as? [String: Any],
@@ -310,8 +447,19 @@ struct MusicBrainzService {
         let summaryURL = URL(string: "https://en.wikipedia.org/api/rest_v1/page/summary/\(encodedTitle)")!
 
         let summaryData = try await data(from: summaryURL)
-        let summaryJSON = try JSONSerialization.jsonObject(with: summaryData) as? [String: Any]
-        let extract = summaryJSON?["extract"] as? String
+        let summaryJSON: [String: Any]
+        do {
+            guard let object = try JSONSerialization.jsonObject(with: summaryData) as? [String: Any]
+            else { throw MusicBrainzServiceError.dataFailure(URLError(.cannotParseResponse)) }
+            summaryJSON = object
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch let error as MusicBrainzServiceError {
+            throw error
+        } catch {
+            throw MusicBrainzServiceError.dataFailure(error)
+        }
+        let extract = summaryJSON["extract"] as? String
 
         return (title, extract ?? "")
     }
@@ -332,11 +480,11 @@ struct MusicBrainzService {
         ]
 
         guard let url = components?.url else {
-            throw URLError(.badURL)
+            throw MusicBrainzServiceError.invalidRequest(URLError(.badURL))
         }
 
         let data = try await data(from: url)
-        let result = try JSONDecoder().decode(MBReleaseSearchResponse.self, from: data)
+        let result = try decode(MBReleaseSearchResponse.self, from: data)
         return (result.releases, result.releases.count == limit)
     }
 
@@ -362,10 +510,12 @@ struct MusicBrainzService {
             URLQueryItem(name: "inc", value: "artist-credits+releases+labels+media")
         ]
 
-        guard let url = components?.url else { throw URLError(.badURL) }
+        guard let url = components?.url else {
+            throw MusicBrainzServiceError.invalidRequest(URLError(.badURL))
+        }
 
         let data = try await data(from: url)
-        let response = try JSONDecoder().decode(MBRecordingSearchResponse.self, from: data)
+        let response = try decode(MBRecordingSearchResponse.self, from: data)
         return response.recordings
     }
 
@@ -375,11 +525,11 @@ struct MusicBrainzService {
         """
 
         guard let url = URL(string: urlString) else {
-            throw URLError(.badURL)
+            throw MusicBrainzServiceError.invalidRequest(URLError(.badURL))
         }
 
         let data = try await data(from: url)
-        return try JSONDecoder().decode(MBRecording.self, from: data)
+        return try decode(MBRecording.self, from: data)
     }
 
     func fetchWork(id: String) async throws -> MBWork {
@@ -388,11 +538,11 @@ struct MusicBrainzService {
         """
 
         guard let url = URL(string: urlString) else {
-            throw URLError(.badURL)
+            throw MusicBrainzServiceError.invalidRequest(URLError(.badURL))
         }
 
         let data = try await data(from: url)
-        return try JSONDecoder().decode(MBWork.self, from: data)
+        return try decode(MBWork.self, from: data)
     }
 }
 

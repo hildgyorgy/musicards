@@ -5,6 +5,128 @@ import XCTest
 
 final class SearchViewModelLibraryFirstTests: XCTestCase {
     @MainActor
+    func testTrailingSpaceDoesNotRestartEquivalentArtistSearch() async {
+        let service = SearchServiceStub()
+        let viewModel = makeViewModel(service: service)
+
+        viewModel.searchQuery = "miles"
+        viewModel.queryDidChange()
+        await eventually { service.requestedArtistQueries == ["miles"] }
+
+        viewModel.searchQuery = "miles "
+        viewModel.queryDidChange()
+        try? await Task.sleep(nanoseconds: 30_000_000)
+
+        XCTAssertEqual(service.requestedArtistQueries, ["miles"])
+    }
+
+    @MainActor
+    func testTrailingSpaceDoesNotRestartEquivalentReleaseSearch() async {
+        let service = SearchServiceStub()
+        let viewModel = makeViewModel(service: service)
+
+        viewModel.searchQuery = "miles davis,"
+        viewModel.queryDidChange()
+        await eventually { service.requestedQueries == ["miles davis,"] }
+
+        viewModel.searchQuery = "miles davis, "
+        viewModel.queryDidChange()
+        try? await Task.sleep(nanoseconds: 30_000_000)
+
+        XCTAssertEqual(service.requestedQueries, ["miles davis,"])
+    }
+
+    @MainActor
+    func testBackspacingEquivalentTrailingSpaceDoesNotRestartReleaseSearch() async {
+        let service = SearchServiceStub()
+        let viewModel = makeViewModel(service: service)
+
+        viewModel.searchQuery = "miles davis, "
+        viewModel.queryDidChange()
+        await eventually { service.requestedQueries == ["miles davis,"] }
+
+        viewModel.searchQuery = "miles davis,"
+        viewModel.queryDidChange()
+        try? await Task.sleep(nanoseconds: 30_000_000)
+
+        XCTAssertEqual(service.requestedQueries, ["miles davis,"])
+    }
+
+    @MainActor
+    func testMeaningfulReleaseFragmentStartsNewSearch() async {
+        let service = SearchServiceStub()
+        let viewModel = makeViewModel(service: service)
+
+        viewModel.searchQuery = "miles davis,"
+        viewModel.queryDidChange()
+        await eventually { service.requestedQueries.count == 1 }
+
+        viewModel.searchQuery = "miles davis, k"
+        viewModel.queryDidChange()
+        await eventually { service.requestedQueries.count == 2 }
+
+        XCTAssertEqual(service.requestedQueries, ["miles davis,", "miles davis, k"])
+    }
+
+    @MainActor
+    func testCommaModeChangeStartsReleaseSearch() async {
+        let service = SearchServiceStub()
+        let viewModel = makeViewModel(service: service)
+
+        viewModel.searchQuery = "miles davis"
+        viewModel.queryDidChange()
+        await eventually { service.requestedArtistQueries == ["miles davis"] }
+
+        viewModel.searchQuery = "miles davis,"
+        viewModel.queryDidChange()
+        await eventually { service.requestedQueries == ["miles davis,"] }
+    }
+
+    @MainActor
+    func testRetryRepeatsSameNormalizedQueryAfterFailure() async {
+        let service = SearchServiceStub()
+        service.behaviors["miles davis,"] = .failure(0)
+        let viewModel = makeViewModel(service: service)
+
+        viewModel.searchQuery = "miles davis, "
+        viewModel.queryDidChange()
+        await eventually { viewModel.searchError != nil }
+
+        viewModel.retrySearch()
+        await eventually {
+            service.requestedQueries.count == 2 && viewModel.searchError != nil
+        }
+
+        XCTAssertEqual(service.requestedQueries, ["miles davis,", "miles davis,"])
+    }
+
+    @MainActor
+    func testCancellationErrorDoesNotPublishSearchError() async {
+        let service = SearchServiceStub()
+        service.behaviors["miles davis,"] = .error(CancellationError(), 0)
+        let viewModel = makeViewModel(service: service)
+
+        viewModel.searchQuery = "miles davis,"
+        viewModel.queryDidChange()
+        await eventually { !viewModel.isSearching }
+
+        XCTAssertNil(viewModel.searchError)
+    }
+
+    @MainActor
+    func testURLCancellationDoesNotPublishConnectivityError() async {
+        let service = SearchServiceStub()
+        service.behaviors["miles davis,"] = .error(URLError(.cancelled), 0)
+        let viewModel = makeViewModel(service: service)
+
+        viewModel.searchQuery = "miles davis,"
+        viewModel.queryDidChange()
+        await eventually { !viewModel.isSearching }
+
+        XCTAssertNil(viewModel.searchError)
+    }
+
+    @MainActor
     func testMergeKeepsLibraryOrderDeduplicatesAndEnrichesExactMBID() {
         let ownedA = row(id: "A", title: "Owned A")
         let ownedB = row(id: "B", title: "Owned B")
@@ -285,6 +407,17 @@ final class SearchViewModelLibraryFirstTests: XCTestCase {
         )
     }
 
+    @MainActor
+    private func makeViewModel(service: SearchServiceStub) -> SearchViewModel {
+        SearchViewModel(
+            service: service,
+            libraryManager: LibraryManager(
+                provider: SearchLibraryProvider(source: .local)
+            ),
+            searchDebounceNanoseconds: 0
+        )
+    }
+
     private func row(
         id: String,
         title: String,
@@ -362,6 +495,7 @@ private final class SearchServiceStub: MusicBrainzSearchServing {
         case empty(UInt64)
         case failure(UInt64)
         case results([MBReleaseSearchResult], UInt64)
+        case error(Error, UInt64)
     }
 
     var behaviors: [String: Behavior] = [:]
@@ -396,6 +530,10 @@ private final class SearchServiceStub: MusicBrainzSearchServing {
             try? await Task.sleep(nanoseconds: delay)
             completedReleaseQueries.append(query)
             return results
+        case .error(let error, let delay):
+            try? await Task.sleep(nanoseconds: delay)
+            completedReleaseQueries.append(query)
+            throw error
         }
     }
 

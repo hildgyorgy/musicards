@@ -43,6 +43,7 @@ final class SearchViewModel: ObservableObject {
     private let libraryManager: LibraryManager
     private let searchDebounceNanoseconds: UInt64
     private var searchGeneration: UInt64 = 0
+    private var lastScheduledNormalizedQuery: String?
     private var activeReleaseSearchQuery: String?
     private var libraryReleaseRows: [SearchReleaseRow] = []
     private var musicBrainzReleaseRows: [SearchReleaseRow] = []
@@ -92,7 +93,7 @@ final class SearchViewModel: ObservableObject {
             return .artistResults
         }
 
-        let q = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        let q = normalizedSearchQuery
 
         if q.isEmpty { return .idle }
 
@@ -106,10 +107,16 @@ final class SearchViewModel: ObservableObject {
     // MARK: - Search entry point
 
     func queryDidChange() {
+        let q = normalizedSearchQuery
+
         if suppressNextQueryChange {
-                suppressNextQueryChange = false
-                return
-            }
+            suppressNextQueryChange = false
+            lastScheduledNormalizedQuery = q
+            return
+        }
+
+        guard q != lastScheduledNormalizedQuery else { return }
+        lastScheduledNormalizedQuery = q
         
         searchTask?.cancel()
         searchGeneration &+= 1
@@ -120,8 +127,6 @@ final class SearchViewModel: ObservableObject {
         searchError = nil
         isSearching = false
         resetReleaseSearchMergeState()
-
-        let q = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard q.count >= 3 else {
             releaseResults = []
@@ -143,6 +148,7 @@ final class SearchViewModel: ObservableObject {
     func switchToSearch() {
         searchTask?.cancel()
         searchGeneration &+= 1
+        lastScheduledNormalizedQuery = ""
         mode = .search
         searchQuery = ""
         releaseResults = []
@@ -168,6 +174,7 @@ final class SearchViewModel: ObservableObject {
         searchError = nil
         isSearching = true
         mode = .search
+        lastScheduledNormalizedQuery = ""
         searchQuery = ""
         artistRows = []
         releaseResults = []
@@ -201,6 +208,7 @@ final class SearchViewModel: ObservableObject {
             } catch is CancellationError {
                 return
             } catch {
+                if Self.isCancellation(error) { return }
                 guard generation == searchGeneration else { return }
                 releaseResults = []
                 artistRows = []
@@ -289,6 +297,7 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
         } catch is CancellationError {
             return
         } catch {
+            if Self.isCancellation(error) { return }
             releaseResults = []
             artistRows = []
             hasMoreResults = false
@@ -313,7 +322,7 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
             artistRows = []
             resetReleaseSearchMergeState()
 
-            let q = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+            let q = normalizedSearchQuery
             guard q.count >= 3 else { return }
 
             isSearching = true
@@ -337,7 +346,20 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
     // MARK: - Private search
 
     private func hasEnoughInput() -> Bool {
-        searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).count >= 3
+        normalizedSearchQuery.count >= 3
+    }
+
+    private var normalizedSearchQuery: String {
+        Self.normalizeSearchQuery(searchQuery)
+    }
+
+    nonisolated static func normalizeSearchQuery(_ rawValue: String) -> String {
+        rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    nonisolated static func isCancellation(_ error: Error) -> Bool {
+        if error is CancellationError { return true }
+        return (error as? URLError)?.code == .cancelled
     }
 
     private func yearRangeText(from lifeSpan: MBLifeSpan?) -> String {
@@ -345,7 +367,7 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
     }
 
     private func performSearch(generation: UInt64) async {
-        let q = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        let q = normalizedSearchQuery
 
         guard q.count >= 3, generation == searchGeneration else {
             isSearching = false
@@ -418,8 +440,19 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
             searchError = nil
 
         } catch is CancellationError {
+            if generation == searchGeneration {
+                isSearching = false
+                isLoadingMore = false
+            }
             return
         } catch {
+            if Self.isCancellation(error) {
+                if generation == searchGeneration {
+                    isSearching = false
+                    isLoadingMore = false
+                }
+                return
+            }
             guard generation == searchGeneration else { return }
             isSearching = false
             isLoadingMore = false
@@ -492,6 +525,7 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
         } catch is CancellationError {
             return
         } catch {
+            if Self.isCancellation(error) { return }
             releaseResults = []
             artistRows = []
             searchError = error
@@ -589,7 +623,7 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
     }
 
     private func loadMoreReleases() async {
-        let q = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        let q = normalizedSearchQuery
         let generation = searchGeneration
         guard !q.isEmpty, q == activeReleaseSearchQuery else { return }
 
@@ -631,7 +665,7 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
     }
 
     private func loadMoreArtists() async {
-        let q = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        let q = normalizedSearchQuery
         guard !q.isEmpty else { return }
 
         do {
@@ -674,9 +708,7 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
     private func activeLibraryDidChange() {
         if mode == .search,
            let query = activeReleaseSearchQuery,
-           query == searchQuery.trimmingCharacters(
-               in: .whitespacesAndNewlines
-           ) {
+           query == normalizedSearchQuery {
             updateLibraryReleaseResults(query: query)
             return
         }

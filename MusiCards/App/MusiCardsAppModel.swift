@@ -33,9 +33,12 @@ final class MusiCardsAppModel: ObservableObject {
     @Published var isLoadingRelease: Bool = false
     @Published var selectedArtistID: String?
     @Published var selectedArtist: MBArtistDetail?
+    @Published var selectedArtistName: String = ""
+    @Published var selectedArtistLifeSpan: String?
     @Published var isLoadingArtistHeader: Bool = false
     @Published var isLoadingArtistWikipedia: Bool = false
     @Published var artistReleaseGroups: [MBReleaseGroupSummary] = []
+    @Published var discographyError: Error?
     @Published var artistWikipedia: (title: String, extract: String)?
     @Published var releaseError: Error?
     @Published var artistError: Error?
@@ -87,6 +90,9 @@ final class MusiCardsAppModel: ObservableObject {
     private let releaseGroupsPageSize: Int = 25
     private var releaseGroupsOffset: Int = 0
     private var currentArtistIDForGroups: String?
+    private var artistSelectionGeneration: UInt64 = 0
+    private var artistLoadTask: Task<Void, Never>?
+    private var artistPaginationTask: Task<Void, Never>?
 
     init(playbackEngine: PlaybackEngine? = nil) {
         let service = musicBrainzService
@@ -308,65 +314,133 @@ final class MusiCardsAppModel: ObservableObject {
     // MARK: - Artist
 
     func selectArtist(_ row: SearchArtistRow) {
-        selectArtist(id: row.id)
+        selectArtist(id: row.id, name: row.name, lifeSpan: row.lifeSpan.nilIfEmpty)
     }
 
     func selectArtist(id: String) {
+        selectArtist(id: id, name: nil, lifeSpan: nil)
+    }
+
+    private func selectArtist(id: String, name: String?, lifeSpan: String?) {
+        artistLoadTask?.cancel()
+        artistPaginationTask?.cancel()
+        artistSelectionGeneration &+= 1
+        let generation = artistSelectionGeneration
+
         // Reset pagination
         releaseGroupsOffset = 0
         hasMoreReleaseGroups = false
         isLoadingMoreReleaseGroups = false
-        currentArtistIDForGroups = nil
+        currentArtistIDForGroups = id
 
         selectedArtistID = id
         selectedArtist = nil
+        selectedArtistName = name ?? ""
+        selectedArtistLifeSpan = lifeSpan
         artistReleaseGroups = []
+        discographyError = nil
         artistWikipedia = nil
         artistError = nil
 
-        isLoadingArtistHeader = true
+        isLoadingArtistHeader = false
         isLoadingArtistWikipedia = false
 
-        Task {
-            await loadArtist(id: id)
+        withAnimation(AppStyle.animation) {
+            deckSelection = DeckSelection<MusiCardID>(
+                activeID: .artist,
+                activeSlotIndex: MusiCardID.artist.slotIndex
+            )
         }
+        artistLoadTask = Task { await loadArtist(id: id, generation: generation) }
     }
 
     func retryArtist() {
         if let artistID = selectedArtistID {
-            selectArtist(id: artistID)
+            if discographyError != nil {
+                retryDiscography(for: artistID)
+            } else {
+                selectArtist(
+                    id: artistID,
+                    name: selectedArtistName.nilIfEmpty,
+                    lifeSpan: selectedArtistLifeSpan
+                )
+            }
         }
     }
 
-    private func loadArtist(id: String) async {
+    func retryDiscography() {
+        guard let artistID = selectedArtistID else { return }
+        retryDiscography(for: artistID)
+    }
+
+    nonisolated static func hasUsableArtistHeader(
+        artist: MBArtistDetail?,
+        name: String
+    ) -> Bool {
+        artist != nil || !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func retryDiscography(for artistID: String) {
+        artistLoadTask?.cancel()
+        artistPaginationTask?.cancel()
+        let generation = artistSelectionGeneration
+
+        discographyError = nil
+        if selectedArtistName.isEmpty { artistError = nil }
+        artistReleaseGroups = []
+        releaseGroupsOffset = 0
+        hasMoreReleaseGroups = false
+        isLoadingMoreReleaseGroups = false
+        currentArtistIDForGroups = artistID
+
+        artistLoadTask = Task {
+            guard await loadDiscographyPage(id: artistID, generation: generation) else {
+                return
+            }
+            if selectedArtist == nil {
+                await loadArtistDetail(id: artistID, generation: generation)
+            }
+        }
+    }
+
+    private func loadArtist(id: String, generation: UInt64) async {
+        guard await loadDiscographyPage(id: id, generation: generation) else { return }
+        await loadArtistDetail(id: id, generation: generation)
+    }
+
+    private func loadDiscographyPage(id: String, generation: UInt64) async -> Bool {
         do {
-            // Load artist info and first page of release groups in parallel
-            async let artistTask = musicBrainzService.fetchArtist(id: id)
-            async let releaseGroupsTask = musicBrainzService.fetchArtistReleaseGroups(
-                id: id,
-                limit: releaseGroupsPageSize,
-                offset: 0
+            let (groups, hasMore) = try await musicBrainzService.fetchArtistReleaseGroups(
+                id: id, limit: releaseGroupsPageSize, offset: 0
             )
-
-            let artist = try await artistTask
-            let (groups, hasMore) = try await releaseGroupsTask
-
-            selectedArtist = artist
+            guard generation == artistSelectionGeneration, selectedArtistID == id else { return false }
             artistReleaseGroups = groups
+            discographyError = nil
             hasMoreReleaseGroups = hasMore
             releaseGroupsOffset = groups.count
             currentArtistIDForGroups = id
+            return true
+        } catch is CancellationError { return false }
+        catch {
+            guard generation == artistSelectionGeneration, selectedArtistID == id else { return false }
+            discographyError = error
+            if !Self.hasUsableArtistHeader(artist: selectedArtist, name: selectedArtistName) {
+                artistError = error
+            }
+            return false
+        }
+    }
 
-            isLoadingArtistHeader = false
-
-            withAnimation(AppStyle.animation) {
-                deckSelection = DeckSelection<MusiCardID>(
-                    activeID: .artist,
-                    activeSlotIndex: MusiCardID.artist.slotIndex
-                )
+    private func loadArtistDetail(id: String, generation: UInt64) async {
+        do {
+            let artist = try await musicBrainzService.fetchArtist(id: id)
+            guard generation == artistSelectionGeneration, selectedArtistID == id else { return }
+            selectedArtist = artist
+            if selectedArtistName.isEmpty { selectedArtistName = artist.name }
+            if selectedArtistLifeSpan == nil {
+                selectedArtistLifeSpan = MBTextFormatter.lifeSpanText(from: artist.lifeSpan)
             }
 
-            // Wikipedia loads after — non-blocking, card is already visible
             isLoadingArtistWikipedia = true
 
             if let wikidataURL = artist.relations?
@@ -375,20 +449,23 @@ final class MusiCardsAppModel: ObservableObject {
                 .resource
                 .flatMap(URL.init(string:)) {
 
-                artistWikipedia = try await musicBrainzService.fetchWikipediaSummary(from: wikidataURL)
+                let summary = try await musicBrainzService.fetchWikipediaSummary(from: wikidataURL)
+                guard generation == artistSelectionGeneration, selectedArtistID == id else { return }
+                artistWikipedia = summary
             } else {
                 artistWikipedia = nil
             }
 
             isLoadingArtistWikipedia = false
 
+        } catch is CancellationError {
+            return
         } catch {
-            selectedArtist = nil
-            artistReleaseGroups = []
-            artistWikipedia = nil
-            isLoadingArtistHeader = false
+            guard generation == artistSelectionGeneration, selectedArtistID == id else { return }
             isLoadingArtistWikipedia = false
-            artistError = error
+            if !Self.hasUsableArtistHeader(artist: selectedArtist, name: selectedArtistName) {
+                artistError = error
+            }
         }
     }
 
@@ -404,14 +481,16 @@ final class MusiCardsAppModel: ObservableObject {
 
         isLoadingMoreReleaseGroups = true
 
-        Task {
-            await loadMoreReleaseGroups()
-        }
+        let generation = artistSelectionGeneration
+        artistPaginationTask?.cancel()
+        artistPaginationTask = Task { await loadMoreReleaseGroups(generation: generation) }
     }
 
-    private func loadMoreReleaseGroups() async {
+    private func loadMoreReleaseGroups(generation: UInt64) async {
+        defer {
+            if generation == artistSelectionGeneration { isLoadingMoreReleaseGroups = false }
+        }
         guard let artistID = currentArtistIDForGroups else {
-            isLoadingMoreReleaseGroups = false
             return
         }
 
@@ -422,6 +501,8 @@ final class MusiCardsAppModel: ObservableObject {
                 offset: releaseGroupsOffset
             )
 
+            guard generation == artistSelectionGeneration, selectedArtistID == artistID else { return }
+
             artistReleaseGroups.append(contentsOf: groups)
             hasMoreReleaseGroups = hasMore
             releaseGroupsOffset += groups.count
@@ -430,13 +511,13 @@ final class MusiCardsAppModel: ObservableObject {
             // Silently fail — user can scroll again to retry
         }
 
-        isLoadingMoreReleaseGroups = false
     }
 
     // MARK: - Release group selection
 
     func selectReleaseGroup(_ group: MBReleaseGroupSummary) {
-        guard let artistName = selectedArtist?.name else { return }
+        let artistName = selectedArtist?.name ?? selectedArtistName
+        guard !artistName.isEmpty else { return }
 
         searchViewModel.loadReleaseGroupResults(
             releaseGroupID: group.id,
@@ -680,4 +761,11 @@ final class MusiCardsAppModel: ObservableObject {
         }
     }
 #endif
+}
+
+private extension String {
+    var nilIfEmpty: String? {
+        let value = trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? nil : value
+    }
 }
