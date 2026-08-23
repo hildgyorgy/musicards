@@ -126,6 +126,7 @@ nonisolated private final class RsyncProcessState: @unchecked Sendable {
 nonisolated final class SyncEngine {
 
     let configuration: SyncConfiguration
+    private let rsyncExecutableURL: URL?
     private let processState = RsyncProcessState()
 
     enum SyncEngineError: LocalizedError {
@@ -166,9 +167,11 @@ nonisolated final class SyncEngine {
     }
 
     init(
-        configuration: SyncConfiguration = .defaultConfiguration
+        configuration: SyncConfiguration = .defaultConfiguration,
+        rsyncExecutableURL: URL? = BundledRsync.executableURL()
     ) {
         self.configuration = configuration
+        self.rsyncExecutableURL = rsyncExecutableURL
     }
 
     func cancel() {
@@ -176,9 +179,12 @@ nonisolated final class SyncEngine {
     }
 
     func checkRsync() throws {
-        let path = configuration.rsyncPath
-
-        guard FileManager.default.isExecutableFile(atPath: path) else {
+        guard
+            let rsyncExecutableURL,
+            FileManager.default.isExecutableFile(
+                atPath: rsyncExecutableURL.path
+            )
+        else {
             throw SyncEngineError.rsyncNotFound
         }
     }
@@ -189,7 +195,7 @@ nonisolated final class SyncEngine {
         let process = Process()
         let pipe = Pipe()
 
-        process.executableURL = URL(fileURLWithPath: configuration.rsyncPath)
+        process.executableURL = rsyncExecutableURL
         process.arguments = ["--version"]
         process.standardOutput = pipe
         process.standardError = pipe
@@ -288,6 +294,7 @@ nonisolated final class SyncEngine {
     ) async throws -> String {
 
         let configuration = self.configuration
+        let rsyncExecutableURL = self.rsyncExecutableURL
         let processState = self.processState
 
         return try await withCheckedThrowingContinuation { continuation in
@@ -295,6 +302,7 @@ nonisolated final class SyncEngine {
                 do {
                     let output = try Self.runRsyncBlocking(
                         configuration: configuration,
+                        rsyncExecutableURL: rsyncExecutableURL,
                         dryRun: dryRun,
                         invalidatesLibraryIndex: invalidatesLibraryIndex,
                         publishesLibraryIndex: publishesLibraryIndex,
@@ -313,6 +321,7 @@ nonisolated final class SyncEngine {
 
     private static func runRsyncBlocking(
         configuration: SyncConfiguration,
+        rsyncExecutableURL: URL?,
         dryRun: Bool,
         invalidatesLibraryIndex: Bool,
         publishesLibraryIndex: Bool,
@@ -320,17 +329,19 @@ nonisolated final class SyncEngine {
         onOutput: @escaping @Sendable ([String]) -> Void
     ) throws -> String {
 
-        guard FileManager.default.isExecutableFile(
-            atPath: configuration.rsyncPath
-        ) else {
+        guard
+            let rsyncExecutableURL,
+            FileManager.default.isExecutableFile(
+                atPath: rsyncExecutableURL.path
+            )
+        else {
             throw SyncEngineError.rsyncNotFound
         }
 
         let process = Process()
         let pipe = Pipe()
 
-        process.executableURL =
-            URL(fileURLWithPath: configuration.rsyncPath)
+        process.executableURL = rsyncExecutableURL
 
         var invalidationDirectoryURL: URL?
 

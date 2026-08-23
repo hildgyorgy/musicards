@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		F6010000305A000000000001 /* rsync in Embed Executables */ = {isa = PBXBuildFile; fileRef = F6010000305A000000000002 /* rsync */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		F50A4F7E2F8EF16E006FD7A7 /* ClassicalMetadataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50A4F7C2F8EF16E006FD7A7 /* ClassicalMetadataStore.swift */; };
 		F50A4F7F2F8EF16E006FD7A7 /* ClassicalTrackFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50A4F7D2F8EF16E006FD7A7 /* ClassicalTrackFormatter.swift */; };
 		F50AC8762F8E5EE200776C7E /* DeckBackgroundView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50AC8752F8E5EE100776C7E /* DeckBackgroundView.swift */; };
@@ -77,7 +78,22 @@
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		F6010000305A000000000003 /* Embed Executables */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 6;
+			files = (
+				F6010000305A000000000001 /* rsync in Embed Executables */,
+			);
+			name = "Embed Executables";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		F6010000305A000000000002 /* rsync */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; path = ThirdParty/rsync/rsync; sourceTree = "<group>"; };
 		F50A4F7C2F8EF16E006FD7A7 /* ClassicalMetadataStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClassicalMetadataStore.swift; sourceTree = "<group>"; };
 		F50A4F7D2F8EF16E006FD7A7 /* ClassicalTrackFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClassicalTrackFormatter.swift; sourceTree = "<group>"; };
 		F50AC8752F8E5EE100776C7E /* DeckBackgroundView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckBackgroundView.swift; sourceTree = "<group>"; };
@@ -248,6 +264,7 @@
 		F5E521362F8292AD00D2CEAE = {
 			isa = PBXGroup;
 			children = (
+				F6010000305A000000000002 /* rsync */,
 				F5E521402F8292AD00D2CEAE /* Products */,
 				F5C0DE032FD0000000000003 /* MusiCards */,
 				F5C0DE042FD0000000000004 /* Shared */,
@@ -375,6 +392,7 @@
 				F5B632B030260A6100A44573 /* Sources */,
 				F5B632B130260A6100A44573 /* Frameworks */,
 				F5B632B230260A6100A44573 /* Resources */,
+				F6010000305A000000000003 /* Embed Executables */,
 			);
 			buildRules = (
 			);

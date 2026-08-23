@@ -131,7 +131,6 @@ final class SyncConfigurationValidatorTests: XCTestCase {
         destination: String
     ) -> SyncConfiguration {
         SyncConfiguration(
-            rsyncPath: "/opt/homebrew/bin/rsync",
             sourcePath: source,
             destination: DestinationProfile(
                 name: "Local folder",

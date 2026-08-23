@@ -24,6 +24,10 @@ final class SyncConfigurationStore {
             return .defaultConfiguration
         }
 
+        if containsLegacyRsyncPath(data) {
+            save(configuration)
+        }
+
         return configuration
     }
 
@@ -33,5 +37,16 @@ final class SyncConfigurationStore {
         }
 
         userDefaults.set(data, forKey: key)
+    }
+
+    private func containsLegacyRsyncPath(_ data: Data) -> Bool {
+        guard
+            let object = try? JSONSerialization.jsonObject(with: data),
+            let dictionary = object as? [String: Any]
+        else {
+            return false
+        }
+
+        return dictionary["rsyncPath"] != nil
     }
 }

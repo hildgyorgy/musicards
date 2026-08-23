@@ -47,7 +47,6 @@ final class RsyncArgumentsTests: XCTestCase {
 
     func testLocalDestinationDoesNotAddSshArguments() {
         let configuration = SyncConfiguration(
-            rsyncPath: "/opt/homebrew/bin/rsync",
             sourcePath: "/Volumes/Source/",
             destination: DestinationProfile(
                 name: "Local folder",
@@ -96,7 +95,6 @@ final class RsyncArgumentsTests: XCTestCase {
         )
 
         let configuration = SyncConfiguration(
-            rsyncPath: "/opt/homebrew/bin/rsync",
             sourcePath: source.path + "/",
             destination: DestinationProfile(
                 name: "Local folder",
@@ -106,7 +104,7 @@ final class RsyncArgumentsTests: XCTestCase {
             sshKeyPath: "/tmp/key"
         )
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: configuration.rsyncPath)
+        process.executableURL = try XCTUnwrap(BundledRsync.executableURL())
         process.arguments = SyncEngine.rsyncArguments(
             configuration: configuration,
             dryRun: false
@@ -163,7 +161,6 @@ final class RsyncArgumentsTests: XCTestCase {
 
     func testLocalIndexInvalidationDoesNotAddSSHArguments() {
         let configuration = SyncConfiguration(
-            rsyncPath: "/opt/homebrew/bin/rsync",
             sourcePath: "/Volumes/Source/",
             destination: DestinationProfile(
                 name: "Local folder",
@@ -213,7 +210,6 @@ final class RsyncArgumentsTests: XCTestCase {
         try Data("music".utf8).write(to: musicURL)
 
         let configuration = SyncConfiguration(
-            rsyncPath: "/opt/homebrew/bin/rsync",
             sourcePath: testRoot.path,
             destination: DestinationProfile(
                 name: "Local folder",
@@ -223,7 +219,7 @@ final class RsyncArgumentsTests: XCTestCase {
             sshKeyPath: "/tmp/key"
         )
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: configuration.rsyncPath)
+        process.executableURL = try XCTUnwrap(BundledRsync.executableURL())
         process.arguments = SyncEngine.libraryIndexInvalidationArguments(
             configuration: configuration,
             emptySourcePath: emptySource.path
@@ -238,7 +234,6 @@ final class RsyncArgumentsTests: XCTestCase {
 
     func testLocalIndexPublicationDoesNotAddSSHArguments() {
         let configuration = SyncConfiguration(
-            rsyncPath: "/opt/homebrew/bin/rsync",
             sourcePath: "/Volumes/Source/",
             destination: DestinationProfile(
                 name: "Local folder",
@@ -261,7 +256,6 @@ final class RsyncArgumentsTests: XCTestCase {
 
     private func remoteConfiguration() -> SyncConfiguration {
         SyncConfiguration(
-            rsyncPath: "/opt/homebrew/bin/rsync",
             sourcePath: "/Volumes/Source/",
             destination: DestinationProfile(
                 name: "Test server",
