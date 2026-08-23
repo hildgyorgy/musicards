@@ -191,7 +191,11 @@ struct SearchCardContentView: View {
 
     private func releaseRow(_ release: SearchReleaseRow) -> some View {
         HStack(alignment: .top, spacing: 12) {
-            ReleaseThumbnailView(releaseID: release.id, hasCoverArt: release.hasCoverArt)
+            ReleaseThumbnailView(
+                releaseID: release.id,
+                hasCoverArt: release.hasCoverArt,
+                isPlayable: libraryManager.containsRelease(release.id)
+            )
                 .frame(width: 76, height: 76)
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 

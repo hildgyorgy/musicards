@@ -711,7 +711,10 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
                 format: release.format
             ),
             disambiguation: "",
-            hasCoverArt: false
+            // The exact library Release MBID is a playable result. Let the
+            // row request the same full artwork cache entry as the Release
+            // card, even before MusicBrainz enriches the row metadata.
+            hasCoverArt: true
         )
     }
 

@@ -278,8 +278,14 @@ final class MusiCardsAppModel: ObservableObject {
 
     private func loadReleaseAndCover(id: String) async {
         do {
-            let release = try await musicBrainzService.loadRelease(id: id)
-            let cover = await CoverArtCache.shared.image(for: id, size: .full)
+            async let releaseTask = musicBrainzService.loadRelease(id: id)
+            async let coverTask = CoverArtCache.shared.image(
+                for: id,
+                size: .full
+            )
+
+            let release = try await releaseTask
+            let cover = await coverTask
 
             selectedRelease = release
             selectedReleaseCover = cover

@@ -10,6 +10,7 @@ import SwiftUI
 struct ReleaseThumbnailView: View {
     let releaseID: String
     let hasCoverArt: Bool
+    let isPlayable: Bool
 
     @State private var image: PlatformImage?
 
@@ -30,13 +31,14 @@ struct ReleaseThumbnailView: View {
                     .fill(Color.gray.opacity(0.15))
             }
         }
-        .task(id: "\(releaseID)::\(hasCoverArt)") {
+        .task(id: "\(releaseID)::\(hasCoverArt)::\(isPlayable)") {
             guard hasCoverArt else {
                 image = nil
                 return
             }
 
-            image = await CoverArtCache.shared.image(for: releaseID, size: .thumbnail)
+            let size: CoverArtSize = isPlayable ? .full : .thumbnail
+            image = await CoverArtCache.shared.image(for: releaseID, size: size)
         }
     }
 }
