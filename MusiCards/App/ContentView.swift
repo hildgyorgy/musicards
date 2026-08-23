@@ -50,7 +50,7 @@ struct ContentView: View {
             DeckCard(
                 id: .search,
                 slotIndex: MusiCardID.search.slotIndex,
-                cardLabel: "Search",
+                cardLabel: appModel.searchViewModel.mode.cardLabel,
                 title: "",
                 subtitle: ""
             ),
@@ -225,8 +225,7 @@ struct ContentView: View {
                     appModel.addRecentArtist(artist)
                 },
                 onSelectRecentRelease: { release in
-                    appModel.selectRelease(release)
-                    appModel.addRecentRelease(release)
+                    appModel.selectRecentRelease(release)
                 },
                 onSelectNowPlayingRelease: {
                     #if os(iOS)

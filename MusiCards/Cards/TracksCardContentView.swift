@@ -20,6 +20,9 @@ struct TracksCardContentView: View {
 
     // Classical support — owned here, matching the MBViewer pattern.
     @ObservedObject var classicalMetadataStore: ClassicalMetadataStore
+#if os(iOS)
+    @Environment(\.deckContentBottomInset) private var deckContentBottomInset
+#endif
 
     // MARK: - Classical detection
     //
@@ -58,6 +61,9 @@ struct TracksCardContentView: View {
                     releaseLinerNotes(for: release)
                 }
             }
+#if os(iOS)
+            .contentMargins(.bottom, deckContentBottomInset, for: .scrollContent)
+#endif
             .task(id: release.id) {
                 // Preload composer metadata for all tracks so composer headers
                 // can appear as the view renders.

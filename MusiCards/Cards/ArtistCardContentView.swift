@@ -23,6 +23,9 @@ struct ArtistCardContentView: View {
     // Pagination
     let isLoadingMore: Bool
     let onLoadMoreIfNeeded: (MBReleaseGroupSummary) -> Void
+#if os(iOS)
+    @Environment(\.deckContentBottomInset) private var deckContentBottomInset
+#endif
 
     @State private var isShowingWikipedia = false
     @State private var wikipediaURL_: URL? = nil
@@ -130,6 +133,9 @@ struct ArtistCardContentView: View {
                     }
                 }
                 .padding(.bottom, 36)
+#if os(iOS)
+                .contentMargins(.bottom, deckContentBottomInset, for: .scrollContent)
+#endif
             
             } else {
                 EmptyStateView.artist

@@ -10,6 +10,9 @@ import SwiftUI
 struct ReleaseCardContentView: View {
     let release: MBRelease?
     let onShowVersions: () -> Void
+#if os(iOS)
+    @Environment(\.deckContentBottomInset) private var deckContentBottomInset
+#endif
 
     var body: some View {
         if let release {
@@ -35,6 +38,9 @@ struct ReleaseCardContentView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.bottom, 28)
             }
+#if os(iOS)
+            .contentMargins(.bottom, deckContentBottomInset, for: .scrollContent)
+#endif
         } else {
             EmptyStateView.release
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

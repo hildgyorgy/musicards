@@ -10,4 +10,13 @@ import Foundation
 enum SearchMode: Equatable {
     case search
     case releaseGroupResults(releaseGroupID: String)
+
+    nonisolated var cardLabel: String {
+        switch self {
+        case .search:
+            return "Search"
+        case .releaseGroupResults:
+            return "Release Versions"
+        }
+    }
 }

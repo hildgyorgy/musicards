@@ -20,6 +20,9 @@ struct SearchCardContentView: View {
     let onSelectRecentArtist: (SearchArtistRow) -> Void
     let onSelectRecentRelease: (SearchReleaseRow) -> Void
     let onSelectNowPlayingRelease: () -> Void
+#if os(iOS)
+    @Environment(\.deckContentBottomInset) private var deckContentBottomInset
+#endif
 
     private var isReleaseGroupMode: Bool {
         if case .releaseGroupResults = viewModel.mode { return true }
@@ -32,6 +35,9 @@ struct SearchCardContentView: View {
                 .frame(maxWidth: .infinity, minHeight: 1, alignment: .leading)
                 .padding(.bottom, 24)
         }
+#if os(iOS)
+        .contentMargins(.bottom, deckContentBottomInset, for: .scrollContent)
+#endif
     }
 
     @ViewBuilder

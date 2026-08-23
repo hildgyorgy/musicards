@@ -4,6 +4,14 @@ import XCTest
 @testable import MusiCards
 
 final class SearchViewModelLibraryFirstTests: XCTestCase {
+    func testSearchCardLabelFollowsExistingSearchMode() {
+        XCTAssertEqual(SearchMode.search.cardLabel, "Search")
+        XCTAssertEqual(
+            SearchMode.releaseGroupResults(releaseGroupID: "rgid").cardLabel,
+            "Release Versions"
+        )
+    }
+
     @MainActor
     func testTrailingSpaceDoesNotRestartEquivalentArtistSearch() async {
         let service = SearchServiceStub()

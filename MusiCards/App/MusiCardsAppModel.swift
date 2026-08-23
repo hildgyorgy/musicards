@@ -73,6 +73,7 @@ final class MusiCardsAppModel: ObservableObject {
     private var localPlaybackNowPlayingCoordinator:
         PlatformNowPlayingCoordinator?
     private var playbackItemObservation: AnyCancellable?
+    private var searchModeObservation: AnyCancellable?
 
     private let musicBrainzService = MusicBrainzService()
 
@@ -125,6 +126,15 @@ final class MusiCardsAppModel: ObservableObject {
         self.trackDetailStore = TrackDetailStore(service: service)
         self.classicalMetadataStore = ClassicalMetadataStore(service: service)
         self.playbackController = playbackController
+        self.searchModeObservation = self.searchViewModel.objectWillChange
+            .sink { [weak self] in
+                // SearchViewModel publishes before its @Published value is
+                // installed; yield once so the deck reads the new mode.
+                Task { @MainActor [weak self] in
+                    await Task.yield()
+                    self?.objectWillChange.send()
+                }
+            }
         self.localPlaybackNowPlayingCoordinator =
             PlatformNowPlayingCoordinator(controller: self.playbackController)
         self.playbackItemObservation = self.playbackController.$currentIndex
@@ -257,16 +267,35 @@ final class MusiCardsAppModel: ObservableObject {
 
     // MARK: - Release
 
-    func selectRelease(_ row: SearchReleaseRow) {
+    func selectRelease(
+        _ row: SearchReleaseRow,
+        activateImmediately: Bool = false
+    ) {
         selectedReleaseID = row.id
         isLoadingRelease = true
         releaseError = nil
         selectedRelease = nil
         selectedReleaseCover = nil
 
+        if activateImmediately {
+            withAnimation(AppStyle.animation) {
+                deckSelection = DeckSelection<MusiCardID>(
+                    activeID: .release,
+                    activeSlotIndex: MusiCardID.release.slotIndex
+                )
+            }
+        }
+
         Task {
             await loadReleaseAndCover(id: row.id)
         }
+    }
+
+    /// Recent-history mutation is deliberately a side effect of selecting
+    /// the exact tapped Release, never a prerequisite for navigation.
+    func selectRecentRelease(_ row: SearchReleaseRow) {
+        selectRelease(row, activateImmediately: true)
+        addRecentRelease(row)
     }
 
     func retryRelease() {

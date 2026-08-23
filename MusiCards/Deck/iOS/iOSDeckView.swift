@@ -5,6 +5,17 @@
 #if os(iOS)
 import SwiftUI
 
+private struct DeckContentBottomInsetKey: EnvironmentKey {
+    static let defaultValue: CGFloat = 0
+}
+
+extension EnvironmentValues {
+    var deckContentBottomInset: CGFloat {
+        get { self[DeckContentBottomInsetKey.self] }
+        set { self[DeckContentBottomInsetKey.self] = newValue }
+    }
+}
+
 struct DeckView<ID: Hashable, BackgroundContent: View, CollapsedHeaderContent: View, HeaderContent: View, CardContent: View>: View {
     let backgroundProvider: () -> BackgroundContent
     let cards: [DeckCard<ID>]
@@ -206,6 +217,10 @@ struct DeckView<ID: Hashable, BackgroundContent: View, CollapsedHeaderContent: V
                         },
                         content: {
                             contentProvider(card)
+                                .environment(
+                                    \.deckContentBottomInset,
+                                    contentBottomInset(for: index, containerHeight: proxy.size.height)
+                                )
                         }
                     )
                     .offset(
@@ -237,6 +252,26 @@ struct DeckView<ID: Hashable, BackgroundContent: View, CollapsedHeaderContent: V
                 selection.selectCard(card)
             }
         }
+    }
+
+    private func contentBottomInset(for index: Int, containerHeight: CGFloat) -> CGFloat {
+        guard index == activeSlotIndex else { return 0 }
+
+        let nextIndex = activeSlotIndex + 1
+        guard nextIndex <= cards.count else { return 0 }
+
+        let nextCardTop = DeckLayout.yPosition(
+            index: nextIndex,
+            activeSlotIndex: activeSlotIndex,
+            totalCards: cards.count,
+            containerHeight: containerHeight,
+            safeAreaTop: viewportSafeAreaTop
+        )
+
+        return max(
+            0,
+            DeckLayout.cardBottom(containerHeight: containerHeight) - nextCardTop
+        )
     }
 
     private func interactiveOffset(for index: Int) -> CGFloat {
