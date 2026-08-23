@@ -279,6 +279,14 @@ struct MusicBrainzService {
 
         guard !trimmed.isEmpty else { return trimmed }
 
+        // Release Versions validation supplies an already-formed exact
+        // MusicBrainz field query (for example rgid + reid). Do not run it
+        // through the human-search rewriter, which would escape its Lucene
+        // operators and field names.
+        if trimmed.contains("rgid:") || trimmed.contains("reid:") {
+            return trimmed
+        }
+
         if trimmed.contains(",") {
             let parts = trimmed.split(separator: ",", maxSplits: 1, omittingEmptySubsequences: false)
 

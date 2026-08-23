@@ -26,6 +26,7 @@ struct ArtistCardContentView: View {
 
     @State private var isShowingWikipedia = false
     @State private var wikipediaURL_: URL? = nil
+    @State private var wikipediaPresentationURL: URL? = nil
     @Environment(\.colorScheme) private var colorScheme
 
     private var cardBackground: Color {
@@ -53,29 +54,7 @@ struct ArtistCardContentView: View {
                     LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
 
                         // Wikipedia excerpt stays above Discography in the stable card layout.
-                        VStack(alignment: .leading, spacing: 8) {
-                            if isLoadingWikipedia {
-                                MusiCardsSpinner()
-                                    .padding(.top, 8)
-                                    .padding(.bottom, 16)
-                            } else if let wikipedia {
-                                Text(
-                                    "\(Text(displayExcerpt(for: wikipedia.extract)).foregroundStyle(.primary))\(Text(" Read more →").foregroundStyle(Color.blue))"
-                                )
-                                .font(.callout)
-                                .onTapGesture {
-                                    #if os(macOS)
-                                    if let url = wikipediaURL(for: wikipedia.title) {
-                                        wikipediaURL_ = url
-                                    }
-                                    #else
-                                    isShowingWikipedia = true
-                                    #endif
-                                }
-                                .padding(.top, 8)
-                                .padding(.bottom, 16)
-                            }
-                        }
+                        wikipediaSection
 
                         if let discographyError, releaseGroups.isEmpty {
                             ErrorStateView.discographyRetry(for: discographyError) {
@@ -160,8 +139,7 @@ struct ArtistCardContentView: View {
         }
 #if os(iOS)
         .sheet(isPresented: $isShowingWikipedia) {
-            if let wikipedia,
-               let url = wikipediaURL(for: wikipedia.title) {
+            if let url = wikipediaPresentationURL {
                 SafariView(url: url)
                     .presentationDetents([.fraction(0.83)])
             }
@@ -198,6 +176,45 @@ struct ArtistCardContentView: View {
     }
 
     // MARK: - Helpers
+
+    @ViewBuilder
+    private var wikipediaSection: some View {
+        if isLoadingWikipedia {
+            MusiCardsSpinner()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 8)
+                .padding(.bottom, 16)
+        } else if let wikipedia {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(displayExcerpt(for: wikipedia.extract))
+                    .font(.callout)
+                    .foregroundStyle(.primary)
+
+                Button("Read more →") {
+                    openWikipedia(wikipedia)
+                }
+                .font(.callout)
+                .foregroundStyle(Color.blue)
+                .buttonStyle(.plain)
+            }
+            .padding(.top, 8)
+            .padding(.bottom, 16)
+        }
+    }
+
+    private func openWikipedia(_ wikipedia: (title: String, extract: String)) {
+        guard let canonicalURL = wikipediaURL(for: wikipedia.title) else { return }
+        let url = WikipediaURLPresentation.url(
+            canonicalURL,
+            isDark: colorScheme == .dark
+        )
+        #if os(macOS)
+        wikipediaURL_ = url
+        #else
+        wikipediaPresentationURL = url
+        isShowingWikipedia = true
+        #endif
+    }
 
     private func isPlayable(_ group: MBReleaseGroupSummary) -> Bool {
         let artistName = artist?.name ?? self.artistName
@@ -243,5 +260,33 @@ struct ArtistCardContentView: View {
             .padding(.horizontal, 0)
             .padding(.bottom, 6)
             .zIndex(1)
+    }
+}
+
+enum WikipediaURLPresentation {
+    private static let vectorNightMode = "vectornightmode"
+    private static let minervaNightMode = "minervanightmode"
+
+    /// Wikimedia-provided night-mode parameters, isolated because their
+    /// temporary forcing/debug status may change in a future Wikimedia release.
+    static func url(_ canonicalURL: URL, isDark: Bool) -> URL {
+        guard isDark,
+              var components = URLComponents(
+                url: canonicalURL,
+                resolvingAgainstBaseURL: false
+              ) else {
+            return canonicalURL
+        }
+
+        let nightModeNames = [vectorNightMode, minervaNightMode]
+        let existingItems = components.queryItems ?? []
+        components.queryItems = existingItems.filter {
+            !nightModeNames.contains($0.name.lowercased())
+        } + [
+            URLQueryItem(name: vectorNightMode, value: "1"),
+            URLQueryItem(name: minervaNightMode, value: "1")
+        ]
+
+        return components.url ?? canonicalURL
     }
 }

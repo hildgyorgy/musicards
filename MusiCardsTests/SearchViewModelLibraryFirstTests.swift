@@ -181,6 +181,61 @@ final class SearchViewModelLibraryFirstTests: XCTestCase {
     }
 
     @MainActor
+    func testReleaseVersionPromotesOwnedExactReleaseOutsideFirstPage() async {
+        let provider = SearchLibraryProvider(source: .local)
+        provider.catalogReleases = [nevermindRelease]
+        let service = SearchServiceStub()
+        let releaseGroupID = "11111111-1111-1111-1111-111111111111"
+        let validationQuery = "rgid:\(releaseGroupID) AND (reid:\(nevermindRelease.releaseID))"
+        service.behaviors[validationQuery] = .results([
+            MBReleaseSearchResult(id: nevermindRelease.releaseID, title: "Nevermind")
+        ], 0)
+
+        let viewModel = SearchViewModel(
+            service: service,
+            libraryManager: LibraryManager(provider: provider),
+            searchDebounceNanoseconds: 0
+        )
+        viewModel.loadReleaseGroupResults(
+            releaseGroupID: releaseGroupID,
+            releaseTitle: "Nevermind",
+            artistName: "Nirvana"
+        )
+
+        await eventually {
+            viewModel.releaseResults.map(\.id) == [self.nevermindRelease.releaseID]
+                && !viewModel.isSearching
+        }
+        XCTAssertEqual(service.requestedQueries, [validationQuery])
+        XCTAssertEqual(viewModel.releaseResults.first?.id, nevermindRelease.releaseID)
+    }
+
+    @MainActor
+    func testReleaseVersionRejectsFalseLibraryCandidate() async {
+        let provider = SearchLibraryProvider(source: .local)
+        provider.catalogReleases = [nevermindRelease]
+        let service = SearchServiceStub()
+        let releaseGroupID = "22222222-2222-2222-2222-222222222222"
+        let validationQuery = "rgid:\(releaseGroupID) AND (reid:\(nevermindRelease.releaseID))"
+        service.behaviors[validationQuery] = .empty(0)
+
+        let viewModel = SearchViewModel(
+            service: service,
+            libraryManager: LibraryManager(provider: provider),
+            searchDebounceNanoseconds: 0
+        )
+        viewModel.loadReleaseGroupResults(
+            releaseGroupID: releaseGroupID,
+            releaseTitle: "Nevermind",
+            artistName: "Nirvana"
+        )
+
+        await eventually { !viewModel.isSearching }
+        XCTAssertTrue(viewModel.releaseResults.isEmpty)
+        XCTAssertEqual(service.requestedQueries, [validationQuery])
+    }
+
+    @MainActor
     func testMusicBrainzResultsAppendWithoutWaitingForCoverArt() async {
         let provider = SearchLibraryProvider(source: .navidrome)
         provider.catalogReleases = [nevermindRelease]

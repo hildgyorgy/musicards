@@ -47,6 +47,7 @@ final class SearchViewModel: ObservableObject {
     private var activeReleaseSearchQuery: String?
     private var libraryReleaseRows: [SearchReleaseRow] = []
     private var musicBrainzReleaseRows: [SearchReleaseRow] = []
+    private var promotedReleaseIDs: Set<String> = []
     private var visibleReleaseLimit = 20
     private var hasMoreMusicBrainzReleaseResults = true
 
@@ -127,6 +128,7 @@ final class SearchViewModel: ObservableObject {
         searchError = nil
         isSearching = false
         resetReleaseSearchMergeState()
+        promotedReleaseIDs = []
 
         guard q.count >= 3 else {
             releaseResults = []
@@ -162,6 +164,7 @@ final class SearchViewModel: ObservableObject {
         isLoadingMoreVersions = false
         currentReleaseGroupID = nil
         resetReleaseSearchMergeState()
+        promotedReleaseIDs = []
     }
 
     func searchByBarcode(_ barcode: String) {
@@ -179,6 +182,7 @@ final class SearchViewModel: ObservableObject {
         artistRows = []
         releaseResults = []
         resetReleaseSearchMergeState()
+        promotedReleaseIDs = []
 
         let normalized = barcode.filter(\.isNumber)
 
@@ -230,6 +234,7 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
     mode = .search
     artistRows = []
     releaseResults = []
+    promotedReleaseIDs = []
 
     let artist = match.artist.trimmingCharacters(in: .whitespacesAndNewlines)
     let title = match.title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -321,6 +326,7 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
             releaseResults = []
             artistRows = []
             resetReleaseSearchMergeState()
+            promotedReleaseIDs = []
 
             let q = normalizedSearchQuery
             guard q.count >= 3 else { return }
@@ -333,6 +339,7 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
         case .releaseGroupResults(let releaseGroupID):
             releaseResults = []
             artistRows = []
+            promotedReleaseIDs = []
             versionsOffset = 0
             hasMoreVersions = false
             isSearching = true
@@ -490,6 +497,7 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
         hasMoreVersions = false
         isLoadingMoreVersions = false
         currentReleaseGroupID = releaseGroupID
+        promotedReleaseIDs = []
 
         searchTask?.cancel()
         releaseResults = []
@@ -497,13 +505,29 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
         searchError = nil
         isSearching = true
 
-        Task {
+        searchTask = Task {
             await fetchReleaseGroupResults(releaseGroupID: releaseGroupID)
         }
     }
 
     private func fetchReleaseGroupResults(releaseGroupID: String) async {
         defer { isSearching = false }
+
+        // Discover owned candidates locally first, then prove their exact
+        // Release Group membership through MusicBrainz identifiers.
+        let promotedRows = await validatedLibraryReleaseRows(
+            releaseGroupID: releaseGroupID,
+            releaseTitle: displayTitle,
+            artistName: displayArtist
+        )
+        guard !Task.isCancelled else { return }
+        if !promotedRows.isEmpty {
+            promotedReleaseIDs = Set(promotedRows.map(\.id))
+            publishPromotedLibraryRows(promotedRows)
+            // Let the promoted rows become visible while the bounded MB page
+            // request is still in flight.
+            isSearching = false
+        }
 
         do {
             let (results, hasMore) = try await musicBrainzService.fetchReleasesForReleaseGroup(
@@ -514,21 +538,28 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
 
             let sorted = playableReleasesFirst(sortedVersions(results))
 
-            releaseResults = []
+            if promotedRows.isEmpty {
+                releaseResults = []
+            }
             artistRows = []
             searchError = nil
             versionsOffset = results.count
             hasMoreVersions = hasMore
 
-            await prepareReleaseRowsSequentially(from: sorted, append: false)
+            await prepareReleaseRowsSequentially(
+                from: sorted,
+                append: !promotedRows.isEmpty
+            )
 
         } catch is CancellationError {
             return
         } catch {
             if Self.isCancellation(error) { return }
-            releaseResults = []
-            artistRows = []
-            searchError = error
+            if promotedRows.isEmpty {
+                releaseResults = []
+                artistRows = []
+                searchError = error
+            }
         }
     }
 
@@ -575,6 +606,52 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
         }
 
         isLoadingMoreVersions = false
+    }
+
+    private func validatedLibraryReleaseRows(
+        releaseGroupID: String,
+        releaseTitle: String,
+        artistName: String
+    ) async -> [SearchReleaseRow] {
+        let query = "\(artistName), \(releaseTitle)"
+        let candidates = libraryManager.searchCatalog(
+            query: query,
+            limit: librarySearchLimit
+        )
+        guard !candidates.isEmpty else { return [] }
+
+        let candidateIDs = candidates.map(\.releaseID)
+        let exactQuery = "rgid:\(releaseGroupID) AND ("
+            + candidateIDs.map { "reid:\($0)" }.joined(separator: " OR ")
+            + ")"
+
+        do {
+            let matches = try await musicBrainzService.searchReleases(
+                query: exactQuery,
+                limit: candidateIDs.count,
+                offset: 0
+            )
+            let validatedIDs = Set(
+                matches
+                    .map(\.id)
+                    .filter { candidateIDs.contains($0) }
+            )
+            return candidates
+                .filter { validatedIDs.contains($0.releaseID) }
+                .map(makeLibraryReleaseRow)
+        } catch is CancellationError {
+            return []
+        } catch {
+            // Candidate validation is an optimization; the normal versions
+            // page remains the fallback when this request is unavailable.
+            return []
+        }
+    }
+
+    private func publishPromotedLibraryRows(_ rows: [SearchReleaseRow]) {
+        for row in rows {
+            appendUniqueReleaseRow(row)
+        }
     }
 
     // Sort versions by year then format priority (vinyl → cd → digital → other)
@@ -942,12 +1019,16 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
         var nextIndex = 0
         var prepared: [Int: SearchReleaseRow] = [:]
         var iterator = releases.enumerated().makeIterator()
+        let promotedIDs = promotedReleaseIDs
 
         await withTaskGroup(of: (Int, SearchReleaseRow).self) { group in
             for _ in 0..<min(maxConcurrent, releases.count) {
                 guard let (i, r) = iterator.next() else { break }
                 group.addTask {
-                    let img = await CoverArtCache.shared.image(for: r.id, size: .thumbnail)
+                    let artworkSize: CoverArtSize = promotedIDs.contains(r.id)
+                        ? .full
+                        : .thumbnail
+                    let img = await CoverArtCache.shared.image(for: r.id, size: artworkSize)
                     let row = self.makeReleaseRow(
                         id: r.id,
                         title: r.title,
@@ -976,7 +1057,10 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
 
                 if let (nextI, nextR) = iterator.next() {
                     group.addTask {
-                        let img = await CoverArtCache.shared.image(for: nextR.id, size: .thumbnail)
+                        let artworkSize: CoverArtSize = promotedIDs.contains(nextR.id)
+                            ? .full
+                            : .thumbnail
+                        let img = await CoverArtCache.shared.image(for: nextR.id, size: artworkSize)
                         let row = self.makeReleaseRow(
                             id: nextR.id,
                             title: nextR.title,

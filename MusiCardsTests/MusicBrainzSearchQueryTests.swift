@@ -35,4 +35,10 @@ final class MusicBrainzSearchQueryTests: XCTestCase {
             "\"Miles\" AND \"\\\"Electric\\\"\""
         )
     }
+
+    func testExactReleaseGroupValidationQueryPreservesLuceneFields() {
+        let query = "rgid:11111111-1111-1111-1111-111111111111 AND (reid:22222222-2222-2222-2222-222222222222)"
+
+        XCTAssertEqual(MusicBrainzService.releaseSearchQuery(from: query), query)
+    }
 }
