@@ -2,9 +2,9 @@ import XCTest
 @testable import MusiCards_Sync
 
 final class RsyncArgumentsTests: XCTestCase {
-    func testRemoteDryRunArgumentsPreserveMirrorAndUnicodeSemantics() {
+    func testRemoteDryRunArgumentsPreserveMirrorAndUnicodeSemantics() throws {
         let configuration = remoteConfiguration()
-        let arguments = SyncEngine.rsyncArguments(
+        let arguments = try SyncEngine.rsyncArguments(
             configuration: configuration,
             dryRun: true
         )
@@ -30,8 +30,8 @@ final class RsyncArgumentsTests: XCTestCase {
         ])
     }
 
-    func testRealSyncEmitsCompletedFileRecords() {
-        let arguments = SyncEngine.rsyncArguments(
+    func testRealSyncEmitsCompletedFileRecords() throws {
+        let arguments = try SyncEngine.rsyncArguments(
             configuration: remoteConfiguration(),
             dryRun: false
         )
@@ -45,7 +45,52 @@ final class RsyncArgumentsTests: XCTestCase {
         XCTAssertTrue(arguments.contains("--exclude=/library.json"))
     }
 
-    func testLocalDestinationDoesNotAddSshArguments() {
+    func testRemoteShellUsesSystemSSHAndQuotesKeyPathAsOneArgument() throws {
+        let plain = try SSHInvocation.rsyncRemoteShell(
+            keyPath: "/Users/test/.ssh/id_ed25519",
+            port: 22
+        )
+        let spaced = try SSHInvocation.rsyncRemoteShell(
+            keyPath: "/Users/test/SSH Keys/Music Server Key",
+            port: 22
+        )
+        let punctuation = try SSHInvocation.rsyncRemoteShell(
+            keyPath: "/Users/test/Keys/O'Reilly\\Key",
+            port: 22
+        )
+
+        XCTAssertTrue(plain.hasPrefix("/usr/bin/ssh "))
+        XCTAssertTrue(spaced.contains("'/Users/test/SSH Keys/Music Server Key'"))
+        XCTAssertTrue(punctuation.contains("'/Users/test/Keys/O''Reilly\\Key'"))
+        XCTAssertFalse(punctuation.contains("'\\''"))
+
+        let configuration = remoteConfiguration()
+        let arguments = try SyncEngine.rsyncArguments(configuration: configuration, dryRun: true)
+        let shell = try XCTUnwrap(arguments.first { $0.contains("/usr/bin/ssh") })
+        XCTAssertTrue(shell.contains("/usr/bin/ssh -i"))
+    }
+
+    func testMalformedRemoteIdentityCannotBecomeRsyncDestination() throws {
+        let configuration = SyncConfiguration(
+            sourcePath: "/Volumes/Source/",
+            destination: DestinationProfile(
+                name: "Untrusted",
+                kind: .remote,
+                user: "user;rm",
+                host: "example.com;rm",
+                path: "/srv/music/"
+            ),
+            sshKeyPath: "/tmp/key"
+        )
+
+        XCTAssertThrowsError(
+            try SyncEngine.rsyncArguments(configuration: configuration, dryRun: true)
+        ) { error in
+            XCTAssertEqual(error as? SSHInvocation.ValidationError, .invalidUsername)
+        }
+    }
+
+    func testLocalDestinationDoesNotAddSshArguments() throws {
         let configuration = SyncConfiguration(
             sourcePath: "/Volumes/Source/",
             destination: DestinationProfile(
@@ -55,7 +100,7 @@ final class RsyncArgumentsTests: XCTestCase {
             ),
             sshKeyPath: "/tmp/key"
         )
-        let arguments = SyncEngine.rsyncArguments(
+        let arguments = try SyncEngine.rsyncArguments(
             configuration: configuration,
             dryRun: true
         )
@@ -105,7 +150,7 @@ final class RsyncArgumentsTests: XCTestCase {
         )
         let process = Process()
         process.executableURL = try XCTUnwrap(BundledRsync.executableURL())
-        process.arguments = SyncEngine.rsyncArguments(
+        process.arguments = try SyncEngine.rsyncArguments(
             configuration: configuration,
             dryRun: false
         )
@@ -123,9 +168,9 @@ final class RsyncArgumentsTests: XCTestCase {
         )
     }
 
-    func testRemoteIndexPublicationTransfersOnlyManifest() {
+    func testRemoteIndexPublicationTransfersOnlyManifest() throws {
         let configuration = remoteConfiguration()
-        let arguments = SyncEngine.libraryIndexPublishArguments(
+        let arguments = try SyncEngine.libraryIndexPublishArguments(
             configuration: configuration
         )
 
@@ -140,9 +185,9 @@ final class RsyncArgumentsTests: XCTestCase {
         ])
     }
 
-    func testRemoteIndexInvalidationDeletesOnlyManifest() {
+    func testRemoteIndexInvalidationDeletesOnlyManifest() throws {
         let configuration = remoteConfiguration()
-        let arguments = SyncEngine.libraryIndexInvalidationArguments(
+        let arguments = try SyncEngine.libraryIndexInvalidationArguments(
             configuration: configuration,
             emptySourcePath: "/tmp/empty-index-source"
         )
@@ -159,7 +204,7 @@ final class RsyncArgumentsTests: XCTestCase {
         ])
     }
 
-    func testLocalIndexInvalidationDoesNotAddSSHArguments() {
+    func testLocalIndexInvalidationDoesNotAddSSHArguments() throws {
         let configuration = SyncConfiguration(
             sourcePath: "/Volumes/Source/",
             destination: DestinationProfile(
@@ -169,7 +214,7 @@ final class RsyncArgumentsTests: XCTestCase {
             ),
             sshKeyPath: "/tmp/key"
         )
-        let arguments = SyncEngine.libraryIndexInvalidationArguments(
+        let arguments = try SyncEngine.libraryIndexInvalidationArguments(
             configuration: configuration,
             emptySourcePath: "/tmp/empty-index-source/"
         )
@@ -220,7 +265,7 @@ final class RsyncArgumentsTests: XCTestCase {
         )
         let process = Process()
         process.executableURL = try XCTUnwrap(BundledRsync.executableURL())
-        process.arguments = SyncEngine.libraryIndexInvalidationArguments(
+        process.arguments = try SyncEngine.libraryIndexInvalidationArguments(
             configuration: configuration,
             emptySourcePath: emptySource.path
         )
@@ -232,7 +277,7 @@ final class RsyncArgumentsTests: XCTestCase {
         XCTAssertTrue(fileManager.fileExists(atPath: musicURL.path))
     }
 
-    func testLocalIndexPublicationDoesNotAddSSHArguments() {
+    func testLocalIndexPublicationDoesNotAddSSHArguments() throws {
         let configuration = SyncConfiguration(
             sourcePath: "/Volumes/Source/",
             destination: DestinationProfile(
@@ -242,7 +287,7 @@ final class RsyncArgumentsTests: XCTestCase {
             ),
             sshKeyPath: "/tmp/key"
         )
-        let arguments = SyncEngine.libraryIndexPublishArguments(
+        let arguments = try SyncEngine.libraryIndexPublishArguments(
             configuration: configuration
         )
 

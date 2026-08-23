@@ -106,6 +106,58 @@ final class SyncConfigurationValidatorTests: XCTestCase {
         }
     }
 
+    func testAcceptsConservativeRemoteUsernamesAndHosts() {
+        for (user, host) in [
+            ("gyuri", "umbrel.local"),
+            ("music_user", "server.example.com"),
+            ("backup-user", "192.168.1.90"),
+            ("user123", "server.example.com")
+        ] {
+            var configuration = SyncConfiguration.defaultConfiguration
+            configuration.sourcePath = "/Music/"
+            configuration.destination = DestinationProfile(
+                name: "Server",
+                kind: .remote,
+                user: user,
+                host: host,
+                path: "/srv/music/"
+            )
+            XCTAssertNoThrow(try validator.validate(configuration))
+        }
+    }
+
+    func testRejectsUnsafeRemoteUsernames() {
+        for user in ["", "user name", "user@example", "-user", "user:foo", "user/foo", "user;rm"] {
+            var configuration = SyncConfiguration.defaultConfiguration
+            configuration.destination = DestinationProfile(
+                name: "Server", kind: .remote, user: user,
+                host: "server.example.com", path: "/srv/music/"
+            )
+            XCTAssertThrowsError(try validator.validate(configuration)) { error in
+                XCTAssertEqual(
+                    error as? SyncConfigurationValidator.ValidationError,
+                    user.isEmpty ? .incompleteRemoteDestination : .invalidRemoteUsername
+                )
+            }
+        }
+    }
+
+    func testRejectsUnsafeRemoteHostnames() {
+        for host in ["", "my server", "-example.com", "user@example.com", "example.com:22", "example.com/path", "example.com;rm"] {
+            var configuration = SyncConfiguration.defaultConfiguration
+            configuration.destination = DestinationProfile(
+                name: "Server", kind: .remote, user: "music",
+                host: host, path: "/srv/music/"
+            )
+            XCTAssertThrowsError(try validator.validate(configuration)) { error in
+                XCTAssertEqual(
+                    error as? SyncConfigurationValidator.ValidationError,
+                    host.isEmpty ? .incompleteRemoteDestination : .invalidRemoteHostname
+                )
+            }
+        }
+    }
+
     func testRejectsUnavailableLocalDestination() {
         let validator = SyncConfigurationValidator(
             directoryExists: { path in path != "/Volumes/Missing" }

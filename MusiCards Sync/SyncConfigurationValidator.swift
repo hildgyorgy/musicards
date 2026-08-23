@@ -9,6 +9,9 @@ nonisolated struct SyncConfigurationValidator: Sendable {
         case incompleteRemoteDestination
         case invalidRemotePort
         case invalidRemotePath
+        case invalidRemoteUsername
+        case invalidRemoteHostname
+        case invalidSSHKeyPath
 
         var errorDescription: String? {
             switch self {
@@ -26,6 +29,12 @@ nonisolated struct SyncConfigurationValidator: Sendable {
                 return "SSH port must be between 1 and 65535."
             case .invalidRemotePath:
                 return "Remote destination folder must be an absolute path beginning with /."
+            case .invalidRemoteUsername:
+                return "Remote username contains unsupported characters."
+            case .invalidRemoteHostname:
+                return "Remote hostname is invalid. Use a DNS name, .local name, or IPv4 address."
+            case .invalidSSHKeyPath:
+                return "SSH private-key path is invalid."
             }
         }
     }
@@ -60,6 +69,19 @@ nonisolated struct SyncConfigurationValidator: Sendable {
             }
             guard destination.path.hasPrefix("/") else {
                 throw ValidationError.invalidRemotePath
+            }
+            do {
+                try SSHInvocation.validate(username: user, hostname: host)
+                _ = try SSHInvocation.rsyncRemoteShell(
+                    keyPath: configuration.sshKeyPath,
+                    port: destination.sshPort
+                )
+            } catch SSHInvocation.ValidationError.invalidUsername {
+                throw ValidationError.invalidRemoteUsername
+            } catch SSHInvocation.ValidationError.invalidHostname {
+                throw ValidationError.invalidRemoteHostname
+            } catch SSHInvocation.ValidationError.invalidKeyPath {
+                throw ValidationError.invalidSSHKeyPath
             }
             return
         }

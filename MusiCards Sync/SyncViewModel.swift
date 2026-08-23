@@ -722,6 +722,10 @@ final class SyncViewModel {
         var testConfiguration = configuration
         testConfiguration.destination = profile
 
+        // Reject malformed SSH configuration before creating keys or trying
+        // either the direct SSH probe or ssh-copy-id pairing flow.
+        try SyncConfigurationValidator().validate(testConfiguration)
+
         try await remoteLocationSetupService.ensureKeyPair(
             at: testConfiguration.sshKeyPath
         )

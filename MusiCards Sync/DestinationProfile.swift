@@ -46,15 +46,27 @@ nonisolated struct DestinationProfile:
     var remoteDestination: String {
         switch kind {
         case .remote:
-            guard let user, let host else {
-                return path
+            guard let user, let host,
+                  SSHInvocation.isValidUsername(user),
+                  SSHInvocation.isValidHostname(host) else {
+                return ""
             }
-
             return "\(user)@\(host):\(path)"
 
         case .local:
             return path
         }
+    }
+
+    func validatedRemoteDestination() throws -> String {
+        guard kind == .remote, let user, let host else {
+            return path
+        }
+        return try SSHInvocation.remoteDestination(
+            username: user,
+            hostname: host,
+            path: path
+        )
     }
 }
 

@@ -139,6 +139,7 @@ nonisolated final class SyncEngine {
         )
         case rsyncMissingIconv(location: String)
         case remoteRsyncUnavailable(details: String)
+        case invalidRemoteConfiguration(String)
         case rsyncFailed(exitCode: Int32, details: String)
         case cancelled
 
@@ -156,6 +157,8 @@ nonisolated final class SyncEngine {
                 return details.isEmpty
                     ? "The remote rsync installation could not be verified."
                     : "The remote rsync installation could not be verified. \(details)"
+            case .invalidRemoteConfiguration(let details):
+                return "The remote destination configuration is invalid. \(details)"
             case .rsyncFailed(let exitCode, let details):
                 return details.isEmpty
                     ? "rsync failed with exit code \(exitCode)."
@@ -329,6 +332,8 @@ nonisolated final class SyncEngine {
         onOutput: @escaping @Sendable ([String]) -> Void
     ) throws -> String {
 
+        try validateRemoteConfiguration(configuration)
+
         guard
             let rsyncExecutableURL,
             FileManager.default.isExecutableFile(
@@ -353,16 +358,16 @@ nonisolated final class SyncEngine {
                 withIntermediateDirectories: true
             )
             invalidationDirectoryURL = directoryURL
-            process.arguments = libraryIndexInvalidationArguments(
+            process.arguments = try libraryIndexInvalidationArguments(
                 configuration: configuration,
                 emptySourcePath: directoryURL.path
             )
         } else if publishesLibraryIndex {
-            process.arguments = libraryIndexPublishArguments(
+            process.arguments = try libraryIndexPublishArguments(
                 configuration: configuration
             )
         } else {
-            process.arguments = rsyncArguments(
+            process.arguments = try rsyncArguments(
                 configuration: configuration,
                 dryRun: dryRun
             )
@@ -464,19 +469,16 @@ nonisolated final class SyncEngine {
             throw SyncEngineError.remoteRsyncUnavailable(details: "")
         }
 
+        try validateRemoteConfiguration(configuration)
+
         let process = Process()
         let pipe = Pipe()
 
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/ssh")
+        process.executableURL = URL(fileURLWithPath: SSHInvocation.executablePath)
         process.arguments = [
             "-i", configuration.sshKeyPath,
-            "-p", String(configuration.destination.sshPort),
-            "-o", "BatchMode=yes",
-            "-o", "ConnectTimeout=5",
-            "-o", "ConnectionAttempts=1",
-            "-o", "ControlMaster=no",
-            "-o", "ControlPersist=no",
-            "-o", "ControlPath=none",
+            "-p", String(configuration.destination.sshPort)
+        ] + SSHInvocation.options + [
             "\(user)@\(host)",
             "rsync --version"
         ]
@@ -535,7 +537,7 @@ nonisolated final class SyncEngine {
     static func rsyncArguments(
         configuration: SyncConfiguration,
         dryRun: Bool
-    ) -> [String] {
+    ) throws -> [String] {
 
         var arguments: [String] = [
             "-av",
@@ -557,19 +559,11 @@ nonisolated final class SyncEngine {
 
         case .remote:
             arguments.append("--timeout=30")
-            arguments.append(contentsOf: [
-            "-e",
-            """
-            ssh -i \(configuration.sshKeyPath) \
-            -p \(configuration.destination.sshPort) \
-            -o BatchMode=yes \
-            -o ConnectTimeout=5 \
-            -o ConnectionAttempts=1 \
-            -o ControlMaster=no \
-            -o ControlPersist=no \
-            -o ControlPath=none
-            """
-        ])
+            let remoteShell = try SSHInvocation.rsyncRemoteShell(
+                keyPath: configuration.sshKeyPath,
+                port: configuration.destination.sshPort
+            )
+            arguments.append(contentsOf: ["-e", remoteShell])
 
         case .local:
             break
@@ -588,7 +582,7 @@ nonisolated final class SyncEngine {
 
         arguments.append(configuration.sourcePath)
         arguments.append(
-            configuration.destination.remoteDestination
+            try configuration.destination.validatedRemoteDestination()
         )
 
         return arguments
@@ -597,7 +591,7 @@ nonisolated final class SyncEngine {
     static func libraryIndexInvalidationArguments(
         configuration: SyncConfiguration,
         emptySourcePath: String
-    ) -> [String] {
+    ) throws -> [String] {
         var arguments: [String] = [
             "-a",
             "--delete",
@@ -614,16 +608,10 @@ nonisolated final class SyncEngine {
             arguments.append("--timeout=30")
             arguments.append(contentsOf: [
                 "-e",
-                """
-                ssh -i \(configuration.sshKeyPath) \
-                -p \(configuration.destination.sshPort) \
-                -o BatchMode=yes \
-                -o ConnectTimeout=5 \
-                -o ConnectionAttempts=1 \
-                -o ControlMaster=no \
-                -o ControlPersist=no \
-                -o ControlPath=none
-                """
+                try SSHInvocation.rsyncRemoteShell(
+                    keyPath: configuration.sshKeyPath,
+                    port: configuration.destination.sshPort
+                )
             ])
         }
 
@@ -631,13 +619,13 @@ nonisolated final class SyncEngine {
             ? emptySourcePath
             : emptySourcePath + "/"
         arguments.append(sourcePath)
-        arguments.append(configuration.destination.remoteDestination)
+        arguments.append(try configuration.destination.validatedRemoteDestination())
         return arguments
     }
 
     static func libraryIndexPublishArguments(
         configuration: SyncConfiguration
-    ) -> [String] {
+    ) throws -> [String] {
         var arguments: [String] = [
             "-a",
             "--itemize-changes",
@@ -651,16 +639,10 @@ nonisolated final class SyncEngine {
             arguments.append("--timeout=30")
             arguments.append(contentsOf: [
                 "-e",
-                """
-                ssh -i \(configuration.sshKeyPath) \
-                -p \(configuration.destination.sshPort) \
-                -o BatchMode=yes \
-                -o ConnectTimeout=5 \
-                -o ConnectionAttempts=1 \
-                -o ControlMaster=no \
-                -o ControlPersist=no \
-                -o ControlPath=none
-                """
+                try SSHInvocation.rsyncRemoteShell(
+                    keyPath: configuration.sshKeyPath,
+                    port: configuration.destination.sshPort
+                )
             ])
         }
 
@@ -669,7 +651,30 @@ nonisolated final class SyncEngine {
             isDirectory: true
         ).appendingPathComponent(LocalLibraryManifestLoader.fileName)
         arguments.append(sourceURL.path)
-        arguments.append(configuration.destination.remoteDestination)
+        arguments.append(try configuration.destination.validatedRemoteDestination())
         return arguments
+    }
+
+    private static func validateRemoteConfiguration(
+        _ configuration: SyncConfiguration
+    ) throws {
+        guard configuration.destination.kind == .remote else { return }
+        guard let user = configuration.destination.user,
+              let host = configuration.destination.host else {
+            throw SyncEngineError.invalidRemoteConfiguration("Username and hostname are required.")
+        }
+        do {
+            try SSHInvocation.validate(username: user, hostname: host)
+            _ = try SSHInvocation.rsyncRemoteShell(
+                keyPath: configuration.sshKeyPath,
+                port: configuration.destination.sshPort
+            )
+        } catch SSHInvocation.ValidationError.invalidUsername {
+            throw SyncEngineError.invalidRemoteConfiguration("Username is invalid.")
+        } catch SSHInvocation.ValidationError.invalidHostname {
+            throw SyncEngineError.invalidRemoteConfiguration("Hostname is invalid.")
+        } catch SSHInvocation.ValidationError.invalidKeyPath {
+            throw SyncEngineError.invalidRemoteConfiguration("SSH private-key path is invalid.")
+        }
     }
 }
