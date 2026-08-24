@@ -41,4 +41,18 @@ final class MusicBrainzSearchQueryTests: XCTestCase {
 
         XCTAssertEqual(MusicBrainzService.releaseSearchQuery(from: query), query)
     }
+
+    func testWikipediaSummaryURLTreatsSlashAsTitleContent() {
+        XCTAssertEqual(
+            MusicBrainzService.wikipediaSummaryURL(for: "AC/DC")?.absoluteString,
+            "https://en.wikipedia.org/api/rest_v1/page/summary/AC%2FDC"
+        )
+    }
+
+    func testWikipediaSummaryURLDoesNotInterpretQueryOrFragmentCharacters() {
+        XCTAssertEqual(
+            MusicBrainzService.wikipediaSummaryURL(for: "Who? #1")?.absoluteString,
+            "https://en.wikipedia.org/api/rest_v1/page/summary/Who%3F_%231"
+        )
+    }
 }

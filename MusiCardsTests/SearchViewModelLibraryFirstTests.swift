@@ -244,6 +244,40 @@ final class SearchViewModelLibraryFirstTests: XCTestCase {
     }
 
     @MainActor
+    func testStaleReleaseGroupFailureCannotReplaceNewerGroup() async {
+        let service = SearchServiceStub()
+        service.releaseGroupPages["group-a"] = [
+            0: .error(SearchTestError.failed, 150_000_000)
+        ]
+        service.releaseGroupPages["group-b"] = [
+            0: .page([], hasMore: false, delay: 0)
+        ]
+        let viewModel = makeViewModel(service: service)
+
+        viewModel.loadReleaseGroupResults(
+            releaseGroupID: "group-a",
+            releaseTitle: "Group A",
+            artistName: "Artist"
+        )
+        await eventually { service.requestedReleaseGroupIDs.contains("group-a") }
+
+        viewModel.loadReleaseGroupResults(
+            releaseGroupID: "group-b",
+            releaseTitle: "Group B",
+            artistName: "Artist"
+        )
+        await eventually { !viewModel.isSearching }
+        try? await Task.sleep(nanoseconds: 180_000_000)
+
+        XCTAssertEqual(
+            viewModel.mode,
+            .releaseGroupResults(releaseGroupID: "group-b")
+        )
+        XCTAssertTrue(viewModel.releaseResults.isEmpty)
+        XCTAssertNil(viewModel.searchError)
+    }
+
+    @MainActor
     func testMusicBrainzResultsAppendWithoutWaitingForCoverArt() async {
         let provider = SearchLibraryProvider(source: .navidrome)
         provider.catalogReleases = [nevermindRelease]
@@ -460,6 +494,36 @@ final class SearchViewModelLibraryFirstTests: XCTestCase {
         XCTAssertTrue(viewModel.releaseResults.isEmpty)
     }
 
+    @MainActor
+    func testStaleArtistPageCannotAppendIntoNewerSearch() async {
+        let service = SearchServiceStub()
+        service.artistPages["alpha"] = [
+            0: .results(artistResults(prefix: "alpha", count: 20), 0),
+            20: .results(artistResults(prefix: "stale", count: 20), 150_000_000)
+        ]
+        service.artistPages["beta"] = [
+            0: .results([MBArtistSearchResult(id: "beta", name: "Beta", lifeSpan: nil)], 0)
+        ]
+        let viewModel = makeViewModel(service: service)
+
+        viewModel.searchQuery = "alpha"
+        viewModel.queryDidChange()
+        await eventually { viewModel.artistRows.count == 20 }
+
+        viewModel.loadMoreIfNeededForArtist(
+            currentItem: viewModel.artistRows[19]
+        )
+        await eventually { service.requestedArtistOffsets.contains(20) }
+
+        viewModel.searchQuery = "beta"
+        viewModel.queryDidChange()
+        await eventually { viewModel.artistRows.map(\.id) == ["beta"] }
+        try? await Task.sleep(nanoseconds: 180_000_000)
+
+        XCTAssertEqual(viewModel.artistRows.map(\.id), ["beta"])
+        XCTAssertFalse(viewModel.isLoadingMore)
+    }
+
     private var nevermindRelease: LibraryCatalogRelease {
         LibraryCatalogRelease(
             releaseID: "189002e7-3285-4e2e-92a3-7f6c30d407a2",
@@ -495,6 +559,19 @@ final class SearchViewModelLibraryFirstTests: XCTestCase {
             disambiguation: "",
             hasCoverArt: false
         )
+    }
+
+    private func artistResults(
+        prefix: String,
+        count: Int
+    ) -> [MBArtistSearchResult] {
+        (0..<count).map {
+            MBArtistSearchResult(
+                id: "\(prefix)-\($0)",
+                name: "\(prefix) \($0)",
+                lifeSpan: nil
+            )
+        }
     }
 
     @MainActor
@@ -561,12 +638,26 @@ private final class SearchServiceStub: MusicBrainzSearchServing {
         case error(Error, UInt64)
     }
 
+    enum ArtistBehavior {
+        case results([MBArtistSearchResult], UInt64)
+        case error(Error, UInt64)
+    }
+
+    enum ReleaseGroupBehavior {
+        case page([MBReleaseSearchResult], hasMore: Bool, delay: UInt64)
+        case error(Error, UInt64)
+    }
+
     var behaviors: [String: Behavior] = [:]
     var releasePages: [String: [Int: [MBReleaseSearchResult]]] = [:]
+    var artistPages: [String: [Int: ArtistBehavior]] = [:]
+    var releaseGroupPages: [String: [Int: ReleaseGroupBehavior]] = [:]
     private(set) var requestedQueries: [String] = []
     private(set) var requestedReleaseOffsets: [Int] = []
     private(set) var completedReleaseQueries: [String] = []
     private(set) var requestedArtistQueries: [String] = []
+    private(set) var requestedArtistOffsets: [Int] = []
+    private(set) var requestedReleaseGroupIDs: [String] = []
 
     func searchReleases(
         query: String,
@@ -606,7 +697,16 @@ private final class SearchServiceStub: MusicBrainzSearchServing {
         offset: Int
     ) async throws -> [MBArtistSearchResult] {
         requestedArtistQueries.append(query)
-        return []
+        requestedArtistOffsets.append(offset)
+        guard let behavior = artistPages[query]?[offset] else { return [] }
+        switch behavior {
+        case .results(let results, let delay):
+            try? await Task.sleep(nanoseconds: delay)
+            return results
+        case .error(let error, let delay):
+            try? await Task.sleep(nanoseconds: delay)
+            throw error
+        }
     }
 
     func fetchReleasesForReleaseGroup(
@@ -614,7 +714,18 @@ private final class SearchServiceStub: MusicBrainzSearchServing {
         limit: Int,
         offset: Int
     ) async throws -> (releases: [MBReleaseSearchResult], hasMore: Bool) {
-        ([], false)
+        requestedReleaseGroupIDs.append(id)
+        guard let behavior = releaseGroupPages[id]?[offset] else {
+            return ([], false)
+        }
+        switch behavior {
+        case .page(let releases, let hasMore, let delay):
+            try? await Task.sleep(nanoseconds: delay)
+            return (releases, hasMore)
+        case .error(let error, let delay):
+            try? await Task.sleep(nanoseconds: delay)
+            throw error
+        }
     }
 
     func searchRecordings(

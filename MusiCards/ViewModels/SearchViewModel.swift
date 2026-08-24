@@ -37,6 +37,8 @@ final class SearchViewModel: ObservableObject {
     @Published var isSearching = false
 
     private var searchTask: Task<Void, Never>?
+    private var searchPaginationTask: Task<Void, Never>?
+    private var releaseVersionPaginationTask: Task<Void, Never>?
     private var suppressNextQueryChange = false
     private var libraryAvailabilityObservation: AnyCancellable?
     private let musicBrainzService: any MusicBrainzSearchServing
@@ -120,6 +122,7 @@ final class SearchViewModel: ObservableObject {
         lastScheduledNormalizedQuery = q
         
         searchTask?.cancel()
+        cancelPaginationTasks()
         searchGeneration &+= 1
         let generation = searchGeneration
         currentOffset = 0
@@ -149,6 +152,7 @@ final class SearchViewModel: ObservableObject {
 
     func switchToSearch() {
         searchTask?.cancel()
+        cancelPaginationTasks()
         searchGeneration &+= 1
         lastScheduledNormalizedQuery = ""
         mode = .search
@@ -169,6 +173,7 @@ final class SearchViewModel: ObservableObject {
 
     func searchByBarcode(_ barcode: String) {
         searchTask?.cancel()
+        cancelPaginationTasks()
         searchGeneration &+= 1
         let generation = searchGeneration
         currentOffset = 0
@@ -206,7 +211,8 @@ final class SearchViewModel: ObservableObject {
 
                 await prepareReleaseRowsSequentially(
                     from: playableReleasesFirst(results),
-                    append: false
+                    append: false,
+                    generation: generation
                 )
 
             } catch is CancellationError {
@@ -224,6 +230,9 @@ final class SearchViewModel: ObservableObject {
 #if os(iOS)
 func searchByRecognizedTrack(_ match: ShazamMatch) {
     searchTask?.cancel()
+    cancelPaginationTasks()
+    searchGeneration &+= 1
+    let generation = searchGeneration
 
     currentOffset = 0
     hasMoreResults = false
@@ -248,7 +257,9 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
     searchQuery = "\(artist), \(title)"
 
     searchTask = Task {
-        defer { isSearching = false }
+        defer {
+            if generation == searchGeneration { isSearching = false }
+        }
 
         do {
             let recordings = try await musicBrainzService.searchRecordings(
@@ -257,6 +268,7 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
                 limit: 20,
                 offset: 0
             )
+            guard generation == searchGeneration else { return }
 
             let trackReleases = flattenRecordingResults(recordings)
 
@@ -268,6 +280,7 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
                 guard let detailedRelease = try? await musicBrainzService.loadRelease(id: candidate.id) else {
                     continue
                 }
+                guard generation == searchGeneration else { return }
 
                 guard releaseContainsTrackTitle(detailedRelease, trackTitle: title) else {
                     continue
@@ -289,7 +302,8 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
 
                 await prepareReleaseRowsSequentially(
                     from: [candidate],
-                    append: false
+                    append: false,
+                    generation: generation
                 )
                 return
             }
@@ -303,6 +317,7 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
             return
         } catch {
             if Self.isCancellation(error) { return }
+            guard generation == searchGeneration else { return }
             releaseResults = []
             artistRows = []
             hasMoreResults = false
@@ -314,6 +329,7 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
 
     func retrySearch() {
         searchTask?.cancel()
+        cancelPaginationTasks()
         searchGeneration &+= 1
         let generation = searchGeneration
         searchError = nil
@@ -342,10 +358,14 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
             promotedReleaseIDs = []
             versionsOffset = 0
             hasMoreVersions = false
+            isLoadingMoreVersions = false
             isSearching = true
 
-            Task {
-                await fetchReleaseGroupResults(releaseGroupID: releaseGroupID)
+            searchTask = Task {
+                await fetchReleaseGroupResults(
+                    releaseGroupID: releaseGroupID,
+                    generation: generation
+                )
             }
         }
     }
@@ -488,6 +508,11 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
         releaseTitle: String,
         artistName: String
     ) {
+        searchTask?.cancel()
+        cancelPaginationTasks()
+        searchGeneration &+= 1
+        let generation = searchGeneration
+
         displayTitle = releaseTitle
         displayArtist = artistName
         mode = .releaseGroupResults(releaseGroupID: releaseGroupID)
@@ -499,19 +524,27 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
         currentReleaseGroupID = releaseGroupID
         promotedReleaseIDs = []
 
-        searchTask?.cancel()
         releaseResults = []
         artistRows = []
         searchError = nil
         isSearching = true
+        isLoadingMore = false
 
         searchTask = Task {
-            await fetchReleaseGroupResults(releaseGroupID: releaseGroupID)
+            await fetchReleaseGroupResults(
+                releaseGroupID: releaseGroupID,
+                generation: generation
+            )
         }
     }
 
-    private func fetchReleaseGroupResults(releaseGroupID: String) async {
-        defer { isSearching = false }
+    private func fetchReleaseGroupResults(
+        releaseGroupID: String,
+        generation: UInt64
+    ) async {
+        defer {
+            if generation == searchGeneration { isSearching = false }
+        }
 
         // Discover owned candidates locally first, then prove their exact
         // Release Group membership through MusicBrainz identifiers.
@@ -520,7 +553,10 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
             releaseTitle: displayTitle,
             artistName: displayArtist
         )
-        guard !Task.isCancelled else { return }
+        guard !Task.isCancelled,
+              generation == searchGeneration,
+              mode == .releaseGroupResults(releaseGroupID: releaseGroupID)
+        else { return }
         if !promotedRows.isEmpty {
             promotedReleaseIDs = Set(promotedRows.map(\.id))
             publishPromotedLibraryRows(promotedRows)
@@ -535,6 +571,9 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
                 limit: versionsPageSize,
                 offset: 0
             )
+            guard generation == searchGeneration,
+                  mode == .releaseGroupResults(releaseGroupID: releaseGroupID)
+            else { return }
 
             let sorted = playableReleasesFirst(sortedVersions(results))
 
@@ -548,13 +587,17 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
 
             await prepareReleaseRowsSequentially(
                 from: sorted,
-                append: !promotedRows.isEmpty
+                append: !promotedRows.isEmpty,
+                generation: generation
             )
 
         } catch is CancellationError {
             return
         } catch {
             if Self.isCancellation(error) { return }
+            guard generation == searchGeneration,
+                  mode == .releaseGroupResults(releaseGroupID: releaseGroupID)
+            else { return }
             if promotedRows.isEmpty {
                 releaseResults = []
                 artistRows = []
@@ -566,7 +609,7 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
     // MARK: - Release group version pagination
 
     func loadMoreIfNeededForReleaseVersion(currentItem: SearchReleaseRow) {
-        guard case .releaseGroupResults = mode else { return }
+        guard case .releaseGroupResults(let groupID) = mode else { return }
         guard !isLoadingMoreVersions, hasMoreVersions else { return }
 
         let threshold = max(releaseResults.count - 5, 0)
@@ -574,17 +617,18 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
               index >= threshold else { return }
 
         isLoadingMoreVersions = true
+        let generation = searchGeneration
 
-        Task {
-            await loadMoreVersions()
+        releaseVersionPaginationTask = Task {
+            await loadMoreVersions(groupID: groupID, generation: generation)
         }
     }
 
-    private func loadMoreVersions() async {
-        guard let groupID = currentReleaseGroupID else {
-            isLoadingMoreVersions = false
-            return
-        }
+    private func loadMoreVersions(groupID: String, generation: UInt64) async {
+        guard generation == searchGeneration,
+              currentReleaseGroupID == groupID,
+              mode == .releaseGroupResults(releaseGroupID: groupID)
+        else { return }
 
         do {
             let (results, hasMore) = try await musicBrainzService.fetchReleasesForReleaseGroup(
@@ -592,12 +636,21 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
                 limit: versionsPageSize,
                 offset: versionsOffset
             )
+            try Task.checkCancellation()
+            guard generation == searchGeneration,
+                  currentReleaseGroupID == groupID,
+                  mode == .releaseGroupResults(releaseGroupID: groupID)
+            else { return }
 
             let sorted = playableReleasesFirst(sortedVersions(results))
             versionsOffset += results.count
             hasMoreVersions = hasMore
 
-            await prepareReleaseRowsSequentially(from: sorted, append: true)
+            await prepareReleaseRowsSequentially(
+                from: sorted,
+                append: true,
+                generation: generation
+            )
 
         } catch is CancellationError {
             // ignore
@@ -605,7 +658,10 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
             // silently fail — user can scroll again
         }
 
-        isLoadingMoreVersions = false
+        if generation == searchGeneration,
+           currentReleaseGroupID == groupID {
+            isLoadingMoreVersions = false
+        }
     }
 
     private func validatedLibraryReleaseRows(
@@ -676,10 +732,12 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
         guard releaseResults.last?.id == currentItem.id else { return }
 
         isLoadingMore = true
+        let generation = searchGeneration
+        let query = normalizedSearchQuery
 
-        Task {
-            await loadMoreReleases()
-            isLoadingMore = false
+        searchPaginationTask = Task {
+            await loadMoreReleases(query: query, generation: generation)
+            if generation == searchGeneration { isLoadingMore = false }
         }
     }
 
@@ -692,17 +750,22 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
               index >= threshold else { return }
 
         isLoadingMore = true
+        let generation = searchGeneration
+        let query = normalizedSearchQuery
 
-        Task {
-            await loadMoreArtists()
-            isLoadingMore = false
+        searchPaginationTask = Task {
+            await loadMoreArtists(query: query, generation: generation)
+            if generation == searchGeneration { isLoadingMore = false }
         }
     }
 
-    private func loadMoreReleases() async {
-        let q = normalizedSearchQuery
-        let generation = searchGeneration
-        guard !q.isEmpty, q == activeReleaseSearchQuery else { return }
+    private func loadMoreReleases(
+        query: String,
+        generation: UInt64
+    ) async {
+        guard generation == searchGeneration,
+              !query.isEmpty,
+              query == activeReleaseSearchQuery else { return }
 
         let nextVisibleLimit = visibleReleaseLimit + pageSize
         guard hasMoreMusicBrainzReleaseResults else {
@@ -713,21 +776,21 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
 
         do {
             let results = try await musicBrainzService.searchReleases(
-                query: q,
+                query: query,
                 limit: pageSize,
                 offset: currentOffset
             )
             try Task.checkCancellation()
             guard generation == searchGeneration,
-                  q == activeReleaseSearchQuery else {
+                  query == activeReleaseSearchQuery else {
                 return
             }
-            let sorted = sortRawReleases(results, query: q)
+            let sorted = sortRawReleases(results, query: query)
             currentOffset += results.count
             hasMoreMusicBrainzReleaseResults = results.count == pageSize
             let rows = makeReleaseRows(from: sorted)
             guard generation == searchGeneration,
-                  q == activeReleaseSearchQuery else {
+                  query == activeReleaseSearchQuery else {
                 return
             }
             visibleReleaseLimit = nextVisibleLimit
@@ -736,21 +799,30 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
         } catch is CancellationError {
             return
         } catch {
+            guard generation == searchGeneration,
+                  query == activeReleaseSearchQuery else { return }
             hasMoreMusicBrainzReleaseResults = false
             hasMoreResults = false
         }
     }
 
-    private func loadMoreArtists() async {
-        let q = normalizedSearchQuery
-        guard !q.isEmpty else { return }
+    private func loadMoreArtists(
+        query: String,
+        generation: UInt64
+    ) async {
+        guard generation == searchGeneration,
+              !query.isEmpty,
+              query == normalizedSearchQuery else { return }
 
         do {
             let results = try await musicBrainzService.searchArtists(
-                query: q,
+                query: query,
                 limit: pageSize,
                 offset: currentOffset
             )
+            try Task.checkCancellation()
+            guard generation == searchGeneration,
+                  query == normalizedSearchQuery else { return }
 
             let rows = results.map {
                 SearchArtistRow(
@@ -767,8 +839,15 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
         } catch is CancellationError {
             return
         } catch {
+            guard generation == searchGeneration,
+                  query == normalizedSearchQuery else { return }
             hasMoreResults = false
         }
+    }
+
+    private func cancelPaginationTasks() {
+        searchPaginationTask?.cancel()
+        releaseVersionPaginationTask?.cancel()
     }
 
     // MARK: - Row builders
@@ -1011,8 +1090,10 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
 
     private func prepareReleaseRowsSequentially(
         from releases: [MBReleaseSearchResult],
-        append: Bool
+        append: Bool,
+        generation: UInt64
     ) async {
+        guard generation == searchGeneration else { return }
         if !append { releaseResults = [] }
 
         let maxConcurrent = 6
@@ -1045,6 +1126,10 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
             }
 
             while let (finishedIndex, row) = await group.next() {
+                guard generation == searchGeneration else {
+                    group.cancelAll()
+                    return
+                }
                 prepared[finishedIndex] = row
 
                 while let readyRow = prepared[nextIndex] {

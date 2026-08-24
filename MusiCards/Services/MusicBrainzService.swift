@@ -451,8 +451,9 @@ struct MusicBrainzService {
             return nil
         }
 
-        let encodedTitle = title.replacingOccurrences(of: " ", with: "_")
-        let summaryURL = URL(string: "https://en.wikipedia.org/api/rest_v1/page/summary/\(encodedTitle)")!
+        guard let summaryURL = Self.wikipediaSummaryURL(for: title) else {
+            throw MusicBrainzServiceError.invalidRequest(URLError(.badURL))
+        }
 
         let summaryData = try await data(from: summaryURL)
         let summaryJSON: [String: Any]
@@ -470,6 +471,20 @@ struct MusicBrainzService {
         let extract = summaryJSON["extract"] as? String
 
         return (title, extract ?? "")
+    }
+
+    nonisolated static func wikipediaSummaryURL(for title: String) -> URL? {
+        let underscored = title.replacingOccurrences(of: " ", with: "_")
+        var allowed = CharacterSet.urlPathAllowed
+        allowed.remove(charactersIn: "/?#%")
+        guard let encodedTitle = underscored.addingPercentEncoding(
+            withAllowedCharacters: allowed
+        ) else {
+            return nil
+        }
+        return URL(
+            string: "https://en.wikipedia.org/api/rest_v1/page/summary/\(encodedTitle)"
+        )
     }
 
     // Now returns (releases, hasMore) and uses a sensible page size

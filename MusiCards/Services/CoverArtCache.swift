@@ -29,15 +29,18 @@ enum CoverArtSize: Sendable {
 actor CoverArtCache {
     static let shared = CoverArtCache()
 
-    private var cache: [String: PlatformImage] = [:]
+    private let cache = NSCache<NSString, PlatformImage>()
     private var inFlight: [String: Task<PlatformImage?, Never>] = [:]
 
-    private init() {}
+    private init() {
+        cache.countLimit = 160
+        cache.totalCostLimit = 96 * 1_024 * 1_024
+    }
 
     func image(for releaseID: String, size: CoverArtSize = .thumbnail) async -> PlatformImage? {
         let key = "\(releaseID)-\(size.urlSuffix)"
 
-        if let cached = cache[key] {
+        if let cached = cache.object(forKey: key as NSString) {
             return cached
         }
 
@@ -54,10 +57,25 @@ actor CoverArtCache {
         inFlight.removeValue(forKey: key)
 
         if let result {
-            cache[key] = result
+            cache.setObject(
+                result,
+                forKey: key as NSString,
+                cost: estimatedMemoryCost(of: result)
+            )
         }
 
         return result
+    }
+
+    private func estimatedMemoryCost(of image: PlatformImage) -> Int {
+        #if canImport(UIKit)
+        guard let cgImage = image.cgImage else { return 0 }
+        return cgImage.bytesPerRow * cgImage.height
+        #else
+        return image.representations.reduce(0) { cost, representation in
+            max(cost, representation.pixelsWide * representation.pixelsHigh * 4)
+        }
+        #endif
     }
 
     private func fetchCover(releaseID: String, size: CoverArtSize) async -> PlatformImage? {

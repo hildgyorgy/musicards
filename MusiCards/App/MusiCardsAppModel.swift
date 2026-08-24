@@ -76,6 +76,8 @@ final class MusiCardsAppModel: ObservableObject {
     private var searchModeObservation: AnyCancellable?
 
     private let musicBrainzService = MusicBrainzService()
+    private let releaseDetailLoader: @Sendable (String) async throws -> MBRelease
+    private let releaseCoverLoader: @Sendable (String) async -> PlatformImage?
 
     private let recentArtistsKey = "recentArtists"
     private let recentReleasesKey = "recentReleases"
@@ -91,11 +93,17 @@ final class MusiCardsAppModel: ObservableObject {
     private let releaseGroupsPageSize: Int = 25
     private var releaseGroupsOffset: Int = 0
     private var currentArtistIDForGroups: String?
+    private var releaseSelectionGeneration: UInt64 = 0
+    private var releaseLoadTask: Task<Void, Never>?
     private var artistSelectionGeneration: UInt64 = 0
     private var artistLoadTask: Task<Void, Never>?
     private var artistPaginationTask: Task<Void, Never>?
 
-    init(playbackEngine: PlaybackEngine? = nil) {
+    init(
+        playbackEngine: PlaybackEngine? = nil,
+        releaseDetailLoader: (@Sendable (String) async throws -> MBRelease)? = nil,
+        releaseCoverLoader: (@Sendable (String) async -> PlatformImage?)? = nil
+    ) {
         let service = musicBrainzService
         let playbackEngine = playbackEngine ?? PlaybackEngineFactory.makeDefault()
         let localLibrary = LocalLibraryStore()
@@ -119,6 +127,12 @@ final class MusiCardsAppModel: ObservableObject {
         self.localLibrary = localLibrary
         self.libraryManager = libraryManager
         self.releasePlaybackQueueBuilder = releasePlaybackQueueBuilder
+        self.releaseDetailLoader = releaseDetailLoader ?? { id in
+            try await service.loadRelease(id: id)
+        }
+        self.releaseCoverLoader = releaseCoverLoader ?? { id in
+            await CoverArtCache.shared.image(for: id, size: .full)
+        }
         self.searchViewModel = SearchViewModel(
             service: service,
             libraryManager: libraryManager
@@ -271,6 +285,10 @@ final class MusiCardsAppModel: ObservableObject {
         _ row: SearchReleaseRow,
         activateImmediately: Bool = false
     ) {
+        releaseLoadTask?.cancel()
+        releaseSelectionGeneration &+= 1
+        let generation = releaseSelectionGeneration
+
         selectedReleaseID = row.id
         isLoadingRelease = true
         releaseError = nil
@@ -286,8 +304,8 @@ final class MusiCardsAppModel: ObservableObject {
             }
         }
 
-        Task {
-            await loadReleaseAndCover(id: row.id)
+        releaseLoadTask = Task {
+            await loadReleaseAndCover(id: row.id, generation: generation)
         }
     }
 
@@ -301,26 +319,38 @@ final class MusiCardsAppModel: ObservableObject {
     func retryRelease() {
         guard let selectedReleaseID else { return }
 
+        releaseLoadTask?.cancel()
+        releaseSelectionGeneration &+= 1
+        let generation = releaseSelectionGeneration
+
         isLoadingRelease = true
         releaseError = nil
         selectedRelease = nil
         selectedReleaseCover = nil
 
-        Task {
-            await loadReleaseAndCover(id: selectedReleaseID)
+        releaseLoadTask = Task {
+            await loadReleaseAndCover(
+                id: selectedReleaseID,
+                generation: generation
+            )
         }
     }
 
-    private func loadReleaseAndCover(id: String) async {
+    private func loadReleaseAndCover(
+        id: String,
+        generation: UInt64
+    ) async {
         do {
-            async let releaseTask = musicBrainzService.loadRelease(id: id)
-            async let coverTask = CoverArtCache.shared.image(
-                for: id,
-                size: .full
-            )
+            async let releaseTask = releaseDetailLoader(id)
+            async let coverTask = releaseCoverLoader(id)
 
             let release = try await releaseTask
             let cover = await coverTask
+
+            guard generation == releaseSelectionGeneration,
+                  selectedReleaseID == id else {
+                return
+            }
 
             selectedRelease = release
             selectedReleaseCover = cover
@@ -332,7 +362,14 @@ final class MusiCardsAppModel: ObservableObject {
                     activeSlotIndex: MusiCardID.release.slotIndex
                 )
             }
+        } catch is CancellationError {
+            return
         } catch {
+            guard generation == releaseSelectionGeneration,
+                  selectedReleaseID == id else {
+                return
+            }
+
             selectedRelease = nil
             selectedReleaseCover = nil
             isLoadingRelease = false
