@@ -35,6 +35,7 @@ struct ContentView: View {
     @State private var showDestinationPicker = false
     @State private var showRemoteLocationSetup = false
     @State private var showRemoveRemoteConfirmation = false
+    @State private var showThirdPartyLicenses = false
 
     init() {
         _model = State(initialValue: SyncViewModel())
@@ -114,13 +115,16 @@ struct ContentView: View {
                 }
             )
         }
-        .sheet(isPresented: $showRemoteLocationSetup) {
+            .sheet(isPresented: $showRemoteLocationSetup) {
             RemoteLocationSetupView { profile, password in
                 try await model.pairAndAddRemoteDestination(
                     profile,
                     password: password
                 )
             }
+        .sheet(isPresented: $showThirdPartyLicenses) {
+            SyncThirdPartyLicensesView()
+        }
         }
         .confirmationDialog(
             "Remove remote location?",
@@ -194,6 +198,13 @@ struct ContentView: View {
             Text("MusiCards Sync")
                 .font(.largeTitle)
                 .fontWeight(.semibold)
+
+            Spacer()
+
+            Button("Third-Party Licenses…") {
+                showThirdPartyLicenses = true
+            }
+            .buttonStyle(.link)
         }
         .padding(.bottom, 47)
     }

@@ -8,6 +8,10 @@
 
 /* Begin PBXBuildFile section */
 		F6010000305A000000000001 /* rsync in Embed Executables */ = {isa = PBXBuildFile; fileRef = F6010000305A000000000002 /* rsync */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		F6010000305A000000000006 /* rsync-NOTICE.md in Resources */ = {isa = PBXBuildFile; fileRef = F6010000305A000000000007 /* rsync-NOTICE.md */; };
+		F6010000305A000000000008 /* rsync-COPYING in Resources */ = {isa = PBXBuildFile; fileRef = F6010000305A000000000009 /* rsync-COPYING */; };
+		F6010000305A00000000000A /* popt-COPYING in Resources */ = {isa = PBXBuildFile; fileRef = F6010000305A00000000000B /* popt-COPYING */; };
+		F6010000305A00000000000C /* zlib-LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = F6010000305A00000000000D /* zlib-LICENSE */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -38,6 +42,10 @@
 		F6010000305A000000000002 /* rsync */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; path = ThirdParty/rsync/rsync; sourceTree = "<group>"; };
 		F6010000305A000000000012 /* MusiCards Sync.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "MusiCards Sync.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		F6010000305A000000000013 /* MusiCards SyncTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "MusiCards SyncTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		F6010000305A000000000007 /* rsync-NOTICE.md */ = {isa = PBXFileReference; lastKnownFileType = text.markdown; path = ThirdParty/rsync/NOTICE.md; sourceTree = "<group>"; };
+		F6010000305A000000000009 /* rsync-COPYING */ = {isa = PBXFileReference; lastKnownFileType = text; path = ThirdParty/rsync/COPYING; sourceTree = "<group>"; };
+		F6010000305A00000000000B /* popt-COPYING */ = {isa = PBXFileReference; lastKnownFileType = text; path = ThirdParty/rsync/licenses/popt-COPYING; sourceTree = "<group>"; };
+		F6010000305A00000000000D /* zlib-LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = ThirdParty/rsync/licenses/zlib-LICENSE; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -84,6 +92,10 @@
 				F6010000305A000000000021 /* MusiCards SyncTests */,
 				F6010000305A000000000022 /* Shared */,
 				F6010000305A000000000002 /* rsync */,
+				F6010000305A000000000007 /* rsync-NOTICE.md */,
+				F6010000305A000000000009 /* rsync-COPYING */,
+				F6010000305A00000000000B /* popt-COPYING */,
+				F6010000305A00000000000D /* zlib-LICENSE */,
 			);
 			sourceTree = "<group>";
 		};
@@ -182,6 +194,10 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F6010000305A000000000006 /* rsync-NOTICE.md in Resources */,
+				F6010000305A000000000008 /* rsync-COPYING in Resources */,
+				F6010000305A00000000000A /* popt-COPYING in Resources */,
+				F6010000305A00000000000C /* zlib-LICENSE in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
