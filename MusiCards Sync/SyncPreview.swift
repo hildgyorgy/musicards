@@ -1,4 +1,55 @@
 import Foundation
+import Darwin
+
+nonisolated struct OnlineOnlyFileMetadata: Equatable, Sendable {
+    let isRegularFile: Bool
+    let isDataless: Bool
+}
+
+/// Metadata-only evidence for a File Provider placeholder. The public macOS
+/// `SF_DATALESS` filesystem flag is the authoritative signal; allocation
+/// size is intentionally not used because sparse files are valid sync inputs.
+nonisolated struct OnlineOnlyFileDetector: Sendable {
+    private let metadataReader: @Sendable (String) -> OnlineOnlyFileMetadata?
+
+    init(
+        metadataReader: @escaping @Sendable (String) -> OnlineOnlyFileMetadata?
+            = OnlineOnlyFileDetector.readMetadata
+    ) {
+        self.metadataReader = metadataReader
+    }
+
+    func isOnlineOnly(path: String) -> Bool {
+        guard let metadata = metadataReader(path) else { return false }
+        return metadata.isRegularFile &&
+            metadata.isDataless
+    }
+
+    func countOnlineOnlyFiles(
+        modifiedPaths: [String],
+        sourceDirectory: String
+    ) -> Int {
+        let sourceURL = URL(fileURLWithPath: sourceDirectory, isDirectory: true)
+        return modifiedPaths.reduce(into: 0) { count, path in
+            let relativePath = path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            let fileURL = sourceURL.appendingPathComponent(relativePath)
+            if isOnlineOnly(path: fileURL.path) {
+                count += 1
+            }
+        }
+    }
+
+    private static func readMetadata(path: String) -> OnlineOnlyFileMetadata? {
+        var fileStat = Darwin.stat()
+        guard Darwin.lstat(path, &fileStat) == 0 else { return nil }
+
+        let fileType = fileStat.st_mode & S_IFMT
+        return OnlineOnlyFileMetadata(
+            isRegularFile: fileType == S_IFREG,
+            isDataless: (fileStat.st_flags & UInt32(bitPattern: SF_DATALESS)) != 0
+        )
+    }
+}
 
 nonisolated struct SyncPreview: Sendable {
     var newFiles: [String] = []

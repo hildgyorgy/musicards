@@ -38,4 +38,54 @@ final class SyncEnginePreviewTests: XCTestCase {
 
         XCTAssertFalse(preview.hasChanges)
     }
+
+    func testOnlineOnlyDetectorCountsOnlyDatalessModifiedFiles() {
+        let detector = OnlineOnlyFileDetector { path in
+            switch path {
+            case "/source/online.m4a":
+                return OnlineOnlyFileMetadata(
+                    isRegularFile: true,
+                    isDataless: true
+                )
+            case "/source/local.m4a":
+                return OnlineOnlyFileMetadata(
+                    isRegularFile: true,
+                    isDataless: false
+                )
+            default:
+                return nil
+            }
+        }
+
+        XCTAssertEqual(
+            detector.countOnlineOnlyFiles(
+                modifiedPaths: ["online.m4a", "local.m4a", "missing.m4a"],
+                sourceDirectory: "/source"
+            ),
+            1
+        )
+    }
+
+    func testOnlineOnlyDetectorDoesNotInferDatalessFromAllocationAlone() {
+        let detector = OnlineOnlyFileDetector { _ in
+            OnlineOnlyFileMetadata(isRegularFile: true, isDataless: false)
+        }
+
+        XCTAssertFalse(detector.isOnlineOnly(path: "/source/sparse.m4a"))
+    }
+
+    func testOnlineOnlyDetectorHandlesNoModifiedFiles() {
+        let detector = OnlineOnlyFileDetector { _ in
+            XCTFail("No metadata lookup should be needed")
+            return nil
+        }
+
+        XCTAssertEqual(
+            detector.countOnlineOnlyFiles(
+                modifiedPaths: [],
+                sourceDirectory: "/source"
+            ),
+            0
+        )
+    }
 }

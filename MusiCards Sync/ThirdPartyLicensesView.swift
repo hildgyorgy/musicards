@@ -10,7 +10,7 @@ struct SyncThirdPartyLicensesView: View {
                     Text("rsync 3.5.0")
                         .font(.headline)
 
-                    Text(resourceText("NOTICE", fileExtension: "md"))
+                    Text(resourceText("NOTICE.md"))
                         .font(.body)
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -57,8 +57,8 @@ struct SyncThirdPartyLicensesView: View {
         .frame(minWidth: 680, minHeight: 560)
     }
 
-    private func resourceText(_ name: String, fileExtension: String? = "txt") -> String {
-        guard let url = Bundle.main.url(forResource: name, withExtension: fileExtension),
+    private func resourceText(_ name: String) -> String {
+        guard let url = Bundle.main.url(forResource: name, withExtension: nil),
               let text = try? String(contentsOf: url, encoding: .utf8) else {
             return "License text unavailable."
         }

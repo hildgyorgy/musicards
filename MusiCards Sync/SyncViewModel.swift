@@ -60,6 +60,7 @@ final class SyncViewModel {
     var configuration: SyncConfiguration
     var remoteDestinations: [DestinationProfile]
     var preview = SyncPreview()
+    var onlineOnlyModifiedFileCount = 0
     var isChecking = false
     var errorMessage: String?
     var hasChecked = false
@@ -350,6 +351,7 @@ final class SyncViewModel {
         errorMessage = nil
         hasChecked = false
         preview = SyncPreview()
+        onlineOnlyModifiedFileCount = 0
         resetFileProgress()
         syncPhase = .idle
         progressLines = []
@@ -400,6 +402,11 @@ final class SyncViewModel {
                     tracksFileProgress: false
                 )
                 preview = engine.parsePreview(output)
+                onlineOnlyModifiedFileCount = OnlineOnlyFileDetector()
+                    .countOnlineOnlyFiles(
+                        modifiedPaths: preview.modifiedFiles,
+                        sourceDirectory: configuration.sourcePath
+                    )
                 hasChecked = true
                 progressTitle = "Check completed"
             } catch SyncEngine.SyncEngineError.cancelled {
@@ -1030,6 +1037,7 @@ final class SyncViewModel {
 
     private func invalidatePreview(resetProgress: Bool) {
         preview = SyncPreview()
+        onlineOnlyModifiedFileCount = 0
         hasChecked = false
         errorMessage = nil
 

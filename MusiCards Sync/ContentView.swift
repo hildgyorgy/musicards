@@ -50,45 +50,49 @@ struct ContentView: View {
     var body: some View {
         @Bindable var model = model
 
-        VStack(alignment: .leading, spacing: 0) {
-            appHeader
+        ScrollView(.vertical) {
+            VStack(alignment: .leading, spacing: 0) {
+                appHeader
 
-            VStack(alignment: .leading, spacing: AppDesign.sectionGap) {
-                sourceSection
-                sourceIndexSection
-                destinationSection
-                previewSection
-                syncSection
-            }
+                VStack(alignment: .leading, spacing: AppDesign.sectionGap) {
+                    sourceSection
+                    sourceIndexSection
+                    destinationSection
+                    previewSection
+                    syncSection
+                }
 
-            Spacer(minLength: 24)
+                Spacer(minLength: 24)
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(model.localRsyncVersionText)
-                    .foregroundStyle(
-                        model.localRsyncStatusIsError
-                            ? Color.red
-                            : Color.secondary
-                    )
-                    .help(
-                        "MusiCards Sync uses this external local rsync executable."
-                    )
-
-                if let remoteText = model.remoteRsyncVersionText {
-                    Text(remoteText)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(model.localRsyncVersionText)
                         .foregroundStyle(
-                            model.remoteRsyncStatusIsError
+                            model.localRsyncStatusIsError
                                 ? Color.red
                                 : Color.secondary
                         )
-                        .help(model.remoteRsyncHelpText)
+                        .help(
+                            "MusiCards Sync uses this external local rsync executable."
+                        )
+
+                    if let remoteText = model.remoteRsyncVersionText {
+                        Text(remoteText)
+                            .foregroundStyle(
+                                model.remoteRsyncStatusIsError
+                                    ? Color.red
+                                    : Color.secondary
+                            )
+                            .help(model.remoteRsyncHelpText)
+                    }
                 }
+                .font(.system(.caption2, design: .monospaced))
+                .lineLimit(1)
             }
-            .font(.system(.caption2, design: .monospaced))
-            .lineLimit(1)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(AppDesign.contentPadding)
+            .padding(.bottom, 12)
         }
-        .padding(AppDesign.contentPadding)
-        .frame(minWidth: 760, minHeight: 620)
+        .frame(minWidth: 760, minHeight: 320)
         .confirmationDialog(
             "Start synchronization?",
             isPresented: $model.showSyncConfirmation
@@ -115,16 +119,16 @@ struct ContentView: View {
                 }
             )
         }
-            .sheet(isPresented: $showRemoteLocationSetup) {
+        .sheet(isPresented: $showRemoteLocationSetup) {
             RemoteLocationSetupView { profile, password in
                 try await model.pairAndAddRemoteDestination(
                     profile,
                     password: password
                 )
             }
+        }
         .sheet(isPresented: $showThirdPartyLicenses) {
             SyncThirdPartyLicensesView()
-        }
         }
         .confirmationDialog(
             "Remove remote location?",
@@ -477,6 +481,11 @@ struct ContentView: View {
             )
             summaryRow("System cleanup", summary.systemCleanup)
 
+            if usesPreviewLabels,
+               model.onlineOnlyModifiedFileCount > 0 {
+                onlineOnlyWarning(model.onlineOnlyModifiedFileCount)
+            }
+
             if let indexSummary {
                 summaryStatusRow(
                     "New index published",
@@ -484,6 +493,22 @@ struct ContentView: View {
                 )
             }
         }
+    }
+
+    private func onlineOnlyWarning(_ count: Int) -> some View {
+        Label {
+            Text(
+                count == 1
+                    ? "1 modified file is online-only. Dropbox may report a different modification date, so it may be downloaded and transferred again even if its contents have not changed."
+                    : "\(count) modified files are online-only. Dropbox may report different modification dates, so these files may be downloaded and transferred again even if their contents have not changed."
+            )
+        } icon: {
+            Image(systemName: "exclamationmark.triangle")
+        }
+        .font(.callout)
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(.top, 6)
     }
 
     private func summaryStatusRow(
