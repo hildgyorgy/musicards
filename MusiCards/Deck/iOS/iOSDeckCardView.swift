@@ -94,6 +94,40 @@ struct DeckCardView<ID: Hashable, CollapsedHeaderContent: View, HeaderContent: V
             cardShape
                 .stroke(strokeColor, lineWidth: DeckStyle.strokeWidth)
         )
+        .overlay {
+            if colorScheme == .dark {
+                cardShape
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                DeckStyle.glassEdgeBlue.opacity(
+                                    isActive
+                                        ? DeckStyle.activeGlassEdgeStrength
+                                        : DeckStyle.inactiveGlassEdgeStrength
+                                ),
+                                DeckStyle.glassEdgeHighlight,
+                                DeckStyle.glassEdgeBlue.opacity(
+                                    isActive ? 0.16 : 0.10
+                                )
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: DeckStyle.strokeWidth
+                    )
+                    .shadow(
+                        color: DeckStyle.glassEdgeBlue.opacity(
+                            isActive
+                                ? DeckStyle.activeGlassGlowStrength
+                                : DeckStyle.inactiveGlassGlowStrength
+                        ),
+                        radius: isActive
+                            ? DeckStyle.activeGlassGlowRadius
+                            : DeckStyle.inactiveGlassGlowRadius
+                    )
+                    .allowsHitTesting(false)
+            }
+        }
         .shadow(
             color: DeckStyle.shadowColor,
             radius: DeckStyle.shadowRadius,

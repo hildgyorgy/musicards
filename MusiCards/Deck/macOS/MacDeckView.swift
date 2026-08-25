@@ -28,6 +28,7 @@ struct DeckView<ID: Hashable, CollapsedHeaderContent: View, HeaderContent: View,
     let showsCollapsedHeader: (DeckCard<ID>) -> Bool
 
     @AppStorage("glassTransparent") private var glassTransparent = false
+    @Environment(\.colorScheme) private var colorScheme
 
     init(
         cards: [DeckCard<ID>],
@@ -107,6 +108,35 @@ struct DeckView<ID: Hashable, CollapsedHeaderContent: View, HeaderContent: View,
                     style: .continuous
                 )
             )
+            .overlay {
+                if colorScheme == .dark {
+                    RoundedRectangle(
+                        cornerRadius: DeckStyle.cornerRadius,
+                        style: .continuous
+                    )
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                DeckStyle.glassEdgeBlue.opacity(
+                                    DeckStyle.activeGlassEdgeStrength
+                                ),
+                                Color.white.opacity(0.10),
+                                DeckStyle.glassEdgeBlue.opacity(0.10)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: DeckStyle.strokeWidth
+                    )
+                    .shadow(
+                        color: DeckStyle.glassEdgeBlue.opacity(
+                            DeckStyle.glassGlowStrength
+                        ),
+                        radius: DeckStyle.glassGlowRadius
+                    )
+                    .allowsHitTesting(false)
+                }
+            }
             .padding(.horizontal, DeckStyle.horizontalInset)
             .padding(.top, DeckStyle.topInset - titlebarOverlap)
             .animation(DeckStyle.animation, value: activeSlotIndex)

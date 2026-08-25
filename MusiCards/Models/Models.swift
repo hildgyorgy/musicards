@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct MBRelease: Decodable {
+struct MBRelease: Codable {
     let id: String
     let title: String
     let artistCredit: [MBArtistCredit]?
@@ -105,7 +105,7 @@ extension MBRelease {
     }
 }
 
-struct MBReleaseGroupRef: Decodable {
+struct MBReleaseGroupRef: Codable {
     let id: String
     let title: String?
 }
@@ -162,7 +162,7 @@ struct MBReleaseSearchResult: Decodable, Identifiable {
     }
 }
 
-struct MBLabelInfo: Decodable {
+struct MBLabelInfo: Codable {
     let catalogNumber: String?
     let label: MBLabel?
 
@@ -172,11 +172,11 @@ struct MBLabelInfo: Decodable {
     }
 }
 
-struct MBLabel: Decodable {
+struct MBLabel: Codable {
     let name: String?
 }
 
-struct MBMedium: Decodable {
+struct MBMedium: Codable {
     let position: Int?
     let trackCount: Int?
     let format: String?
@@ -190,7 +190,7 @@ struct MBMedium: Decodable {
     }
 }
 
-struct MBTrack: Decodable {
+struct MBTrack: Codable {
     let id: String?
     let position: Int?
     let title: String
@@ -220,7 +220,7 @@ struct MBTrack: Decodable {
     }
 }
 
-struct MBRecording: Decodable {
+struct MBRecording: Codable {
     let id: String
     let disambiguation: String?
     let relations: [MBRelation]?
@@ -242,12 +242,12 @@ struct MBRecording: Decodable {
     }
 }
 
-struct MBPlace: Decodable {
+struct MBPlace: Codable {
     let id: String?
     let name: String
 }
 
-struct MBRelation: Decodable {
+struct MBRelation: Codable {
     let type: String?
     let artist: MBArtist?
     let label: MBLabel?
@@ -281,7 +281,7 @@ struct MBRelation: Decodable {
     }
 }
 
-struct MBArtistCredit: Decodable {
+struct MBArtistCredit: Codable {
     let name: String
     let artist: MBArtist?
     let joinPhrase: String?
@@ -293,7 +293,7 @@ struct MBArtistCredit: Decodable {
     }
 }
 
-struct MBArtist: Decodable {
+struct MBArtist: Codable {
     let id: String
     let name: String
     let disambiguation: String?
@@ -305,7 +305,7 @@ struct MBArtist: Decodable {
     }
 }
 
-struct MBArtistDetail: Decodable {
+struct MBArtistDetail: Codable {
     let id: String
     let name: String
     let disambiguation: String?
@@ -349,21 +349,21 @@ struct MBArtistSearchResult: Decodable, Identifiable {
     }
 }
 
-struct MBRelationURL: Decodable {
+struct MBRelationURL: Codable {
     let resource: String?
 }
 
-struct MBLifeSpan: Decodable {
+struct MBLifeSpan: Codable {
     let begin: String?
     let end: String?
     let ended: Bool?
 }
 
-struct MBAreaRef: Decodable {
+struct MBAreaRef: Codable {
     let name: String?
 }
 
-struct MBWorkReference: Decodable {
+struct MBWorkReference: Codable {
     let id: String
     let title: String?
 
@@ -429,7 +429,7 @@ struct MBReleaseGroupBrowseResponse: Decodable {
     }
 }
 
-struct MBReleaseGroupSummary: Decodable, Identifiable, Hashable {
+struct MBReleaseGroupSummary: Codable, Identifiable, Hashable {
     let id: String
     let title: String
     let primaryType: String?

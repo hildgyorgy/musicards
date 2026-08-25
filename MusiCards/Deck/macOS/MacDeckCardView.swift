@@ -58,12 +58,41 @@ struct DeckCardView<ID: Hashable, CollapsedHeaderContent: View, HeaderContent: V
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(cardBackground)
-        .overlay(
-            Rectangle()
-                .frame(height: DeckStyle.strokeWidth)
-                .foregroundStyle(strokeColor),
-            alignment: .bottom
-        )
+        .overlay(alignment: .bottom) {
+            ZStack {
+                Rectangle()
+                    .frame(height: DeckStyle.strokeWidth)
+                    .foregroundStyle(strokeColor)
+
+                if colorScheme == .dark {
+                    Rectangle()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    DeckStyle.glassEdgeBlue.opacity(0.08),
+                                    DeckStyle.glassEdgeBlue.opacity(
+                                        isActive
+                                            ? DeckStyle.activeGlassEdgeStrength
+                                            : DeckStyle.glassEdgeStrength
+                                    ),
+                                    DeckStyle.glassEdgeBlue.opacity(0.08)
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(height: DeckStyle.strokeWidth)
+                        .shadow(
+                            color: DeckStyle.glassEdgeBlue.opacity(
+                                DeckStyle.glassGlowStrength
+                            ),
+                            radius: DeckStyle.glassGlowRadius,
+                            y: -1
+                        )
+                        .allowsHitTesting(false)
+                }
+            }
+        }
     }
     
     private var cardHeader: some View {

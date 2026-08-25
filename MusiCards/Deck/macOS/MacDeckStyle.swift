@@ -56,6 +56,11 @@ enum DeckStyle {
 
     static let strokeColor: Color = Color.primary.opacity(separatorStrength)
     static let outerStrokeColor: Color = Color.white.opacity(outerStrokeStrength)
+    static let glassEdgeBlue: Color = .blue
+    static let glassEdgeStrength: Double = 0.20
+    static let activeGlassEdgeStrength: Double = 0.28
+    static let glassGlowStrength: Double = 0.12
+    static let glassGlowRadius: CGFloat = 4
 
     // MARK: - Surfaces
 

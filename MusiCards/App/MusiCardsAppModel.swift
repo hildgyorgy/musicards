@@ -12,6 +12,9 @@ import OSLog
 #if canImport(UIKit)
 import UIKit
 #endif
+#if canImport(AppKit)
+import AppKit
+#endif
 #if os(iOS)
 import MediaPlayer
 #endif
@@ -78,6 +81,14 @@ final class MusiCardsAppModel: ObservableObject {
     private let musicBrainzService = MusicBrainzService()
     private let releaseDetailLoader: @Sendable (String) async throws -> MBRelease
     private let releaseCoverLoader: @Sendable (String) async -> PlatformImage?
+    private let artistDetailLoader:
+        @Sendable (String) async throws -> MBArtistDetail
+    private let artistReleaseGroupsLoader:
+        @Sendable (String, Int, Int) async throws
+        -> (groups: [MBReleaseGroupSummary], hasMore: Bool)
+    private let artistWikipediaLoader:
+        @Sendable (URL) async throws -> (title: String, extract: String)?
+    private let recentContentCache: RecentContentCache
 
     private let recentArtistsKey = "recentArtists"
     private let recentReleasesKey = "recentReleases"
@@ -102,7 +113,16 @@ final class MusiCardsAppModel: ObservableObject {
     init(
         playbackEngine: PlaybackEngine? = nil,
         releaseDetailLoader: (@Sendable (String) async throws -> MBRelease)? = nil,
-        releaseCoverLoader: (@Sendable (String) async -> PlatformImage?)? = nil
+        releaseCoverLoader: (@Sendable (String) async -> PlatformImage?)? = nil,
+        artistDetailLoader:
+            (@Sendable (String) async throws -> MBArtistDetail)? = nil,
+        artistReleaseGroupsLoader:
+            (@Sendable (String, Int, Int) async throws
+            -> (groups: [MBReleaseGroupSummary], hasMore: Bool))? = nil,
+        artistWikipediaLoader:
+            (@Sendable (URL) async throws
+            -> (title: String, extract: String)?)? = nil,
+        recentContentCache: RecentContentCache = .shared
     ) {
         let service = musicBrainzService
         let playbackEngine = playbackEngine ?? PlaybackEngineFactory.makeDefault()
@@ -133,6 +153,21 @@ final class MusiCardsAppModel: ObservableObject {
         self.releaseCoverLoader = releaseCoverLoader ?? { id in
             await CoverArtCache.shared.image(for: id, size: .full)
         }
+        self.artistDetailLoader = artistDetailLoader ?? { id in
+            try await service.fetchArtist(id: id)
+        }
+        self.artistReleaseGroupsLoader = artistReleaseGroupsLoader
+            ?? { id, limit, offset in
+                try await service.fetchArtistReleaseGroups(
+                    id: id,
+                    limit: limit,
+                    offset: offset
+                )
+            }
+        self.artistWikipediaLoader = artistWikipediaLoader ?? { url in
+            try await service.fetchWikipediaSummary(from: url)
+        }
+        self.recentContentCache = recentContentCache
         self.searchViewModel = SearchViewModel(
             service: service,
             libraryManager: libraryManager
@@ -340,6 +375,18 @@ final class MusiCardsAppModel: ObservableObject {
         id: String,
         generation: UInt64
     ) async {
+        if let cached = await recentContentCache.release(for: id) {
+            guard generation == releaseSelectionGeneration,
+                  selectedReleaseID == id else {
+                return
+            }
+            selectedRelease = cached.release
+            selectedReleaseCover = cached.coverData.flatMap(PlatformImage.init(data:))
+            isLoadingRelease = false
+            releaseError = nil
+            activateReleaseCardIfNeeded()
+        }
+
         do {
             async let releaseTask = releaseDetailLoader(id)
             async let coverTask = releaseCoverLoader(id)
@@ -355,11 +402,18 @@ final class MusiCardsAppModel: ObservableObject {
             selectedRelease = release
             selectedReleaseCover = cover
             isLoadingRelease = false
+            releaseError = nil
 
-            withAnimation(AppStyle.animation) {
-                deckSelection = DeckSelection<MusiCardID>(
-                    activeID: .release,
-                    activeSlotIndex: MusiCardID.release.slotIndex
+            activateReleaseCardIfNeeded()
+
+            if recentReleases.contains(where: { $0.id == id }) {
+                await recentContentCache.save(
+                    RecentReleaseSnapshot(
+                        savedAt: Date(),
+                        release: release,
+                        coverData: imageData(for: cover)
+                    ),
+                    for: id
                 )
             }
         } catch is CancellationError {
@@ -370,11 +424,35 @@ final class MusiCardsAppModel: ObservableObject {
                 return
             }
 
-            selectedRelease = nil
-            selectedReleaseCover = nil
             isLoadingRelease = false
-            releaseError = error
+            if selectedRelease?.id == id {
+                releaseError = nil
+            } else {
+                selectedRelease = nil
+                selectedReleaseCover = nil
+                releaseError = error
+            }
         }
+    }
+
+    private func activateReleaseCardIfNeeded() {
+        guard deckSelection.activeID != .release else { return }
+        withAnimation(AppStyle.animation) {
+            deckSelection = DeckSelection<MusiCardID>(
+                activeID: .release,
+                activeSlotIndex: MusiCardID.release.slotIndex
+            )
+        }
+    }
+
+    private func imageData(for image: PlatformImage?) -> Data? {
+        #if canImport(UIKit)
+        image?.pngData()
+        #elseif canImport(AppKit)
+        image?.tiffRepresentation
+        #else
+        nil
+        #endif
     }
 
     // MARK: - Artist
@@ -470,14 +548,36 @@ final class MusiCardsAppModel: ObservableObject {
     }
 
     private func loadArtist(id: String, generation: UInt64) async {
+        if let cached = await recentContentCache.artist(for: id) {
+            guard generation == artistSelectionGeneration,
+                  selectedArtistID == id else {
+                return
+            }
+            selectedArtist = cached.artist
+            selectedArtistName = cached.name
+            selectedArtistLifeSpan = cached.lifeSpan
+            artistReleaseGroups = cached.releaseGroups
+            hasMoreReleaseGroups = cached.hasMoreReleaseGroups
+            releaseGroupsOffset = cached.releaseGroups.count
+            currentArtistIDForGroups = id
+            if let title = cached.wikipediaTitle,
+               let extract = cached.wikipediaExtract {
+                artistWikipedia = (title, extract)
+            }
+            discographyError = nil
+            artistError = nil
+        }
+
         guard await loadDiscographyPage(id: id, generation: generation) else { return }
         await loadArtistDetail(id: id, generation: generation)
     }
 
     private func loadDiscographyPage(id: String, generation: UInt64) async -> Bool {
         do {
-            let (groups, hasMore) = try await musicBrainzService.fetchArtistReleaseGroups(
-                id: id, limit: releaseGroupsPageSize, offset: 0
+            let (groups, hasMore) = try await artistReleaseGroupsLoader(
+                id,
+                releaseGroupsPageSize,
+                0
             )
             guard generation == artistSelectionGeneration, selectedArtistID == id else { return false }
             artistReleaseGroups = groups
@@ -485,6 +585,7 @@ final class MusiCardsAppModel: ObservableObject {
             hasMoreReleaseGroups = hasMore
             releaseGroupsOffset = groups.count
             currentArtistIDForGroups = id
+            await cacheSelectedArtist(id: id, generation: generation)
             return true
         } catch is CancellationError { return false }
         catch {
@@ -499,7 +600,7 @@ final class MusiCardsAppModel: ObservableObject {
 
     private func loadArtistDetail(id: String, generation: UInt64) async {
         do {
-            let artist = try await musicBrainzService.fetchArtist(id: id)
+            let artist = try await artistDetailLoader(id)
             guard generation == artistSelectionGeneration, selectedArtistID == id else { return }
             selectedArtist = artist
             if selectedArtistName.isEmpty { selectedArtistName = artist.name }
@@ -507,7 +608,8 @@ final class MusiCardsAppModel: ObservableObject {
                 selectedArtistLifeSpan = MBTextFormatter.lifeSpanText(from: artist.lifeSpan)
             }
 
-            isLoadingArtistWikipedia = true
+            // Keep a cached excerpt visible while its refresh runs.
+            isLoadingArtistWikipedia = artistWikipedia == nil
 
             if let wikidataURL = artist.relations?
                 .first(where: { $0.type == "wikidata" })?
@@ -515,7 +617,7 @@ final class MusiCardsAppModel: ObservableObject {
                 .resource
                 .flatMap(URL.init(string:)) {
 
-                let summary = try await musicBrainzService.fetchWikipediaSummary(from: wikidataURL)
+                let summary = try await artistWikipediaLoader(wikidataURL)
                 guard generation == artistSelectionGeneration, selectedArtistID == id else { return }
                 artistWikipedia = summary
             } else {
@@ -523,6 +625,7 @@ final class MusiCardsAppModel: ObservableObject {
             }
 
             isLoadingArtistWikipedia = false
+            await cacheSelectedArtist(id: id, generation: generation)
 
         } catch is CancellationError {
             return
@@ -533,6 +636,27 @@ final class MusiCardsAppModel: ObservableObject {
                 artistError = error
             }
         }
+    }
+
+    private func cacheSelectedArtist(id: String, generation: UInt64) async {
+        guard generation == artistSelectionGeneration,
+              selectedArtistID == id,
+              recentArtists.contains(where: { $0.id == id }) else {
+            return
+        }
+        await recentContentCache.save(
+            RecentArtistSnapshot(
+                savedAt: Date(),
+                artist: selectedArtist,
+                name: selectedArtistName,
+                lifeSpan: selectedArtistLifeSpan,
+                releaseGroups: artistReleaseGroups,
+                hasMoreReleaseGroups: hasMoreReleaseGroups,
+                wikipediaTitle: artistWikipedia?.title,
+                wikipediaExtract: artistWikipedia?.extract
+            ),
+            for: id
+        )
     }
 
     // MARK: - Release group pagination
@@ -561,10 +685,10 @@ final class MusiCardsAppModel: ObservableObject {
         }
 
         do {
-            let (groups, hasMore) = try await musicBrainzService.fetchArtistReleaseGroups(
-                id: artistID,
-                limit: releaseGroupsPageSize,
-                offset: releaseGroupsOffset
+            let (groups, hasMore) = try await artistReleaseGroupsLoader(
+                artistID,
+                releaseGroupsPageSize,
+                releaseGroupsOffset
             )
 
             guard generation == artistSelectionGeneration, selectedArtistID == artistID else { return }
@@ -604,6 +728,7 @@ final class MusiCardsAppModel: ObservableObject {
         recentArtists.insert(artist, at: 0)
         recentArtists = Array(recentArtists.prefix(3))
         saveRecents()
+        pruneRecentContentCache()
     }
 
     func addRecentRelease(_ release: SearchReleaseRow) {
@@ -611,6 +736,7 @@ final class MusiCardsAppModel: ObservableObject {
         recentReleases.insert(release, at: 0)
         recentReleases = Array(recentReleases.prefix(3))
         saveRecents()
+        pruneRecentContentCache()
     }
 
     private func loadRecents() {
@@ -636,6 +762,17 @@ final class MusiCardsAppModel: ObservableObject {
 
         if let releaseData = try? JSONEncoder().encode(recentReleases) {
             defaults.set(releaseData, forKey: recentReleasesKey)
+        }
+    }
+
+    private func pruneRecentContentCache() {
+        let artistIDs = Set(recentArtists.map(\.id))
+        let releaseIDs = Set(recentReleases.map(\.id))
+        Task {
+            await recentContentCache.retain(
+                artistIDs: artistIDs,
+                releaseIDs: releaseIDs
+            )
         }
     }
 
