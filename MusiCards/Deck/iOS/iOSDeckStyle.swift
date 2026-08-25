@@ -58,13 +58,9 @@ enum DeckStyle {
     static let glassEdgeHighlight = Color.white.opacity(0.42)
     static let glassEdgeBlue = Color(red: 0.05, green: 0.48, blue: 1.0)
     static let activeGlassEdgeStrength: Double = 0.55
-    static let inactiveGlassEdgeStrength: Double = 0.44
     static let activeTopEdgeStrength: Double = 0.92
-    static let inactiveTopEdgeStrength: Double = 0.76
     static let activeGlassGlowStrength: Double = 0.38
-    static let inactiveGlassGlowStrength: Double = 0.28
     static let activeGlassGlowRadius: CGFloat = 8
-    static let inactiveGlassGlowRadius: CGFloat = 6
     static let neonCoreWidth: CGFloat = 0.7
 
     // MARK: - Card shadow
@@ -79,6 +75,7 @@ enum DeckStyle {
     static let cardLabelTracking: CGFloat = 4
     static let cardLabelTopPadding: CGFloat = 12
     static let cardLabelColor: Color = .secondary
+    static let activeCardLabelColor: Color = glassEdgeBlue
     static let cardLabelHitHeight: CGFloat = 56
     static let collapsedPlayerHeight: CGFloat = 92
     

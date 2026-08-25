@@ -95,7 +95,7 @@ struct DeckCardView<ID: Hashable, CollapsedHeaderContent: View, HeaderContent: V
                 .stroke(strokeColor, lineWidth: DeckStyle.strokeWidth)
         )
         .overlay {
-            if colorScheme == .dark {
+            if colorScheme == .dark && isActive {
                 ZStack {
                     cardShape
                         .stroke(
@@ -103,9 +103,7 @@ struct DeckCardView<ID: Hashable, CollapsedHeaderContent: View, HeaderContent: V
                                 colors: [
                                     DeckStyle.glassEdgeHighlight,
                                     DeckStyle.glassEdgeBlue.opacity(
-                                        isActive
-                                            ? DeckStyle.activeGlassEdgeStrength
-                                            : DeckStyle.inactiveGlassEdgeStrength
+                                        DeckStyle.activeGlassEdgeStrength
                                     ),
                                     DeckStyle.glassEdgeBlue.opacity(0.24)
                                 ],
@@ -115,16 +113,14 @@ struct DeckCardView<ID: Hashable, CollapsedHeaderContent: View, HeaderContent: V
                             lineWidth: DeckStyle.neonCoreWidth
                         )
                         .shadow(
-                            color: DeckStyle.glassEdgeBlue.opacity(0.20),
-                            radius: 2
+                            color: DeckStyle.glassEdgeBlue.opacity(0.28),
+                            radius: 5
                         )
 
                     cardShape
                         .stroke(
                             DeckStyle.glassEdgeBlue.opacity(
-                                isActive
-                                    ? DeckStyle.activeTopEdgeStrength
-                                    : DeckStyle.inactiveTopEdgeStrength
+                                DeckStyle.activeTopEdgeStrength
                             ),
                             lineWidth: DeckStyle.neonCoreWidth
                         )
@@ -137,13 +133,9 @@ struct DeckCardView<ID: Hashable, CollapsedHeaderContent: View, HeaderContent: V
                         }
                         .shadow(
                             color: DeckStyle.glassEdgeBlue.opacity(
-                                isActive
-                                    ? DeckStyle.activeGlassGlowStrength
-                                    : DeckStyle.inactiveGlassGlowStrength
+                                DeckStyle.activeGlassGlowStrength
                             ),
-                            radius: isActive
-                                ? DeckStyle.activeGlassGlowRadius
-                                : DeckStyle.inactiveGlassGlowRadius
+                            radius: DeckStyle.activeGlassGlowRadius
                         )
                 }
                 .allowsHitTesting(false)
@@ -198,7 +190,11 @@ struct DeckCardView<ID: Hashable, CollapsedHeaderContent: View, HeaderContent: V
                     .font(DeckStyle.cardLabelFont)
                     .tracking(DeckStyle.cardLabelTracking)
                     .textCase(.uppercase)
-                    .foregroundStyle(DeckStyle.cardLabelColor)
+                    .foregroundStyle(
+                        colorScheme == .dark && isActive
+                            ? DeckStyle.activeCardLabelColor
+                            : DeckStyle.cardLabelColor
+                    )
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.top, DeckStyle.cardLabelTopPadding)
                     .allowsHitTesting(false)
