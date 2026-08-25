@@ -59,11 +59,12 @@ struct TracksCardContentView: View {
                         flatSections(for: release)
                     }
                     releaseLinerNotes(for: release)
+#if os(iOS)
+                    Color.clear
+                        .frame(height: deckContentBottomInset)
+#endif
                 }
             }
-#if os(iOS)
-            .contentMargins(.bottom, deckContentBottomInset, for: .scrollContent)
-#endif
             .task(id: release.id) {
                 // Preload composer metadata for all tracks so composer headers
                 // can appear as the view renders.

@@ -54,16 +54,18 @@ enum DeckStyle {
     static let strokeDark: Color = Color(UIColor.opaqueSeparator)
     static let strokeWidth: CGFloat = 1
 
-    // A restrained blue light catch gives stacked cards depth in dark mode
-    // without turning their outlines into a continuous neon border.
-    static let glassEdgeHighlight = Color.white.opacity(0.14)
-    static let glassEdgeBlue = Color.blue
-    static let activeGlassEdgeStrength: Double = 0.38
-    static let inactiveGlassEdgeStrength: Double = 0.25
-    static let activeGlassGlowStrength: Double = 0.30
-    static let inactiveGlassGlowStrength: Double = 0.20
-    static let activeGlassGlowRadius: CGFloat = 7
-    static let inactiveGlassGlowRadius: CGFloat = 5
+    // Dark-mode glass edge: a restrained outline with a brighter top rim.
+    static let glassEdgeHighlight = Color.white.opacity(0.42)
+    static let glassEdgeBlue = Color(red: 0.05, green: 0.48, blue: 1.0)
+    static let activeGlassEdgeStrength: Double = 0.55
+    static let inactiveGlassEdgeStrength: Double = 0.44
+    static let activeTopEdgeStrength: Double = 0.92
+    static let inactiveTopEdgeStrength: Double = 0.76
+    static let activeGlassGlowStrength: Double = 0.38
+    static let inactiveGlassGlowStrength: Double = 0.28
+    static let activeGlassGlowRadius: CGFloat = 8
+    static let inactiveGlassGlowRadius: CGFloat = 6
+    static let neonCoreWidth: CGFloat = 0.7
 
     // MARK: - Card shadow
 

@@ -31,13 +31,20 @@ struct SearchCardContentView: View {
 
     var body: some View {
         ScrollView {
-            contentView
-                .frame(maxWidth: .infinity, minHeight: 1, alignment: .leading)
-                .padding(.bottom, 24)
-        }
+            VStack(alignment: .leading, spacing: 0) {
+                contentView
+                    .frame(
+                        maxWidth: .infinity,
+                        minHeight: 1,
+                        alignment: .leading
+                    )
+                    .padding(.bottom, 24)
 #if os(iOS)
-        .contentMargins(.bottom, deckContentBottomInset, for: .scrollContent)
+                Color.clear
+                    .frame(height: deckContentBottomInset)
 #endif
+            }
+        }
     }
 
     @ViewBuilder

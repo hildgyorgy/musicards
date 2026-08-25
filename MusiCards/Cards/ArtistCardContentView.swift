@@ -130,12 +130,14 @@ struct ArtistCardContentView: View {
                                 .padding(.vertical, 16)
                         }
 
+#if os(iOS)
+                        Color.clear
+                            .frame(height: deckContentBottomInset)
+#endif
+
                     }
                 }
                 .padding(.bottom, 36)
-#if os(iOS)
-                .contentMargins(.bottom, deckContentBottomInset, for: .scrollContent)
-#endif
             
             } else {
                 EmptyStateView.artist
