@@ -91,6 +91,15 @@ struct DeckView<ID: Hashable, BackgroundContent: View, CollapsedHeaderContent: V
                 ? min(padAvailableWidth, DeckStyle.maximumPadCardWidth)
                 : phoneCardWidth
 
+            let verticalDeckInset = DeckStyle.verticalDeckInset(
+                viewportSize: proxy.size
+            )
+            let deckContainerHeight = max(
+                1,
+                proxy.size.height - verticalDeckInset
+            )
+            let deckSafeAreaTop = viewportSafeAreaTop + verticalDeckInset
+
             let bottomCornerRadius = DeckStyle.bottomCornerRadius(
                 viewportWidth: proxy.size.width,
                 viewportSafeAreaTop: viewportSafeAreaTop,
@@ -117,8 +126,8 @@ struct DeckView<ID: Hashable, BackgroundContent: View, CollapsedHeaderContent: V
                         index: index,
                         activeSlotIndex: activeSlotIndex,
                         totalCards: cards.count,
-                        containerHeight: proxy.size.height,
-                        safeAreaTop: viewportSafeAreaTop
+                        containerHeight: deckContainerHeight,
+                        safeAreaTop: deckSafeAreaTop
                     )
 
                     let cardTop =
@@ -127,7 +136,7 @@ struct DeckView<ID: Hashable, BackgroundContent: View, CollapsedHeaderContent: V
                         + nudgeOffset(for: index)
 
                     let cardBottom = DeckLayout.cardBottom(
-                        containerHeight: proxy.size.height
+                        containerHeight: deckContainerHeight
                     )
 
                     let cardHeight = DeckLayout.cardHeight(
@@ -219,7 +228,11 @@ struct DeckView<ID: Hashable, BackgroundContent: View, CollapsedHeaderContent: V
                             contentProvider(card)
                                 .environment(
                                     \.deckContentBottomInset,
-                                    contentBottomInset(for: index, containerHeight: proxy.size.height)
+                                    contentBottomInset(
+                                        for: index,
+                                        containerHeight: deckContainerHeight,
+                                        safeAreaTop: deckSafeAreaTop
+                                    )
                                 )
                         }
                     )
@@ -254,7 +267,11 @@ struct DeckView<ID: Hashable, BackgroundContent: View, CollapsedHeaderContent: V
         }
     }
 
-    private func contentBottomInset(for index: Int, containerHeight: CGFloat) -> CGFloat {
+    private func contentBottomInset(
+        for index: Int,
+        containerHeight: CGFloat,
+        safeAreaTop: CGFloat
+    ) -> CGFloat {
         guard index == activeSlotIndex else { return 0 }
 
         let nextIndex = activeSlotIndex + 1
@@ -265,7 +282,7 @@ struct DeckView<ID: Hashable, BackgroundContent: View, CollapsedHeaderContent: V
             activeSlotIndex: activeSlotIndex,
             totalCards: cards.count,
             containerHeight: containerHeight,
-            safeAreaTop: viewportSafeAreaTop
+            safeAreaTop: safeAreaTop
         )
 
         return max(

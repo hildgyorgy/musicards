@@ -30,6 +30,19 @@ protocol MusicBrainzSearchServing {
     func loadRelease(id: String) async throws -> MBRelease
 }
 
+struct WikipediaSummary: Equatable, Sendable {
+    let title: String
+    let extract: String
+    let languageCode: String
+    let pageURL: URL
+}
+
+private struct WikipediaPageReference {
+    let title: String
+    let languageCode: String
+    let pageURL: URL
+}
+
 enum MusicBrainzErrorCategory: Equatable {
     case cancelled
     case connectivity
@@ -422,16 +435,25 @@ struct MusicBrainzService {
         return (result.releaseGroups, hasMore)
     }
 
-    func fetchWikipediaSummary(from wikidataURL: URL) async throws -> (title: String, extract: String)? {
+    func fetchWikipediaSummary(
+        from wikidataURL: URL
+    ) async throws -> WikipediaSummary? {
         guard let qid = wikidataID(from: wikidataURL) else { return nil }
 
-        let wikidataAPI = URL(string: "https://www.wikidata.org/wiki/Special:EntityData/\(qid).json")!
+        let wikidataAPI = URL(
+            string: "https://www.wikidata.org/wiki/Special:EntityData/\(qid).json"
+        )!
         let wikidataData = try await data(from: wikidataAPI)
 
         let json: [String: Any]
         do {
-            guard let object = try JSONSerialization.jsonObject(with: wikidataData) as? [String: Any]
-            else { throw MusicBrainzServiceError.dataFailure(URLError(.cannotParseResponse)) }
+            guard let object = try JSONSerialization.jsonObject(
+                with: wikidataData
+            ) as? [String: Any] else {
+                throw MusicBrainzServiceError.dataFailure(
+                    URLError(.cannotParseResponse)
+                )
+            }
             json = object
         } catch is CancellationError {
             throw CancellationError()
@@ -441,25 +463,59 @@ struct MusicBrainzService {
             throw MusicBrainzServiceError.dataFailure(error)
         }
 
-        guard
-            let entities = json["entities"] as? [String: Any],
-            let entity = entities[qid] as? [String: Any],
-            let sitelinks = entity["sitelinks"] as? [String: Any],
-            let enwiki = sitelinks["enwiki"] as? [String: Any],
-            let title = enwiki["title"] as? String
-        else {
+        guard let entities = json["entities"] as? [String: Any],
+              let entity = entities[qid] as? [String: Any],
+              let sitelinks = entity["sitelinks"] as? [String: Any] else {
             return nil
         }
 
-        guard let summaryURL = Self.wikipediaSummaryURL(for: title) else {
-            throw MusicBrainzServiceError.invalidRequest(URLError(.badURL))
+        let pages = sitelinks.values.compactMap { value
+            -> WikipediaPageReference? in
+            guard let sitelink = value as? [String: Any],
+                  let title = sitelink["title"] as? String,
+                  let urlString = sitelink["url"] as? String,
+                  let pageURL = URL(string: urlString),
+                  let host = pageURL.host?.lowercased(),
+                  host.hasSuffix(".wikipedia.org") else {
+                return nil
+            }
+
+            let languageCode = String(
+                host.dropLast(".wikipedia.org".count)
+            )
+            guard !languageCode.isEmpty else { return nil }
+
+            return WikipediaPageReference(
+                title: title,
+                languageCode: languageCode,
+                pageURL: pageURL
+            )
+        }
+
+        guard let languageCode = Self.preferredWikipediaLanguage(
+            availableLanguages: Set(pages.map(\.languageCode)),
+            preferredLanguages: Locale.preferredLanguages
+        ),
+              let page = pages.first(where: {
+                  $0.languageCode == languageCode
+              }),
+              let summaryURL = Self.wikipediaSummaryURL(
+                  for: page.title,
+                  languageCode: languageCode
+              ) else {
+            return nil
         }
 
         let summaryData = try await data(from: summaryURL)
         let summaryJSON: [String: Any]
         do {
-            guard let object = try JSONSerialization.jsonObject(with: summaryData) as? [String: Any]
-            else { throw MusicBrainzServiceError.dataFailure(URLError(.cannotParseResponse)) }
+            guard let object = try JSONSerialization.jsonObject(
+                with: summaryData
+            ) as? [String: Any] else {
+                throw MusicBrainzServiceError.dataFailure(
+                    URLError(.cannotParseResponse)
+                )
+            }
             summaryJSON = object
         } catch is CancellationError {
             throw CancellationError()
@@ -468,12 +524,69 @@ struct MusicBrainzService {
         } catch {
             throw MusicBrainzServiceError.dataFailure(error)
         }
-        let extract = summaryJSON["extract"] as? String
 
-        return (title, extract ?? "")
+        return WikipediaSummary(
+            title: page.title,
+            extract: summaryJSON["extract"] as? String ?? "",
+            languageCode: languageCode,
+            pageURL: page.pageURL
+        )
     }
 
-    nonisolated static func wikipediaSummaryURL(for title: String) -> URL? {
+    nonisolated static func preferredWikipediaLanguage(
+        availableLanguages: Set<String>,
+        preferredLanguages: [String]
+    ) -> String? {
+        let available = Set(availableLanguages.map { $0.lowercased() })
+        let preferred = preferredLanguages.compactMap {
+            normalizedWikipediaLanguage($0)
+        }
+        let priority = ["en"] + preferred + ["simple"]
+
+        for language in priority where available.contains(language) {
+            return language
+        }
+        return available.sorted().first
+    }
+
+    nonisolated static func wikipediaSummaryURL(
+        for title: String,
+        languageCode: String = "en"
+    ) -> URL? {
+        wikipediaURL(
+            for: title,
+            languageCode: languageCode,
+            pathPrefix: "/api/rest_v1/page/summary/"
+        )
+    }
+
+    nonisolated static func wikipediaPageURL(
+        for title: String,
+        languageCode: String = "en"
+    ) -> URL? {
+        wikipediaURL(
+            for: title,
+            languageCode: languageCode,
+            pathPrefix: "/wiki/"
+        )
+    }
+
+    nonisolated private static func wikipediaURL(
+        for title: String,
+        languageCode: String,
+        pathPrefix: String
+    ) -> URL? {
+        let normalizedLanguage = languageCode.lowercased()
+        let allowedLanguageCharacters = CharacterSet(
+            charactersIn: "abcdefghijklmnopqrstuvwxyz0123456789-"
+        )
+        guard !normalizedLanguage.isEmpty,
+              normalizedLanguage.unicodeScalars.allSatisfy(
+                  allowedLanguageCharacters.contains
+              ) else {
+            return nil
+        }
+
         let underscored = title.replacingOccurrences(of: " ", with: "_")
         var allowed = CharacterSet.urlPathAllowed
         allowed.remove(charactersIn: "/?#%")
@@ -482,9 +595,23 @@ struct MusicBrainzService {
         ) else {
             return nil
         }
+
         return URL(
-            string: "https://en.wikipedia.org/api/rest_v1/page/summary/\(encodedTitle)"
+            string: "https://\(normalizedLanguage).wikipedia.org"
+                + "\(pathPrefix)\(encodedTitle)"
         )
+    }
+
+    nonisolated private static func normalizedWikipediaLanguage(
+        _ identifier: String
+    ) -> String? {
+        let normalized = identifier
+            .replacingOccurrences(of: "_", with: "-")
+            .lowercased()
+        if normalized == "simple" {
+            return normalized
+        }
+        return normalized.split(separator: "-").first.map(String.init)
     }
 
     // Now returns (releases, hasMore) and uses a sensible page size

@@ -43,7 +43,9 @@ nonisolated enum LibFLACRemoteAudioDecoder {
             decodeBuffer: decodeBuffer,
             decodeChunkFrames: decodeChunkFrames,
             didAccessSecurityScope: false,
-            sourceURL: nil
+            sourceURL: nil,
+            sourceCodec: "FLAC",
+            sourceBitDepth: backend.bitsPerSample
         )
 
         do {

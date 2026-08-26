@@ -123,7 +123,9 @@ nonisolated enum RemoteAudioFileDecoder {
                 decodeBuffer: decodeBuffer,
                 decodeChunkFrames: decodeChunkFrames,
                 didAccessSecurityScope: false,
-                sourceURL: nil
+                sourceURL: nil,
+                sourceCodec: formatName(sourceFormat.mFormatID),
+                sourceBitDepth: sourceBitDepth(sourceFormat)
             )
             ownershipTransferredToDecodedPCM = true
             let startupFrames = UInt64(
@@ -234,12 +236,15 @@ nonisolated enum RemoteAudioFileDecoder {
         }
     }
 
-    #if DEBUG
     private static func formatName(_ formatID: AudioFormatID) -> String {
         switch formatID {
         case kAudioFormatFLAC: "FLAC"
         case kAudioFormatAppleLossless: "ALAC"
-        case kAudioFormatMPEG4AAC: "AAC"
+        case kAudioFormatMPEG4AAC,
+             kAudioFormatMPEG4AAC_HE,
+             kAudioFormatMPEG4AAC_HE_V2,
+             kAudioFormatMPEG4AAC_LD,
+             kAudioFormatMPEG4AAC_ELD: "AAC"
         case kAudioFormatMPEGLayer3: "MP3"
         default: "OTHER"
         }
@@ -263,6 +268,7 @@ nonisolated enum RemoteAudioFileDecoder {
         }
     }
 
+    #if DEBUG
     private static func elapsedSeconds(since start: UInt64) -> Double {
         Double(DispatchTime.now().uptimeNanoseconds - start)
             / 1_000_000_000

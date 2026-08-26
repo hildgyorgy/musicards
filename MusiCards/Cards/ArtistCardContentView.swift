@@ -12,7 +12,7 @@ struct ArtistCardContentView: View {
     let artist: MBArtistDetail?
     let artistName: String
     let releaseGroups: [MBReleaseGroupSummary]
-    let wikipedia: (title: String, extract: String)?
+    let wikipedia: WikipediaSummary?
     let discographyError: Error?
     let onSelectReleaseGroup: (MBReleaseGroupSummary) -> Void
     let onRetryDiscography: () -> Void
@@ -198,7 +198,7 @@ struct ArtistCardContentView: View {
                     .font(.callout)
                     .foregroundStyle(.primary)
 
-                Button("Read more →") {
+                Button(readMoreTitle(for: wikipedia)) {
                     openWikipedia(wikipedia)
                 }
                 .font(.callout)
@@ -210,10 +210,9 @@ struct ArtistCardContentView: View {
         }
     }
 
-    private func openWikipedia(_ wikipedia: (title: String, extract: String)) {
-        guard let canonicalURL = wikipediaURL(for: wikipedia.title) else { return }
+    private func openWikipedia(_ wikipedia: WikipediaSummary) {
         let url = WikipediaURLPresentation.url(
-            canonicalURL,
+            wikipedia.pageURL,
             isDark: colorScheme == .dark
         )
         #if os(macOS)
@@ -242,12 +241,13 @@ struct ArtistCardContentView: View {
         return base + "..."
     }
 
-    private func wikipediaURL(for title: String) -> URL? {
-        let underscored = title.replacingOccurrences(of: " ", with: "_")
-        let encoded = underscored.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)
-        return encoded.flatMap {
-            URL(string: "https://en.wikipedia.org/wiki/\($0)")
+    private func readMoreTitle(for wikipedia: WikipediaSummary) -> String {
+        guard wikipedia.languageCode != "en" else {
+            return "Read more →"
         }
+        return "Read more on Wikipedia · "
+            + wikipedia.languageCode.uppercased()
+            + " →"
     }
 
     private func typeSectionHeader(_ title: String) -> some View {

@@ -15,6 +15,31 @@ enum DeckStyle {
 
     static let maximumPadCardWidth: CGFloat = 600
     static let minimumPadHorizontalMargin: CGFloat = 8
+    static let padVerticalInset: CGFloat = 32
+    private static let fullScreenSizeTolerance: CGFloat = 2
+
+    @MainActor
+    static func verticalDeckInset(viewportSize: CGSize) -> CGFloat {
+        guard UIDevice.current.userInterfaceIdiom == .pad else {
+            return 0
+        }
+
+        let isFullScreen = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .contains { scene in
+                let sceneSize = scene.effectiveGeometry
+                    .coordinateSpace.bounds.size
+                return sizesMatch(viewportSize, sceneSize)
+                    && sizesMatch(sceneSize, scene.screen.bounds.size)
+            }
+
+        return isFullScreen ? padVerticalInset : 0
+    }
+
+    private static func sizesMatch(_ lhs: CGSize, _ rhs: CGSize) -> Bool {
+        abs(lhs.width - rhs.width) <= fullScreenSizeTolerance
+            && abs(lhs.height - rhs.height) <= fullScreenSizeTolerance
+    }
 
     static let expandedTopInset: CGFloat = 0
     static let cardBottomInset: CGFloat = 8
@@ -55,8 +80,7 @@ enum DeckStyle {
     static let strokeWidth: CGFloat = 1
 
     // Dark-mode glass edge: a restrained outline with a brighter top rim.
-    static let glassEdgeHighlight = Color.white.opacity(0.42)
-    static let glassEdgeBlue = Color(red: 0.05, green: 0.48, blue: 1.0)
+    static let glassEdgeBlue: Color = .blue
     static let activeGlassEdgeStrength: Double = 0.55
     static let activeTopEdgeStrength: Double = 0.92
     static let activeGlassGlowStrength: Double = 0.38

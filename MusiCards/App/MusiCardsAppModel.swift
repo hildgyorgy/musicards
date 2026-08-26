@@ -42,7 +42,7 @@ final class MusiCardsAppModel: ObservableObject {
     @Published var isLoadingArtistWikipedia: Bool = false
     @Published var artistReleaseGroups: [MBReleaseGroupSummary] = []
     @Published var discographyError: Error?
-    @Published var artistWikipedia: (title: String, extract: String)?
+    @Published var artistWikipedia: WikipediaSummary?
     @Published var releaseError: Error?
     @Published var artistError: Error?
     @Published var recentArtists: [SearchArtistRow] = []
@@ -87,7 +87,7 @@ final class MusiCardsAppModel: ObservableObject {
         @Sendable (String, Int, Int) async throws
         -> (groups: [MBReleaseGroupSummary], hasMore: Bool)
     private let artistWikipediaLoader:
-        @Sendable (URL) async throws -> (title: String, extract: String)?
+        @Sendable (URL) async throws -> WikipediaSummary?
     private let recentContentCache: RecentContentCache
 
     private let recentArtistsKey = "recentArtists"
@@ -120,8 +120,7 @@ final class MusiCardsAppModel: ObservableObject {
             (@Sendable (String, Int, Int) async throws
             -> (groups: [MBReleaseGroupSummary], hasMore: Bool))? = nil,
         artistWikipediaLoader:
-            (@Sendable (URL) async throws
-            -> (title: String, extract: String)?)? = nil,
+            (@Sendable (URL) async throws -> WikipediaSummary?)? = nil,
         recentContentCache: RecentContentCache = .shared
     ) {
         let service = musicBrainzService
@@ -201,6 +200,9 @@ final class MusiCardsAppModel: ObservableObject {
         LibrarySourcePreference.save(restoredLibrarySource)
 
         loadRecents()
+        Task { [weak self] in
+            await self?.refreshRecentReleaseMetadataFromCache()
+        }
 #if os(iOS)
         startNowPlayingUpdates()
         #endif
@@ -384,6 +386,7 @@ final class MusiCardsAppModel: ObservableObject {
             selectedReleaseCover = cached.coverData.flatMap(PlatformImage.init(data:))
             isLoadingRelease = false
             releaseError = nil
+            updateRecentReleaseMetadata(from: cached.release)
             activateReleaseCardIfNeeded()
         }
 
@@ -403,6 +406,7 @@ final class MusiCardsAppModel: ObservableObject {
             selectedReleaseCover = cover
             isLoadingRelease = false
             releaseError = nil
+            updateRecentReleaseMetadata(from: release)
 
             activateReleaseCardIfNeeded()
 
@@ -562,7 +566,19 @@ final class MusiCardsAppModel: ObservableObject {
             currentArtistIDForGroups = id
             if let title = cached.wikipediaTitle,
                let extract = cached.wikipediaExtract {
-                artistWikipedia = (title, extract)
+                let languageCode = cached.wikipediaLanguageCode ?? "en"
+                if let pageURL = cached.wikipediaPageURL
+                    ?? MusicBrainzService.wikipediaPageURL(
+                        for: title,
+                        languageCode: languageCode
+                    ) {
+                    artistWikipedia = WikipediaSummary(
+                        title: title,
+                        extract: extract,
+                        languageCode: languageCode,
+                        pageURL: pageURL
+                    )
+                }
             }
             discographyError = nil
             artistError = nil
@@ -653,7 +669,9 @@ final class MusiCardsAppModel: ObservableObject {
                 releaseGroups: artistReleaseGroups,
                 hasMoreReleaseGroups: hasMoreReleaseGroups,
                 wikipediaTitle: artistWikipedia?.title,
-                wikipediaExtract: artistWikipedia?.extract
+                wikipediaExtract: artistWikipedia?.extract,
+                wikipediaLanguageCode: artistWikipedia?.languageCode,
+                wikipediaPageURL: artistWikipedia?.pageURL
             ),
             for: id
         )
@@ -763,6 +781,26 @@ final class MusiCardsAppModel: ObservableObject {
         if let releaseData = try? JSONEncoder().encode(recentReleases) {
             defaults.set(releaseData, forKey: recentReleasesKey)
         }
+    }
+
+    private func refreshRecentReleaseMetadataFromCache() async {
+        for id in recentReleases.map(\.id) {
+            guard let cached = await recentContentCache.release(for: id) else {
+                continue
+            }
+            updateRecentReleaseMetadata(from: cached.release)
+        }
+    }
+
+    private func updateRecentReleaseMetadata(from release: MBRelease) {
+        guard let index = recentReleases.firstIndex(where: {
+            $0.id == release.id
+        }) else {
+            return
+        }
+
+        recentReleases[index] = recentReleases[index].enriched(with: release)
+        saveRecents()
     }
 
     private func pruneRecentContentCache() {

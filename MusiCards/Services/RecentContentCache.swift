@@ -20,6 +20,32 @@ struct RecentArtistSnapshot: Codable, @unchecked Sendable {
     let hasMoreReleaseGroups: Bool
     let wikipediaTitle: String?
     let wikipediaExtract: String?
+    let wikipediaLanguageCode: String?
+    let wikipediaPageURL: URL?
+
+    init(
+        savedAt: Date,
+        artist: MBArtistDetail?,
+        name: String,
+        lifeSpan: String?,
+        releaseGroups: [MBReleaseGroupSummary],
+        hasMoreReleaseGroups: Bool,
+        wikipediaTitle: String?,
+        wikipediaExtract: String?,
+        wikipediaLanguageCode: String? = nil,
+        wikipediaPageURL: URL? = nil
+    ) {
+        self.savedAt = savedAt
+        self.artist = artist
+        self.name = name
+        self.lifeSpan = lifeSpan
+        self.releaseGroups = releaseGroups
+        self.hasMoreReleaseGroups = hasMoreReleaseGroups
+        self.wikipediaTitle = wikipediaTitle
+        self.wikipediaExtract = wikipediaExtract
+        self.wikipediaLanguageCode = wikipediaLanguageCode
+        self.wikipediaPageURL = wikipediaPageURL
+    }
 }
 
 actor RecentContentCache {

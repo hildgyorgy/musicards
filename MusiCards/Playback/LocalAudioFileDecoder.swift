@@ -171,6 +171,8 @@ nonisolated final class DecodedPCM: @unchecked Sendable {
     let frameCount: UInt64
     let isRemote: Bool
     let seekCapabilityOverride: PlaybackSeekCapability?
+    let sourceCodec: String?
+    let sourceBitDepth: Int?
 
     private let decoder: any PCMDecoderBackend
     private let feederQueue = DispatchQueue(
@@ -198,7 +200,9 @@ nonisolated final class DecodedPCM: @unchecked Sendable {
         decodeBuffer: UnsafeMutablePointer<Float>,
         decodeChunkFrames: UInt32,
         didAccessSecurityScope: Bool,
-        sourceURL: URL?
+        sourceURL: URL?,
+        sourceCodec: String? = nil,
+        sourceBitDepth: Int? = nil
     ) {
         self.renderer = renderer
         self.sampleRate = sampleRate
@@ -206,6 +210,8 @@ nonisolated final class DecodedPCM: @unchecked Sendable {
         self.frameCount = frameCount
         self.isRemote = decoder.isRemote
         self.seekCapabilityOverride = decoder.seekCapabilityOverride
+        self.sourceCodec = sourceCodec
+        self.sourceBitDepth = sourceBitDepth
         self.decoder = decoder
         self.decodeBuffer = decodeBuffer
         self.decodeChunkFrames = decodeChunkFrames

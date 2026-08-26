@@ -24,7 +24,11 @@ final class RecentContentCacheTests: XCTestCase {
                 releaseGroups: [Self.group(id: "group-a")],
                 hasMoreReleaseGroups: true,
                 wikipediaTitle: "Cached artist",
-                wikipediaExtract: "Cached summary"
+                wikipediaExtract: "Cached summary",
+                wikipediaLanguageCode: "de",
+                wikipediaPageURL: URL(
+                    string: "https://de.wikipedia.org/wiki/Cached_artist"
+                )
             ),
             for: "artist-a"
         )
@@ -38,6 +42,11 @@ final class RecentContentCacheTests: XCTestCase {
         XCTAssertEqual(artist?.artist?.name, "Cached artist")
         XCTAssertEqual(artist?.releaseGroups.map(\.id), ["group-a"])
         XCTAssertEqual(artist?.wikipediaExtract, "Cached summary")
+        XCTAssertEqual(artist?.wikipediaLanguageCode, "de")
+        XCTAssertEqual(
+            artist?.wikipediaPageURL?.absoluteString,
+            "https://de.wikipedia.org/wiki/Cached_artist"
+        )
 
         await reloaded.retain(artistIDs: [], releaseIDs: [])
         let removedRelease = await reloaded.release(for: "release-a")
@@ -76,6 +85,39 @@ final class RecentContentCacheTests: XCTestCase {
                 && !model.isLoadingRelease
         }
         XCTAssertNil(model.releaseError)
+
+        model.selectRelease(Self.releaseRow(id: "cancel-refresh"))
+    }
+
+    @MainActor
+    func testLoadedReleaseReplacesPlaybackFormatInRecentMetadata() async {
+        let model = MusiCardsAppModel(
+            playbackEngine: PendingPlaybackEngine(),
+            releaseDetailLoader: { id in
+                Self.releaseWithMetadata(id: id, title: "Point of View")
+            },
+            releaseCoverLoader: { _ in nil },
+            recentContentCache: RecentContentCache(
+                fileURL: temporaryCacheURL()
+            )
+        )
+        let row = SearchReleaseRow(
+            id: "release-with-metadata",
+            title: "Point of View",
+            artistLine: "[re:jazz]",
+            metaLine: "M4A",
+            disambiguation: "",
+            hasCoverArt: true
+        )
+
+        model.selectRelease(row)
+        model.addRecentRelease(row)
+
+        await eventually {
+            model.recentReleases.first?.metaLine
+                == "2004 • DE • INFRACom! • CD"
+        }
+        XCTAssertEqual(model.recentReleases.first?.artistLine, "[re:jazz]")
 
         model.selectRelease(Self.releaseRow(id: "cancel-refresh"))
     }
@@ -144,6 +186,44 @@ final class RecentContentCacheTests: XCTestCase {
             disambiguation: nil,
             labelInfo: nil,
             media: nil,
+            releaseGroup: nil,
+            relations: nil,
+            annotation: nil
+        )
+    }
+
+    private nonisolated static func releaseWithMetadata(
+        id: String,
+        title: String
+    ) -> MBRelease {
+        MBRelease(
+            id: id,
+            title: title,
+            artistCredit: [
+                MBArtistCredit(
+                    name: "[re:jazz]",
+                    artist: nil,
+                    joinPhrase: nil
+                )
+            ],
+            date: "2004-01-01",
+            country: "DE",
+            barcode: nil,
+            disambiguation: nil,
+            labelInfo: [
+                MBLabelInfo(
+                    catalogNumber: nil,
+                    label: MBLabel(name: "INFRACom!")
+                )
+            ],
+            media: [
+                MBMedium(
+                    position: 1,
+                    trackCount: nil,
+                    format: "CD",
+                    tracks: nil
+                )
+            ],
             releaseGroup: nil,
             relations: nil,
             annotation: nil

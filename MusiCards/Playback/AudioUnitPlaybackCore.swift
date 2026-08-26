@@ -116,7 +116,8 @@ final class AudioUnitPlaybackCore {
 
     func completePreparation(
         decodedPCM: DecodedPCM,
-        seekCapability: PlaybackSeekCapability
+        seekCapability: PlaybackSeekCapability,
+        audioFormatHint: PlaybackAudioFormat?
     ) {
         self.decodedPCM = decodedPCM
         currentSeekCapability = decodedPCM.seekCapabilityOverride
@@ -129,7 +130,20 @@ final class AudioUnitPlaybackCore {
             )
         }
         #endif
-        eventHandler?(.prepared(duration: duration(of: decodedPCM)))
+        let audioFormat = decodedPCM.sourceCodec.map { codec in
+            PlaybackAudioFormat(
+                codec: codec,
+                bitDepth: decodedPCM.sourceBitDepth
+                    ?? audioFormatHint?.bitDepth,
+                sampleRate: decodedPCM.sampleRate,
+                bitrate: audioFormatHint?.bitrate,
+                channelCount: Int(decodedPCM.channelCount)
+            )
+        } ?? audioFormatHint
+        eventHandler?(.prepared(
+            duration: duration(of: decodedPCM),
+            audioFormat: audioFormat
+        ))
     }
 
     func pause() {

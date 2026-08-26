@@ -217,8 +217,28 @@ struct PlayerCardContentView: View {
             }
         let route = routeComponents
             .joined(separator: " → ")
-        let format = audioFormatText(item.track.audioFormat)
+        let format = audioFormatText(displayedAudioFormat(for: item))
         return format.isEmpty ? route : "\(route)\n\(format)"
+    }
+
+    private func displayedAudioFormat(
+        for item: PlaybackQueueItem
+    ) -> PlaybackAudioFormat? {
+        if isNavidromeSource(item.source) {
+            return controller.preparedAudioFormat
+        }
+        return controller.preparedAudioFormat ?? item.track.audioFormat
+    }
+
+    private func isNavidromeSource(_ source: PlaybackSource) -> Bool {
+        switch source {
+        case .remoteAudio(let asset):
+            return asset.source == .navidrome
+        case .libraryAsset(let reference):
+            return reference.source == .navidrome
+        case .localFile:
+            return false
+        }
     }
 
     private func sourceName(_ source: PlaybackSource) -> String {

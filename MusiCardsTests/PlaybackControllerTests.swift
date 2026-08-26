@@ -408,7 +408,10 @@ private final class PlaybackEngineSpy: PlaybackEngine {
         preparedIDs.append(item.id)
         preparedSources.append(item.source)
         canSeek = item.source.seekCapability.isSupported
-        eventHandler?(.prepared(duration: item.track.duration))
+        eventHandler?(.prepared(
+            duration: item.track.duration,
+            audioFormat: item.track.audioFormat
+        ))
     }
 
     func play() async throws {

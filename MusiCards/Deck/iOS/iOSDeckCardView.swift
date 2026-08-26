@@ -99,16 +99,8 @@ struct DeckCardView<ID: Hashable, CollapsedHeaderContent: View, HeaderContent: V
                 ZStack {
                     cardShape
                         .stroke(
-                            LinearGradient(
-                                colors: [
-                                    DeckStyle.glassEdgeHighlight,
-                                    DeckStyle.glassEdgeBlue.opacity(
-                                        DeckStyle.activeGlassEdgeStrength
-                                    ),
-                                    DeckStyle.glassEdgeBlue.opacity(0.24)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
+                            DeckStyle.glassEdgeBlue.opacity(
+                                DeckStyle.activeGlassEdgeStrength
                             ),
                             lineWidth: DeckStyle.neonCoreWidth
                         )

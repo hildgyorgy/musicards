@@ -55,4 +55,52 @@ final class MusicBrainzSearchQueryTests: XCTestCase {
             "https://en.wikipedia.org/api/rest_v1/page/summary/Who%3F_%231"
         )
     }
+
+    func testWikipediaLanguagePreferenceUsesEnglishThenDeviceThenSimple() {
+        XCTAssertEqual(
+            MusicBrainzService.preferredWikipediaLanguage(
+                availableLanguages: ["de", "en", "hu"],
+                preferredLanguages: ["hu-HU"]
+            ),
+            "en"
+        )
+        XCTAssertEqual(
+            MusicBrainzService.preferredWikipediaLanguage(
+                availableLanguages: ["de", "hu"],
+                preferredLanguages: ["hu-HU"]
+            ),
+            "hu"
+        )
+        XCTAssertEqual(
+            MusicBrainzService.preferredWikipediaLanguage(
+                availableLanguages: ["de", "simple"],
+                preferredLanguages: ["hu-HU"]
+            ),
+            "simple"
+        )
+        XCTAssertEqual(
+            MusicBrainzService.preferredWikipediaLanguage(
+                availableLanguages: ["fr", "de"],
+                preferredLanguages: ["hu-HU"]
+            ),
+            "de"
+        )
+    }
+
+    func testWikipediaURLsUseSelectedLanguage() {
+        XCTAssertEqual(
+            MusicBrainzService.wikipediaSummaryURL(
+                for: "[re:jazz]",
+                languageCode: "de"
+            )?.absoluteString,
+            "https://de.wikipedia.org/api/rest_v1/page/summary/%5Bre:jazz%5D"
+        )
+        XCTAssertEqual(
+            MusicBrainzService.wikipediaPageURL(
+                for: "[re:jazz]",
+                languageCode: "de"
+            )?.absoluteString,
+            "https://de.wikipedia.org/wiki/%5Bre:jazz%5D"
+        )
+    }
 }

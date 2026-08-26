@@ -329,7 +329,10 @@ enum AudioOutputRouteInspector {
 }
 
 enum PlaybackEngineEvent: Equatable {
-    case prepared(duration: TimeInterval?)
+    case prepared(
+        duration: TimeInterval?,
+        audioFormat: PlaybackAudioFormat?
+    )
     case started
     case paused
     case positionChanged(TimeInterval)

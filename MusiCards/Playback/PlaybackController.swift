@@ -20,6 +20,7 @@ final class PlaybackController: ObservableObject {
     @Published private(set) var status: PlaybackStatus = .idle
     @Published private(set) var position: TimeInterval = 0
     @Published private(set) var preparedDuration: TimeInterval?
+    @Published private(set) var preparedAudioFormat: PlaybackAudioFormat?
 
     private let engine: PlaybackEngine
     private let assetResolver: (any PlaybackAssetResolving)?
@@ -77,6 +78,7 @@ final class PlaybackController: ObservableObject {
         preparedItemID = nil
         position = 0
         preparedDuration = nil
+        preparedAudioFormat = nil
         return true
     }
 
@@ -106,6 +108,7 @@ final class PlaybackController: ObservableObject {
         preparedItemID = nil
         position = 0
         preparedDuration = nil
+        preparedAudioFormat = nil
 
         guard !items.isEmpty else {
             currentIndex = nil
@@ -133,6 +136,7 @@ final class PlaybackController: ObservableObject {
                 status = .loading
                 position = 0
                 preparedDuration = currentItem.track.duration
+                preparedAudioFormat = nil
                 let resolvedItem = try await resolvedItem(currentItem)
                 guard isCurrent(generation: generation, itemID: itemID),
                       !Task.isCancelled else {
@@ -183,6 +187,7 @@ final class PlaybackController: ObservableObject {
         _ = advancePlaybackGeneration()
         preparedItemID = nil
         position = 0
+        preparedAudioFormat = nil
         status = queue.isEmpty ? .idle : .stopped
         await engine.stop()
         engine.restoreOutputConfiguration()
@@ -211,6 +216,7 @@ final class PlaybackController: ObservableObject {
             self.position = position
         } catch {
             preparedItemID = nil
+            preparedAudioFormat = nil
             fail(with: error)
         }
     }
@@ -225,6 +231,7 @@ final class PlaybackController: ObservableObject {
         preparedItemID = nil
         position = 0
         preparedDuration = queue[index].track.duration
+        preparedAudioFormat = nil
         status = .idle
 
         if autoplay {
@@ -246,8 +253,9 @@ final class PlaybackController: ObservableObject {
 
     private func handle(_ event: PlaybackEngineEvent) {
         switch event {
-        case .prepared(let duration):
+        case .prepared(let duration, let audioFormat):
             preparedDuration = duration ?? currentItem?.track.duration
+            preparedAudioFormat = audioFormat
         case .started:
             status = .playing
         case .paused:
@@ -264,6 +272,7 @@ final class PlaybackController: ObservableObject {
             }
         case .failed(let failure):
             preparedItemID = nil
+            preparedAudioFormat = nil
             status = .failed(failure)
         }
     }

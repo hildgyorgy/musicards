@@ -29,7 +29,8 @@ final class MacSystemPlaybackEngine: PlaybackEngine {
         try configureOutputUnit(for: decodedPCM)
         core.completePreparation(
             decodedPCM: decodedPCM,
-            seekCapability: item.source.seekCapability
+            seekCapability: item.source.seekCapability,
+            audioFormatHint: item.track.audioFormat
         )
     }
 

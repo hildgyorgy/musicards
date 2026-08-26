@@ -50,9 +50,13 @@ struct DeckBackgroundView: View {
     }
 
     var body: some View {
-        GeometryReader { _ in
+        GeometryReader { proxy in
             #if os(iOS)
-            iosHome
+            iosHome(
+                verticalDeckInset: DeckStyle.verticalDeckInset(
+                    viewportSize: proxy.size
+                )
+            )
             #else
             macHome
             #endif
@@ -149,7 +153,7 @@ struct DeckBackgroundView: View {
     }
 
     #if os(iOS)
-    private var iosHome: some View {
+    private func iosHome(verticalDeckInset: CGFloat) -> some View {
         VStack(spacing: 0) {
             VStack(spacing: 16) {
                 Text("MusiCards")
@@ -219,7 +223,10 @@ struct DeckBackgroundView: View {
             Spacer(minLength: 24)
 
             homePrompt("TO EXPLORE:")
-                .padding(.bottom, explorePromptBottomInset)
+                .padding(
+                    .bottom,
+                    explorePromptBottomInset + verticalDeckInset
+                )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .sheet(isPresented: $isShowingAbout) {

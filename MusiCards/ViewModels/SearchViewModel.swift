@@ -896,7 +896,9 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
                 year: MBTextFormatter.year(from: release.date),
                 country: release.country,
                 label: release.label,
-                format: release.format
+                // A library's codec or filename suffix is playback metadata,
+                // not a MusicBrainz release medium such as CD or Digital Media.
+                format: nil
             ),
             disambiguation: "",
             // The exact library Release MBID is a playable result. Let the
