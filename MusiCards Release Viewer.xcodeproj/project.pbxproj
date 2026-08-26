@@ -693,7 +693,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = MusiCards/MusiCardsMac/MusiCardsMac.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 8;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 963B9MS98N;
 				ENABLE_APP_SANDBOX = YES;
@@ -747,7 +747,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = MusiCards/MusiCardsMac/MusiCardsMac.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 8;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 963B9MS98N;
 				ENABLE_APP_SANDBOX = YES;
