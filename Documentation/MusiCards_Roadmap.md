@@ -145,3 +145,5 @@ A sorrend nem véletlenszerű – tényleges függőségekre és kockázat-elszi
 4. **Gapless** – ez a legköltségesebb és legkockázatosabb belenyúlás a motor belsejébe, ezért utoljára. Két dolog is megkönnyíti, ha addigra megvan: a bitperfekt munkából örökölt ráta-váltási logika (2. pont), és a UPnP motor, aminél a gapless jó eséllyel szinte ingyen adódik a `SetNextAVTransportURI`-ból (3. pont). Ha ezt csinálnánk először, kétszer nyúlnánk hozzá ugyanazokhoz a fájlokhoz, feleslegesen.
 
 Mind a négy önállóan is értékes munkacsomag – nem kell egyben megcsinálni, és a sorrend pont azt szolgálja, hogy egyik se dolgozzon a másik ellen menet közben.
+## macOS alatt esetleg egy “miniplayer” nézet
+
