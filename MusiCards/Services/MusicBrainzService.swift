@@ -58,7 +58,7 @@ enum MusicBrainzErrorCategory: Equatable {
 enum MusicBrainzServiceError: Error {
     case connectivity(URLError)
     case timeout(URLError)
-    case rateLimited(statusCode: Int)
+    case rateLimited(statusCode: Int, retryAfter: TimeInterval?)
     case serverUnavailable(statusCode: Int)
     case httpFailure(statusCode: Int)
     case dataFailure(Error)
@@ -78,9 +78,16 @@ enum MusicBrainzServiceError: Error {
         }
     }
 
-    static func fromHTTPStatus(_ statusCode: Int) -> MusicBrainzServiceError {
+    static func fromHTTPStatus(
+        _ statusCode: Int,
+        retryAfter: TimeInterval? = nil
+    ) -> MusicBrainzServiceError {
         switch statusCode {
-        case 429: return .rateLimited(statusCode: statusCode)
+        case 429:
+            return .rateLimited(
+                statusCode: statusCode,
+                retryAfter: retryAfter
+            )
         case 500...599: return .serverUnavailable(statusCode: statusCode)
         default: return .httpFailure(statusCode: statusCode)
         }
@@ -145,12 +152,82 @@ actor RateLimiter {
 }
 
 struct MusicBrainzService {
+    typealias RequestExecutor = @Sendable (URLRequest) async throws
+        -> (Data, URLResponse)
+    typealias RetrySleeper = @Sendable (Duration) async throws -> Void
+
     private var version: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1" }
     private var userAgent: String { "MusiCards/\(version) (hild.gyorgy@freemail.hu)" }
     private static let sharedRateLimiter = RateLimiter()
+    private static let defaultRetryDelays: [Duration] = [
+        .milliseconds(500),
+        .milliseconds(1_500),
+        .seconds(3),
+        .seconds(5),
+        .seconds(8)
+    ]
+
+    private let rateLimiter: RateLimiter
+    private let retryDelays: [Duration]
+    private let maximumTotalRetryDelay: Duration
+    private let requestExecutor: RequestExecutor
+    private let retrySleeper: RetrySleeper
+
+    init(
+        rateLimiter: RateLimiter = Self.sharedRateLimiter,
+        retryDelays: [Duration] = Self.defaultRetryDelays,
+        maximumTotalRetryDelay: Duration = .seconds(20),
+        requestExecutor: @escaping RequestExecutor = { request in
+            try await URLSession.shared.data(for: request)
+        },
+        retrySleeper: @escaping RetrySleeper = { delay in
+            try await Task.sleep(for: delay)
+        }
+    ) {
+        self.rateLimiter = rateLimiter
+        self.retryDelays = retryDelays
+        self.maximumTotalRetryDelay = maximumTotalRetryDelay
+        self.requestExecutor = requestExecutor
+        self.retrySleeper = retrySleeper
+    }
 
     private func data(from url: URL) async throws -> Data {
-        try await Self.sharedRateLimiter.waitIfNeeded()
+        var retryIndex = 0
+        var totalRetryDelay = Duration.zero
+
+        while true {
+            do {
+                return try await performRequest(from: url)
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch let error as MusicBrainzServiceError {
+                try Task.checkCancellation()
+
+                guard retryIndex < retryDelays.count,
+                      Self.isRetryable(error) else {
+                    throw error
+                }
+
+                var delay = retryDelays[retryIndex]
+                if case .rateLimited(_, let retryAfter?) = error {
+                    delay = max(delay, Self.duration(seconds: retryAfter))
+                }
+
+                guard totalRetryDelay + delay <= maximumTotalRetryDelay else {
+                    throw error
+                }
+
+                retryIndex += 1
+                totalRetryDelay += delay
+                try await retrySleeper(delay)
+            }
+        }
+    }
+
+    private func performRequest(from url: URL) async throws -> Data {
+        if Self.requiresMusicBrainzRateLimit(url) {
+            try await rateLimiter.waitIfNeeded()
+        }
         try Task.checkCancellation()
 
         var request = URLRequest(url: url)
@@ -159,7 +236,7 @@ struct MusicBrainzService {
         let data: Data
         let response: URLResponse
         do {
-            (data, response) = try await URLSession.shared.data(for: request)
+            (data, response) = try await requestExecutor(request)
         } catch is CancellationError {
             throw CancellationError()
         } catch let error as URLError {
@@ -189,10 +266,78 @@ struct MusicBrainzService {
         }
 
         guard (200...299).contains(httpResponse.statusCode) else {
-            throw MusicBrainzServiceError.fromHTTPStatus(httpResponse.statusCode)
+            throw MusicBrainzServiceError.fromHTTPStatus(
+                httpResponse.statusCode,
+                retryAfter: Self.retryAfterInterval(from: httpResponse)
+            )
         }
 
         return data
+    }
+
+    nonisolated static func requiresMusicBrainzRateLimit(_ url: URL) -> Bool {
+        guard let host = url.host?.lowercased() else { return false }
+        return host == "musicbrainz.org" || host.hasSuffix(".musicbrainz.org")
+    }
+
+    nonisolated static func isRetryable(
+        _ error: MusicBrainzServiceError
+    ) -> Bool {
+        switch error {
+        case .timeout, .rateLimited, .serverUnavailable:
+            return true
+        case .connectivity(let urlError):
+            switch urlError.code {
+            case .notConnectedToInternet, .cannotFindHost,
+                 .cannotConnectToHost, .networkConnectionLost,
+                 .dnsLookupFailed, .secureConnectionFailed:
+                return true
+            default:
+                return false
+            }
+        case .httpFailure, .dataFailure, .invalidRequest, .unexpected:
+            return false
+        }
+    }
+
+    nonisolated static func retryAfterInterval(
+        from response: HTTPURLResponse,
+        now: Date = Date()
+    ) -> TimeInterval? {
+        guard let value = response.value(forHTTPHeaderField: "Retry-After")?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+              !value.isEmpty else {
+            return nil
+        }
+
+        if let seconds = TimeInterval(value), seconds >= 0 {
+            return seconds
+        }
+
+        let formats = [
+            "EEE, dd MMM yyyy HH:mm:ss zzz",
+            "EEEE, dd-MMM-yy HH:mm:ss zzz",
+            "EEE MMM d HH:mm:ss yyyy"
+        ]
+        for format in formats {
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.timeZone = TimeZone(secondsFromGMT: 0)
+            formatter.dateFormat = format
+
+            if let date = formatter.date(from: value) {
+                return max(0, date.timeIntervalSince(now))
+            }
+        }
+
+        return nil
+    }
+
+    nonisolated private static func duration(
+        seconds: TimeInterval
+    ) -> Duration {
+        let clamped = min(max(0, seconds), Double(Int64.max) / 1_000_000_000)
+        return .nanoseconds(Int64(clamped * 1_000_000_000))
     }
 
     private func decode<T: Decodable>(

@@ -17,6 +17,10 @@ struct ArtistCardContentView: View {
     let onSelectReleaseGroup: (MBReleaseGroupSummary) -> Void
     let onRetryDiscography: () -> Void
     let isLoadingWikipedia: Bool
+    let wikipediaError: Error?
+    let isWikipediaUnavailable: Bool
+    let onRetryWikipedia: () -> Void
+    let isLoadingDiscography: Bool
     let artistError: Error?
     let onRetryArtist: () -> Void
 
@@ -65,6 +69,10 @@ struct ArtistCardContentView: View {
                             }
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 20)
+                        } else if isLoadingDiscography && releaseGroups.isEmpty {
+                            MusiCardsSpinner()
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 20)
                         } else {
                             // Discography sections
                             ForEach(groupedDiscographySections(from: releaseGroups)) { section in
@@ -120,6 +128,14 @@ struct ArtistCardContentView: View {
                                 } header: {
                                     typeSectionHeader(section.title)
                                 }
+                            }
+
+                            if releaseGroups.isEmpty {
+                                Text("n/a")
+                                    .font(.callout)
+                                    .foregroundStyle(.secondary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.vertical, 20)
                             }
                         }
 
@@ -207,6 +223,17 @@ struct ArtistCardContentView: View {
             }
             .padding(.top, 8)
             .padding(.bottom, 16)
+        } else if let wikipediaError {
+            ErrorStateView.wikipediaRetry(for: wikipediaError) {
+                onRetryWikipedia()
+            }
+            .padding(.vertical, 8)
+        } else if isWikipediaUnavailable {
+            Text("n/a")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .padding(.top, 8)
+                .padding(.bottom, 16)
         }
     }
 

@@ -2,6 +2,29 @@ import XCTest
 @testable import MusiCards
 
 final class MusicBrainzSearchQueryTests: XCTestCase {
+    func testRateLimitAppliesOnlyToMusicBrainzHosts() throws {
+        XCTAssertTrue(
+            MusicBrainzService.requiresMusicBrainzRateLimit(
+                try XCTUnwrap(URL(string: "https://musicbrainz.org/ws/2/artist"))
+            )
+        )
+        XCTAssertTrue(
+            MusicBrainzService.requiresMusicBrainzRateLimit(
+                try XCTUnwrap(URL(string: "https://beta.musicbrainz.org/ws/2/artist"))
+            )
+        )
+        XCTAssertFalse(
+            MusicBrainzService.requiresMusicBrainzRateLimit(
+                try XCTUnwrap(URL(string: "https://www.wikidata.org/wiki/Q1"))
+            )
+        )
+        XCTAssertFalse(
+            MusicBrainzService.requiresMusicBrainzRateLimit(
+                try XCTUnwrap(URL(string: "https://de.wikipedia.org/api/rest_v1/page/summary/Test"))
+            )
+        )
+    }
+
     func testCommaSearchKeepsArtistAndReleaseFields() {
         XCTAssertEqual(
             MusicBrainzService.releaseSearchQuery(

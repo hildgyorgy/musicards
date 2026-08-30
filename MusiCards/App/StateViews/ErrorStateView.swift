@@ -96,6 +96,29 @@ extension ErrorStateView {
         )
     }
 
+    static func wikipediaRetry(
+        for error: Error,
+        _ action: @escaping () -> Void
+    ) -> ErrorStateView {
+        let subtitle: String
+        switch musicBrainzErrorCategory(for: error) {
+        case .connectivity:
+            subtitle = "Check your connection and try again"
+        case .timeout:
+            subtitle = "The request timed out"
+        case .rateLimited, .serverUnavailable:
+            subtitle = "The service is temporarily unavailable"
+        case .cancelled, .httpFailure, .dataFailure, .invalidRequest, .unexpected:
+            subtitle = "Please try again"
+        }
+        return ErrorStateView(
+            title: "Couldn't load Wikipedia",
+            subtitle: subtitle,
+            retryTitle: "Try again",
+            onRetry: action
+        )
+    }
+
     static func discographyRetry(
         for error: Error,
         _ action: @escaping () -> Void

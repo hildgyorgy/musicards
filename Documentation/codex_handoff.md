@@ -12,14 +12,25 @@
 - **Last updated:** 2026-08-30 (Europe/Budapest)
 - **Repository:** `musicards`
 - **Branch:** `main`
-- **HEAD:** `632f92c` — `Update MusiCards_Roadmap.md`
-- **Remote state at handoff:** `main` matched `origin/main`.
-- **Working tree at handoff:** one pre-existing untracked document:
-  `Documentation/MusiCards_Roadmap_No_3_ UPnP_Renderer_Task.md`.
-- The UPnP document belongs to the user. Do not delete, overwrite, rename, or
-  stage it without checking the current task and Git state first.
-- This handoff file is new and will also appear as untracked until the user
-  commits it.
+- **HEAD:** `e8eb109` — `codex handoff!`
+- **Remote state at session start:** `main` matched `origin/main`.
+- **Working tree:** an uncommitted MusicBrainz/Track Details and Artist-card
+  reliability fix:
+  - `MusiCards/App/ContentView.swift`
+  - `MusiCards/App/MusiCardsAppModel.swift`
+  - `MusiCards/App/StateViews/ErrorStateView.swift`
+  - `MusiCards/Cards/ArtistCardContentView.swift`
+  - `MusiCards/Cards/TrackDetailPagerView.swift`
+  - `MusiCards/Cards/TracksCardContentView.swift`
+  - `MusiCards/Services/MusicBrainzService.swift`
+  - `MusiCards/Services/TrackDetailStore.swift`
+  - `MusiCardsTests/ArtistIndependentLoadingTests.swift` (new)
+  - `MusiCardsTests/MusicBrainzRetryTests.swift` (new)
+  - `MusiCardsTests/MusicBrainzSearchQueryTests.swift`
+  - `MusiCardsTests/SearchErrorSemanticsTests.swift`
+  - `MusiCardsTests/TrackDetailStoreTests.swift` (new)
+  - this handoff document
+- No unrelated user changes were present when this work began.
 
 Always begin a new session with:
 
@@ -123,6 +134,40 @@ The following work is already implemented and should be treated as the stable
 - Privacy manifests, signing/capability review, bundled-rsync provenance, and
   third-party licence material were completed before release.
 
+### Post-2.0 working-tree change
+
+- MusicBrainz requests now silently retry at most five times after transient
+  timeout, selected connectivity, HTTP 429, and HTTP 5xx failures. Backoff is
+  0.5, 1.5, 3, 5, then 8 seconds; cancellation remains immediate,
+  `Retry-After` is respected, and total scheduled retry delay is capped at 20
+  seconds. Non-transient HTTP, request, and data failures are not retried. The
+  HTTP executor and retry sleeper are injectable so the complete retry chain is
+  covered by deterministic tests.
+- Track Details still loads recording and work/creator metadata for every genre.
+  Recording-level performer, technical, and note data is now published before
+  work enrichment, so a failed work request cannot erase already loaded data.
+  Failed work enrichment remains explicitly retryable and retries only the work
+  request. The UI shows loading and retry state instead of silently falling back
+  to `n/a` after a request failure. On the creators/work page, `n/a` appears only
+  after a successful, complete lookup establishes that the data is genuinely
+  absent; pending and failed work lookups show loading or retry UI instead.
+- The album-wide composer preload now runs only for releases using the classical
+  track-list layout. This does not affect creators/work on non-classical Track
+  Details; those continue to load on demand through `TrackDetailStore`. It
+  removes unused duplicate MusicBrainz traffic for non-classical releases.
+- Artist-card loading now has three independent progressive sections. The
+  already-known artist name/lifespan is published immediately; artist-detail →
+  Wikidata/Wikipedia starts first; and the initial discography page starts as a
+  separate task. Wikipedia can therefore appear while a slow discography is
+  still loading, and either section can fail or retry without clearing or
+  reloading the other. Wikipedia and initial discography now have explicit
+  loading, completed-empty (`n/a`), and retry states instead of silent blank
+  space. Cached Wikipedia content remains visible during refresh.
+- The shared request pipeline still retries transient failures for MusicBrainz,
+  Wikidata, and Wikipedia, but the 1.05-second MusicBrainz admission interval is
+  now applied only to `musicbrainz.org` hosts. Wikidata/Wikipedia traffic no
+  longer consumes MusicBrainz rate-limit slots.
+
 Do not casually redesign these behaviours while starting a roadmap item. The
 2.0 release is the known-good baseline.
 
@@ -204,11 +249,17 @@ Before handing off a code change, normally run in this order:
 4. MusiCards iOS build
 5. MusiCards Sync build/tests when Sync or shared indexing code changed
 
-At this handoff no new build or test run was required because only this Markdown
-document was added. A sandboxed `xcodebuild -list` probe could not access normal
-Xcode/SwiftPM caches and CoreSimulator services; this is an execution-environment
-restriction, not evidence of a project failure. The shipped 2.0 build 8 had
-already passed the release checks and Apple review.
+Most recent verification for the uncommitted MusicBrainz/Track Details and
+Artist-card fix on 2026-08-30:
+
+- all MusiCards macOS tests passed;
+- the focused retry/error-semantics/Track Details run passed 18 tests, including
+  8 new end-to-end retry policy tests and 3 Track Details state tests;
+- the focused Artist/cache/rate-limit regression run passed, including 3 new
+  independent Artist-section state tests;
+- MusiCards macOS compiled and linked as part of the full test run;
+- MusiCards generic iOS device build passed with code signing disabled;
+- `git diff --check` passed before the final handoff update.
 
 ## 7. Roadmap and next likely work
 
@@ -324,4 +375,3 @@ Before switching computers:
 4. push the intended branch;
 5. on the other computer, pull/fetch first and ask Codex to read this document
    plus the current Git state before making changes.
-

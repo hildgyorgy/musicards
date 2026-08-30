@@ -40,9 +40,12 @@ final class MusiCardsAppModel: ObservableObject {
     @Published var selectedArtistLifeSpan: String?
     @Published var isLoadingArtistHeader: Bool = false
     @Published var isLoadingArtistWikipedia: Bool = false
+    @Published var isLoadingArtistDiscography: Bool = false
     @Published var artistReleaseGroups: [MBReleaseGroupSummary] = []
     @Published var discographyError: Error?
     @Published var artistWikipedia: WikipediaSummary?
+    @Published var artistWikipediaError: Error?
+    @Published var isArtistWikipediaUnavailable: Bool = false
     @Published var releaseError: Error?
     @Published var artistError: Error?
     @Published var recentArtists: [SearchArtistRow] = []
@@ -108,6 +111,8 @@ final class MusiCardsAppModel: ObservableObject {
     private var releaseLoadTask: Task<Void, Never>?
     private var artistSelectionGeneration: UInt64 = 0
     private var artistLoadTask: Task<Void, Never>?
+    private var artistWikipediaTask: Task<Void, Never>?
+    private var artistDiscographyTask: Task<Void, Never>?
     private var artistPaginationTask: Task<Void, Never>?
 
     init(
@@ -471,6 +476,8 @@ final class MusiCardsAppModel: ObservableObject {
 
     private func selectArtist(id: String, name: String?, lifeSpan: String?) {
         artistLoadTask?.cancel()
+        artistWikipediaTask?.cancel()
+        artistDiscographyTask?.cancel()
         artistPaginationTask?.cancel()
         artistSelectionGeneration &+= 1
         let generation = artistSelectionGeneration
@@ -488,10 +495,13 @@ final class MusiCardsAppModel: ObservableObject {
         artistReleaseGroups = []
         discographyError = nil
         artistWikipedia = nil
+        artistWikipediaError = nil
+        isArtistWikipediaUnavailable = false
         artistError = nil
 
         isLoadingArtistHeader = false
-        isLoadingArtistWikipedia = false
+        isLoadingArtistWikipedia = true
+        isLoadingArtistDiscography = true
 
         withAnimation(AppStyle.animation) {
             deckSelection = DeckSelection<MusiCardID>(
@@ -503,22 +513,41 @@ final class MusiCardsAppModel: ObservableObject {
     }
 
     func retryArtist() {
-        if let artistID = selectedArtistID {
-            if discographyError != nil {
-                retryDiscography(for: artistID)
-            } else {
-                selectArtist(
-                    id: artistID,
-                    name: selectedArtistName.nilIfEmpty,
-                    lifeSpan: selectedArtistLifeSpan
-                )
-            }
+        guard let artistID = selectedArtistID else { return }
+        artistWikipediaTask?.cancel()
+        artistError = nil
+        artistWikipediaError = nil
+        isArtistWikipediaUnavailable = false
+        isLoadingArtistWikipedia = artistWikipedia == nil
+        let generation = artistSelectionGeneration
+        artistWikipediaTask = Task {
+            await loadArtistDetail(id: artistID, generation: generation)
         }
     }
 
     func retryDiscography() {
         guard let artistID = selectedArtistID else { return }
         retryDiscography(for: artistID)
+    }
+
+    func retryArtistWikipedia() {
+        guard let artistID = selectedArtistID else { return }
+        artistWikipediaTask?.cancel()
+        artistWikipediaError = nil
+        isArtistWikipediaUnavailable = false
+        isLoadingArtistWikipedia = artistWikipedia == nil
+        let generation = artistSelectionGeneration
+        artistWikipediaTask = Task {
+            if let artist = selectedArtist {
+                await loadArtistWikipedia(
+                    for: artist,
+                    id: artistID,
+                    generation: generation
+                )
+            } else {
+                await loadArtistDetail(id: artistID, generation: generation)
+            }
+        }
     }
 
     nonisolated static func hasUsableArtistHeader(
@@ -529,25 +558,19 @@ final class MusiCardsAppModel: ObservableObject {
     }
 
     private func retryDiscography(for artistID: String) {
-        artistLoadTask?.cancel()
-        artistPaginationTask?.cancel()
+        artistDiscographyTask?.cancel()
         let generation = artistSelectionGeneration
 
         discographyError = nil
-        if selectedArtistName.isEmpty { artistError = nil }
         artistReleaseGroups = []
         releaseGroupsOffset = 0
         hasMoreReleaseGroups = false
         isLoadingMoreReleaseGroups = false
+        isLoadingArtistDiscography = true
         currentArtistIDForGroups = artistID
 
-        artistLoadTask = Task {
-            guard await loadDiscographyPage(id: artistID, generation: generation) else {
-                return
-            }
-            if selectedArtist == nil {
-                await loadArtistDetail(id: artistID, generation: generation)
-            }
+        artistDiscographyTask = Task {
+            _ = await loadDiscographyPage(id: artistID, generation: generation)
         }
     }
 
@@ -584,11 +607,31 @@ final class MusiCardsAppModel: ObservableObject {
             artistError = nil
         }
 
-        guard await loadDiscographyPage(id: id, generation: generation) else { return }
-        await loadArtistDetail(id: id, generation: generation)
+        guard generation == artistSelectionGeneration,
+              selectedArtistID == id else { return }
+
+        // Start the metadata/Wikipedia branch first. The discography branch is
+        // independent and publishes as soon as its own first page arrives.
+        artistWikipediaTask = Task {
+            await loadArtistDetail(id: id, generation: generation)
+        }
+        await Task.yield()
+        guard generation == artistSelectionGeneration,
+              selectedArtistID == id else { return }
+        artistDiscographyTask = Task {
+            _ = await loadDiscographyPage(id: id, generation: generation)
+        }
     }
 
     private func loadDiscographyPage(id: String, generation: UInt64) async -> Bool {
+        if artistReleaseGroups.isEmpty {
+            isLoadingArtistDiscography = true
+        }
+        defer {
+            if generation == artistSelectionGeneration, selectedArtistID == id {
+                isLoadingArtistDiscography = false
+            }
+        }
         do {
             let (groups, hasMore) = try await artistReleaseGroupsLoader(
                 id,
@@ -619,37 +662,74 @@ final class MusiCardsAppModel: ObservableObject {
             let artist = try await artistDetailLoader(id)
             guard generation == artistSelectionGeneration, selectedArtistID == id else { return }
             selectedArtist = artist
+            artistError = nil
             if selectedArtistName.isEmpty { selectedArtistName = artist.name }
             if selectedArtistLifeSpan == nil {
                 selectedArtistLifeSpan = MBTextFormatter.lifeSpanText(from: artist.lifeSpan)
             }
 
-            // Keep a cached excerpt visible while its refresh runs.
-            isLoadingArtistWikipedia = artistWikipedia == nil
-
-            if let wikidataURL = artist.relations?
-                .first(where: { $0.type == "wikidata" })?
-                .url?
-                .resource
-                .flatMap(URL.init(string:)) {
-
-                let summary = try await artistWikipediaLoader(wikidataURL)
-                guard generation == artistSelectionGeneration, selectedArtistID == id else { return }
-                artistWikipedia = summary
-            } else {
-                artistWikipedia = nil
-            }
-
-            isLoadingArtistWikipedia = false
-            await cacheSelectedArtist(id: id, generation: generation)
+            await loadArtistWikipedia(
+                for: artist,
+                id: id,
+                generation: generation
+            )
 
         } catch is CancellationError {
             return
         } catch {
             guard generation == artistSelectionGeneration, selectedArtistID == id else { return }
             isLoadingArtistWikipedia = false
+            if artistWikipedia == nil {
+                artistWikipediaError = error
+            }
             if !Self.hasUsableArtistHeader(artist: selectedArtist, name: selectedArtistName) {
                 artistError = error
+            }
+        }
+    }
+
+    private func loadArtistWikipedia(
+        for artist: MBArtistDetail,
+        id: String,
+        generation: UInt64
+    ) async {
+        guard generation == artistSelectionGeneration,
+              selectedArtistID == id else { return }
+
+        // A cached excerpt stays visible while its network refresh runs.
+        isLoadingArtistWikipedia = artistWikipedia == nil
+        artistWikipediaError = nil
+        isArtistWikipediaUnavailable = false
+
+        guard let wikidataURL = artist.relations?
+            .first(where: { $0.type == "wikidata" })?
+            .url?
+            .resource
+            .flatMap(URL.init(string:)) else {
+            if artistWikipedia == nil {
+                isArtistWikipediaUnavailable = true
+            }
+            isLoadingArtistWikipedia = false
+            await cacheSelectedArtist(id: id, generation: generation)
+            return
+        }
+
+        do {
+            let summary = try await artistWikipediaLoader(wikidataURL)
+            guard generation == artistSelectionGeneration,
+                  selectedArtistID == id else { return }
+            artistWikipedia = summary
+            isArtistWikipediaUnavailable = summary == nil
+            isLoadingArtistWikipedia = false
+            await cacheSelectedArtist(id: id, generation: generation)
+        } catch is CancellationError {
+            return
+        } catch {
+            guard generation == artistSelectionGeneration,
+                  selectedArtistID == id else { return }
+            isLoadingArtistWikipedia = false
+            if artistWikipedia == nil {
+                artistWikipediaError = error
             }
         }
     }

@@ -9,6 +9,11 @@ import Foundation
 import Combine
 import OSLog
 
+protocol TrackDetailServing {
+    func fetchRecording(id: String) async throws -> MBRecording
+    func fetchWork(id: String) async throws -> MBWork
+}
+
 @MainActor
 final class TrackDetailStore: ObservableObject {
     nonisolated private static let logger = Logger(
@@ -20,9 +25,10 @@ final class TrackDetailStore: ObservableObject {
     @Published private(set) var loadingIDs: Set<String> = []
     @Published private(set) var failedIDs: Set<String> = []
 
-    private let service: MusicBrainzService
+    private let service: any TrackDetailServing
+    private var workReferencesNeedingRetry: [String: MBWorkReference] = [:]
 
-    init(service: MusicBrainzService) {
+    init(service: any TrackDetailServing) {
         self.service = service
     }
 
@@ -42,7 +48,16 @@ final class TrackDetailStore: ObservableObject {
     }
 
     func fetchIfNeeded(recordingID: String) {
-        guard cache[recordingID] == nil else { return }
+        if cache[recordingID] != nil,
+           failedIDs.contains(recordingID),
+           let workRef = workReferencesNeedingRetry[recordingID] {
+            retryWork(recordingID: recordingID, workRef: workRef)
+            return
+        }
+
+        guard cache[recordingID] == nil else {
+            return
+        }
         guard !loadingIDs.contains(recordingID) else { return }
 
         loadingIDs.insert(recordingID)
@@ -66,19 +81,6 @@ final class TrackDetailStore: ObservableObject {
 
                 let workRef = firstWorkReference(in: recordingRelations)
 
-                var creators: [LinkedArtistGroup] = []
-                var workHierarchy: [String] = []
-
-                if let workRef {
-                    let work = try await service.fetchWork(id: workRef.id)
-
-                    workHierarchy = buildSimpleWorkHierarchy(from: work)
-                    creators = buildLinkedArtistGroups(
-                        from: work.relations ?? [],
-                        bucket: .creator
-                    )
-                }
-
                 var notes: [String] = []
                 if let disambiguation = recording.disambiguation?
                     .trimmingCharacters(in: .whitespacesAndNewlines),
@@ -86,28 +88,80 @@ final class TrackDetailStore: ObservableObject {
                     notes.append(disambiguation)
                 }
 
-                let detailData = TrackDetailData(
+                // Publish recording-level metadata as soon as it is available.
+                // A later work lookup must not erase already loaded performer,
+                // technical, or note data.
+                cache[recordingID] = TrackDetailData(
                     recordingID: recordingID,
                     performers: performers,
-                    creators: creators,
-                    workHierarchy: workHierarchy,
+                    creators: [],
+                    workHierarchy: [],
                     technical: technical,
                     notes: notes
                 )
 
-                cache[recordingID] = detailData
+                if let workRef {
+                    workReferencesNeedingRetry[recordingID] = workRef
+                    let work = try await service.fetchWork(id: workRef.id)
+                    apply(work: work, to: recordingID)
+                    workReferencesNeedingRetry.removeValue(forKey: recordingID)
+                }
+
                 loadingIDs.remove(recordingID)
                 failedIDs.remove(recordingID)
 
             } catch {
                 loadingIDs.remove(recordingID)
                 failedIDs.insert(recordingID)
-                let nsError = error as NSError
-                Self.logger.error(
-                    "Track detail load failed domain=\(nsError.domain, privacy: .public) code=\(nsError.code, privacy: .public) detail=\(nsError.localizedDescription, privacy: .private)"
-                )
+                logFailure(error)
             }
         }
+    }
+
+    private func retryWork(
+        recordingID: String,
+        workRef: MBWorkReference
+    ) {
+        guard !loadingIDs.contains(recordingID) else { return }
+
+        loadingIDs.insert(recordingID)
+        failedIDs.remove(recordingID)
+
+        Task {
+            do {
+                let work = try await service.fetchWork(id: workRef.id)
+                apply(work: work, to: recordingID)
+                workReferencesNeedingRetry.removeValue(forKey: recordingID)
+                loadingIDs.remove(recordingID)
+                failedIDs.remove(recordingID)
+            } catch {
+                loadingIDs.remove(recordingID)
+                failedIDs.insert(recordingID)
+                logFailure(error)
+            }
+        }
+    }
+
+    private func apply(work: MBWork, to recordingID: String) {
+        guard let existing = cache[recordingID] else { return }
+        cache[recordingID] = TrackDetailData(
+            recordingID: recordingID,
+            performers: existing.performers,
+            creators: buildLinkedArtistGroups(
+                from: work.relations ?? [],
+                bucket: .creator
+            ),
+            workHierarchy: buildSimpleWorkHierarchy(from: work),
+            technical: existing.technical,
+            notes: existing.notes
+        )
+    }
+
+    private func logFailure(_ error: Error) {
+        let nsError = error as NSError
+        Self.logger.error(
+            "Track detail load failed domain=\(nsError.domain, privacy: .public) code=\(nsError.code, privacy: .public) detail=\(nsError.localizedDescription, privacy: .private)"
+        )
     }
 
     private func firstWorkReference(in relations: [MBRelation]) -> MBWorkReference? {
@@ -244,3 +298,5 @@ final class TrackDetailStore: ObservableObject {
         return results
     }
 }
+
+extension MusicBrainzService: TrackDetailServing {}

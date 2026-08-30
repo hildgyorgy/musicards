@@ -66,8 +66,10 @@ struct TracksCardContentView: View {
                 }
             }
             .task(id: release.id) {
-                // Preload composer metadata for all tracks so composer headers
-                // can appear as the view renders.
+                // Track details load their own recording/work metadata for
+                // every genre. This album-wide preload only supplies the
+                // shared composer/work headers in the classical track layout.
+                guard isClassicalRelease(release) else { return }
                 for medium in release.media ?? [] {
                     await classicalMetadataStore.preload(for: medium.tracks ?? [])
                 }

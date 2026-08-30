@@ -23,7 +23,7 @@ final class SearchErrorSemanticsTests: XCTestCase {
         let error = MusicBrainzServiceError.fromHTTPStatus(429)
         let view = ErrorStateView.searchRetry(for: error) { }
 
-        if case .rateLimited(let statusCode) = error {
+        if case .rateLimited(let statusCode, _) = error {
             XCTAssertEqual(statusCode, 429)
         } else {
             XCTFail("Expected rate-limit error")
