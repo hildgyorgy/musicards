@@ -43,6 +43,12 @@ nonisolated struct LocalLibraryLookup {
 
         normalizedArtistCredits = Set(
             files.compactMap { file in
+                // An artist tag on an untagged/unidentified file is not a
+                // playable MusicBrainz artist result. Only count artists
+                // attached to a release that can actually be resolved.
+                guard Self.nonemptyMBID(file.releaseMBID) != nil else {
+                    return nil
+                }
                 let artist = Self.normalizedLibraryText(file.artist)
                 return artist.isEmpty ? nil : artist
             }

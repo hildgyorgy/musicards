@@ -12,6 +12,7 @@ struct ArtistCardContentView: View {
     let artist: MBArtistDetail?
     let artistName: String
     let releaseGroups: [MBReleaseGroupSummary]
+    let searchScope: SearchScope
     let wikipedia: WikipediaSummary?
     let discographyError: Error?
     let onSelectReleaseGroup: (MBReleaseGroupSummary) -> Void
@@ -46,6 +47,11 @@ struct ArtistCardContentView: View {
         artist != nil || !artistName.isEmpty || !releaseGroups.isEmpty
     }
 
+    private var visibleReleaseGroups: [MBReleaseGroupSummary] {
+        guard searchScope == .libraryOnly else { return releaseGroups }
+        return releaseGroups.filter(isPlayable)
+    }
+
     var body: some View {
         Group {
             if artistError != nil && !MusiCardsAppModel.hasUsableArtistHeader(
@@ -75,7 +81,7 @@ struct ArtistCardContentView: View {
                                 .padding(.vertical, 20)
                         } else {
                             // Discography sections
-                            ForEach(groupedDiscographySections(from: releaseGroups)) { section in
+                            ForEach(groupedDiscographySections(from: visibleReleaseGroups)) { section in
                                 Section {
                                     VStack(alignment: .leading, spacing: 0) {
                                         ForEach(section.items) { group in
@@ -130,12 +136,24 @@ struct ArtistCardContentView: View {
                                 }
                             }
 
-                            if releaseGroups.isEmpty {
+                            if visibleReleaseGroups.isEmpty
+                                && !(searchScope == .libraryOnly
+                                     && !releaseGroups.isEmpty) {
                                 Text("n/a")
                                     .font(.callout)
                                     .foregroundStyle(.secondary)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .padding(.vertical, 20)
+                            }
+
+                            // A library-only view may hide an entire loaded
+                            // page. Keep pagination alive until the provider
+                            // reports that no more MusicBrainz groups exist.
+                            if searchScope == .libraryOnly,
+                               let last = releaseGroups.last {
+                                Color.clear
+                                    .frame(height: 1)
+                                    .onAppear { onLoadMoreIfNeeded(last) }
                             }
                         }
 

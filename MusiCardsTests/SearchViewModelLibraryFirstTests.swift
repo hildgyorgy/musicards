@@ -4,6 +4,34 @@ import XCTest
 @testable import MusiCards
 
 final class SearchViewModelLibraryFirstTests: XCTestCase {
+    @MainActor
+    func testLibraryOnlyReleaseSearchDoesNotCallMusicBrainz() async {
+        let service = SearchServiceStub()
+        let viewModel = makeViewModel(service: service)
+        viewModel.searchScope = .libraryOnly
+
+        viewModel.searchQuery = "Nirvana, Nevermind"
+        viewModel.queryDidChange()
+        await eventually { !viewModel.isSearching }
+
+        XCTAssertTrue(service.requestedQueries.isEmpty)
+        XCTAssertTrue(viewModel.releaseResults.isEmpty)
+    }
+
+    @MainActor
+    func testLibraryOnlyArtistSearchDoesNotCallMusicBrainz() async {
+        let service = SearchServiceStub()
+        let viewModel = makeViewModel(service: service)
+        viewModel.searchScope = .libraryOnly
+
+        viewModel.searchQuery = "Nirvana"
+        viewModel.queryDidChange()
+        await eventually { !viewModel.isSearching }
+
+        XCTAssertTrue(service.requestedArtistQueries.isEmpty)
+        XCTAssertTrue(viewModel.artistRows.isEmpty)
+    }
+
     func testSearchCardLabelFollowsExistingSearchMode() {
         XCTAssertEqual(SearchMode.search.cardLabel, "Search")
         XCTAssertEqual(

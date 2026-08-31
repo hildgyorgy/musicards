@@ -33,6 +33,9 @@ final class SearchViewModel: ObservableObject {
 
     // MARK: - Shared state
     @Published var mode: SearchMode = .search
+    @Published var searchScope: SearchScope = .libraryAndMusicBrainz
+
+    var showsSearchScopeControl: Bool { searchBehavior == .scoped }
     @Published var searchError: Error?
     @Published var isSearching = false
 
@@ -44,23 +47,29 @@ final class SearchViewModel: ObservableObject {
     private let musicBrainzService: any MusicBrainzSearchServing
     private let libraryManager: LibraryManager
     private let searchDebounceNanoseconds: UInt64
+    private let searchBehavior: SearchBehavior
     private var searchGeneration: UInt64 = 0
     private var lastScheduledNormalizedQuery: String?
     private var activeReleaseSearchQuery: String?
     private var libraryReleaseRows: [SearchReleaseRow] = []
     private var musicBrainzReleaseRows: [SearchReleaseRow] = []
+    private var libraryArtistRows: [SearchArtistRow] = []
+    private var musicBrainzArtistRows: [SearchArtistRow] = []
     private var promotedReleaseIDs: Set<String> = []
     private var visibleReleaseLimit = 20
     private var hasMoreMusicBrainzReleaseResults = true
+    private var hasMoreMusicBrainzArtistResults = true
 
     init(
         service: any MusicBrainzSearchServing,
         libraryManager: LibraryManager,
-        searchDebounceNanoseconds: UInt64 = 350_000_000
+        searchDebounceNanoseconds: UInt64 = 350_000_000,
+        searchBehavior: SearchBehavior = .scoped
     ) {
         self.musicBrainzService = service
         self.libraryManager = libraryManager
         self.searchDebounceNanoseconds = searchDebounceNanoseconds
+        self.searchBehavior = searchBehavior
         libraryAvailabilityObservation = libraryManager.objectWillChange.sink {
             @MainActor [weak self] in
             // ObservableObject publishes immediately before its state changes.
@@ -131,6 +140,7 @@ final class SearchViewModel: ObservableObject {
         searchError = nil
         isSearching = false
         resetReleaseSearchMergeState()
+        resetArtistSearchMergeState()
         promotedReleaseIDs = []
 
         guard q.count >= 3 else {
@@ -148,6 +158,12 @@ final class SearchViewModel: ObservableObject {
             }
             await performSearch(generation: generation)
         }
+    }
+
+    func searchScopeDidChange() {
+        guard searchBehavior == .scoped else { return }
+        lastScheduledNormalizedQuery = nil
+        queryDidChange()
     }
 
     func switchToSearch() {
@@ -409,6 +425,12 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
                 musicBrainzReleaseRows = []
                 updateLibraryReleaseResults(query: q)
                 artistRows = []
+                if searchBehavior == .scoped,
+                   searchScope == .libraryOnly {
+                    isSearching = false
+                    hasMoreResults = false
+                    return
+                }
                 if !libraryReleaseRows.isEmpty {
                     // The owned results are useful immediately; the global
                     // MusicBrainz request continues without hiding them.
@@ -441,6 +463,21 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
 
             } else {
                 resetReleaseSearchMergeState()
+                updateLibraryArtistResults(query: q)
+                if searchBehavior == .scoped,
+                   searchScope == .libraryOnly {
+                    artistRows = libraryArtistRows
+                    releaseResults = []
+                    currentOffset = 0
+                    hasMoreResults = false
+                    isSearching = false
+                    return
+                }
+                if searchBehavior == .scoped, !libraryArtistRows.isEmpty {
+                    artistRows = libraryArtistRows
+                    isSearching = false
+                    isLoadingMore = true
+                }
                 let results = try await musicBrainzService.searchArtists(
                     query: q,
                     limit: pageSize,
@@ -457,7 +494,9 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
                     )
                 }
 
-                artistRows = playableArtistsFirst(rows)
+                musicBrainzArtistRows = rows
+                hasMoreMusicBrainzArtistResults = results.count == pageSize
+                publishMergedArtistResults()
                 releaseResults = []
                 currentOffset = rows.count
                 hasMoreResults = rows.count == pageSize
@@ -483,7 +522,7 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
             guard generation == searchGeneration else { return }
             isSearching = false
             isLoadingMore = false
-            if libraryReleaseRows.isEmpty {
+            if libraryReleaseRows.isEmpty && libraryArtistRows.isEmpty {
                 releaseResults = []
                 artistRows = []
                 searchError = error
@@ -495,6 +534,8 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
             hasMoreMusicBrainzReleaseResults = false
             if activeReleaseSearchQuery != nil {
                 publishMergedReleaseResults()
+            } else if !libraryArtistRows.isEmpty {
+                publishMergedArtistResults()
             } else {
                 hasMoreResults = false
             }
@@ -813,6 +854,10 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
         guard generation == searchGeneration,
               !query.isEmpty,
               query == normalizedSearchQuery else { return }
+        guard searchBehavior == .legacy
+            || searchScope == .libraryAndMusicBrainz else {
+            return
+        }
 
         do {
             let results = try await musicBrainzService.searchArtists(
@@ -832,7 +877,9 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
                 )
             }
 
-            appendUniqueArtistRows(playableArtistsFirst(rows))
+            hasMoreMusicBrainzArtistResults = results.count == pageSize
+            musicBrainzArtistRows.append(contentsOf: rows)
+            publishMergedArtistResults()
             currentOffset += results.count
             hasMoreResults = results.count == pageSize
 
@@ -883,6 +930,45 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
             limit: librarySearchLimit
         ).map(makeLibraryReleaseRow)
         publishMergedReleaseResults()
+    }
+
+    private func updateLibraryArtistResults(query: String) {
+        var seen = Set<String>()
+        libraryArtistRows = libraryManager.searchCatalog(
+            // Artist searches must not match release or track text. The
+            // trailing comma selects the library searcher's artist-only
+            // branch while keeping the existing source-independent matcher.
+            query: "\(query),",
+            limit: librarySearchLimit
+        ).compactMap { release in
+            let name = release.artistName.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !name.isEmpty else { return nil }
+            let key = name.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+            guard seen.insert(key).inserted else { return nil }
+            return SearchArtistRow(id: "library-artist-\(key)", name: name, lifeSpan: "")
+        }
+        if searchBehavior == .scoped {
+            publishMergedArtistResults()
+        }
+    }
+
+    private func publishMergedArtistResults() {
+        var seen = Set<String>()
+        let merged = (libraryArtistRows + musicBrainzArtistRows).filter { row in
+            let key = row.name.folding(
+                options: [.caseInsensitive, .diacriticInsensitive],
+                locale: .current
+            )
+            return seen.insert(key).inserted
+        }
+        artistRows = merged
+        hasMoreResults = hasMoreMusicBrainzArtistResults
+    }
+
+    private func resetArtistSearchMergeState() {
+        libraryArtistRows = []
+        musicBrainzArtistRows = []
+        hasMoreMusicBrainzArtistResults = true
     }
 
     private func makeLibraryReleaseRow(

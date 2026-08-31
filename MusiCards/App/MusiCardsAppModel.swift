@@ -126,7 +126,8 @@ final class MusiCardsAppModel: ObservableObject {
             -> (groups: [MBReleaseGroupSummary], hasMore: Bool))? = nil,
         artistWikipediaLoader:
             (@Sendable (URL) async throws -> WikipediaSummary?)? = nil,
-        recentContentCache: RecentContentCache = .shared
+        recentContentCache: RecentContentCache = .shared,
+        searchBehavior: SearchBehavior = .scoped
     ) {
         let service = musicBrainzService
         let playbackEngine = playbackEngine ?? PlaybackEngineFactory.makeDefault()
@@ -174,7 +175,8 @@ final class MusiCardsAppModel: ObservableObject {
         self.recentContentCache = recentContentCache
         self.searchViewModel = SearchViewModel(
             service: service,
-            libraryManager: libraryManager
+            libraryManager: libraryManager,
+            searchBehavior: searchBehavior
         )
         self.trackDetailStore = TrackDetailStore(service: service)
         self.classicalMetadataStore = ClassicalMetadataStore(service: service)
@@ -467,6 +469,28 @@ final class MusiCardsAppModel: ObservableObject {
     // MARK: - Artist
 
     func selectArtist(_ row: SearchArtistRow) {
+        if row.id.hasPrefix("library-artist-") {
+            // Library-only artist rows do not have a MusicBrainz artist ID.
+            // Resolve the ID only after the user explicitly opens the card.
+            Task { [weak self] in
+                guard let self else { return }
+                do {
+                    let matches = try await musicBrainzService.searchArtists(
+                        query: "artist:\(row.name)", limit: 5, offset: 0
+                    )
+                    guard let match = matches.first else { return }
+                    selectArtist(
+                        id: match.id,
+                        name: match.name,
+                        lifeSpan: MBTextFormatter.lifeSpanTextOrEmpty(from: match.lifeSpan).nilIfEmpty
+                    )
+                } catch {
+                    // The search card remains available; a later explicit
+                    // MusicBrainz search can still resolve the artist.
+                }
+            }
+            return
+        }
         selectArtist(id: row.id, name: row.name, lifeSpan: row.lifeSpan.nilIfEmpty)
     }
 

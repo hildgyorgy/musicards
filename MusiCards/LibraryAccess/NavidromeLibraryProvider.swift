@@ -154,13 +154,15 @@ final class NavidromeLibraryProvider: ObservableObject, LibraryProvider {
                     let artistCredits = Self.normalizedArtistCredits(
                         in: album
                     )
-                    refreshedArtistCredits.formUnion(artistCredits)
-
                     guard let releaseID = Self.releaseID(
                         from: album.musicBrainzID
                     ) else {
                         continue
                     }
+                    // Only identified albums are playable MusicBrainz
+                    // results. Artist credits from untagged Navidrome albums
+                    // must not paint unrelated MB artist rows as playable.
+                    refreshedArtistCredits.formUnion(artistCredits)
                     refreshedReleaseIDs.insert(releaseID)
                     refreshedAlbumIDsByReleaseID[releaseID, default: []]
                         .insert(album.id)

@@ -13,13 +13,11 @@ struct SearchCardContentView: View {
 
     let recentArtists: [SearchArtistRow]
     let recentReleases: [SearchReleaseRow]
-    let nowPlayingRelease: SearchReleaseRow?
 
     let onSelectRelease: (SearchReleaseRow) -> Void
     let onSelectArtist: (SearchArtistRow) -> Void
     let onSelectRecentArtist: (SearchArtistRow) -> Void
     let onSelectRecentRelease: (SearchReleaseRow) -> Void
-    let onSelectNowPlayingRelease: () -> Void
 #if os(iOS)
     @Environment(\.deckContentBottomInset) private var deckContentBottomInset
 #endif
@@ -247,27 +245,6 @@ struct SearchCardContentView: View {
     private var recentContent: some View {
         LazyVStack(alignment: .leading, spacing: 0) {
 
-            if let nowPlayingRelease {
-                VStack(alignment: .leading, spacing: 8) {
-
-                    HStack(spacing: 8) {
-                        sectionLabel("NOW PLAYING in Apple Music")
-                        LiveWaveformIcon()
-                            .padding(.bottom, 2)
-                    }
-
-                    Button {
-                        dismissKeyboard()
-                        onSelectNowPlayingRelease()
-                    } label: {
-                        releaseRow(nowPlayingRelease)
-                    }
-                    .buttonStyle(.plain)
-                }
-
-                Spacer().frame(height: 20)
-            }
-
             if !recentArtists.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
 
@@ -349,31 +326,4 @@ struct SearchCardContentView: View {
 #endif
     }
 
-    private struct LiveWaveformIcon: View {
-        @State private var isAnimating = false
-
-        var body: some View {
-            HStack(spacing: 2) {
-                bar(height: isAnimating ? 5 : 11)
-                bar(height: isAnimating ? 12 : 6)
-                bar(height: isAnimating ? 7 : 13)
-            }
-            .frame(height: 14)
-            .foregroundStyle(.secondary)
-            .onAppear {
-                withAnimation(
-                    .easeInOut(duration: 0.7)
-                    .repeatForever(autoreverses: true)
-                ) {
-                    isAnimating = true
-                }
-            }
-        }
-
-        private func bar(height: CGFloat) -> some View {
-            Capsule()
-                .fill(.secondary)
-                .frame(width: 2, height: height)
-        }
-    }
 } 

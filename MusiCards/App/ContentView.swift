@@ -184,10 +184,10 @@ struct ContentView: View {
     {
         switch card.id {
         case .home:
-            DeckBackgroundView(
-                localLibrary: appModel.localLibrary,
-                libraryManager: appModel.libraryManager,
-                navidromeConnection: appModel.navidromeConnection,
+                DeckBackgroundView(
+                    localLibrary: appModel.localLibrary,
+                    libraryManager: appModel.libraryManager,
+                    navidromeConnection: appModel.navidromeConnection,
                 activeLibrarySource: $appModel.activeLibrarySource,
                 onSelectMusicFolder: { url in
                     appModel.selectMusicFolder(url)
@@ -211,7 +211,6 @@ struct ContentView: View {
                 libraryManager: appModel.libraryManager,
                 recentArtists: appModel.recentArtists,
                 recentReleases: appModel.recentReleases,
-                nowPlayingRelease: appModel.nowPlayingRelease,
                 onSelectRelease: { row in
                     appModel.selectRelease(row)
                     appModel.addRecentRelease(row)
@@ -227,11 +226,6 @@ struct ContentView: View {
                 onSelectRecentRelease: { release in
                     appModel.selectRecentRelease(release)
                 },
-                onSelectNowPlayingRelease: {
-                    #if os(iOS)
-                        appModel.openNowPlayingVersions()
-                    #endif
-                }
             )
         case .release:
             if appModel.isLoadingRelease {
@@ -288,6 +282,7 @@ struct ContentView: View {
                     artist: appModel.selectedArtist,
                     artistName: appModel.selectedArtistName,
                     releaseGroups: appModel.artistReleaseGroups,
+                    searchScope: appModel.searchViewModel.searchScope,
                     wikipedia: appModel.artistWikipedia,
                     discographyError: appModel.discographyError,
                     onSelectReleaseGroup: { group in

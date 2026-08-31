@@ -64,6 +64,7 @@ struct LibraryConnectionView: View {
                         )
                     )
                     .toggleStyle(.switch)
+                    .tint(.blue)
                     .labelsHidden()
 
                     Text("NAVIDROME")

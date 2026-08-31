@@ -10,6 +10,34 @@ import SwiftUI
 import VisionKit
 #endif
 
+struct SearchScopeControl: View {
+    @Binding var scope: SearchScope
+    let onChange: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Text("MY LIBRARY")
+            Toggle("", isOn: Binding(
+                get: { scope == .libraryAndMusicBrainz },
+                set: { newValue in
+                    scope = newValue ? .libraryAndMusicBrainz : .libraryOnly
+                    onChange()
+                }
+            ))
+            .labelsHidden()
+            .toggleStyle(.switch)
+            .tint(.blue)
+            Text("MUSICBRAINZ")
+        }
+        .font(.system(.footnote, design: .monospaced))
+        .tracking(1.4)
+        .foregroundStyle(.primary)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Search scope")
+        .accessibilityValue(scope == .libraryOnly ? "In my library" : "In MusicBrainz")
+    }
+}
+
 struct SearchCardHeaderView: View {
     @ObservedObject var viewModel: SearchViewModel
     let isShazamListening: Bool
@@ -143,6 +171,15 @@ struct SearchCardHeaderView: View {
                             )
                     )
             )
+
+            if viewModel.showsSearchScopeControl && !isReleaseGroupMode {
+                SearchScopeControl(
+                    scope: $viewModel.searchScope,
+                    onChange: { viewModel.searchScopeDidChange() }
+                )
+                .frame(maxWidth: .infinity)
+                .padding(.top, 18)
+            }
 
             Spacer().frame(height: 32)
 
