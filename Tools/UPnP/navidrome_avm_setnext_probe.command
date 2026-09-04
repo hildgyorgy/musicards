@@ -264,6 +264,7 @@ def main():
     friendly_name, version, av_service, av_url = find_avtransport(description)
     print(f"    Renderer: {friendly_name}")
     print(f"    AVTransport: {version}")
+    print(f"    Device description: {description}")
     print(f"    Vezérlési végpont: {av_url}")
 
     answer = input(
