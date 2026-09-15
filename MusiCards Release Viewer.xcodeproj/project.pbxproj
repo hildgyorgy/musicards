@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 100;
+	objectVersion = 110;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -419,7 +419,7 @@
 				F60000000000000000000003 /* XCRemoteSwiftPackageReference "flac-binary-xcframework" */,
 				F60000000000000000000006 /* XCRemoteSwiftPackageReference "ogg-binary-xcframework" */,
 			);
-			preferredProjectObjectVersion = 100;
+			preferredProjectObjectVersion = 110;
 			productRefGroup = F5E521402F8292AD00D2CEAE /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -705,6 +705,7 @@
 				INFOPLIST_FILE = "MusiCards/MusiCards Release Viewer-Info.plist";
 				"INFOPLIST_FILE[sdk=iphone*]" = "MusiCards/MusiCards Release Viewer-iOS-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = MusiCards;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -759,6 +760,7 @@
 				INFOPLIST_FILE = "MusiCards/MusiCards Release Viewer-Info.plist";
 				"INFOPLIST_FILE[sdk=iphone*]" = "MusiCards/MusiCards Release Viewer-iOS-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = MusiCards;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;

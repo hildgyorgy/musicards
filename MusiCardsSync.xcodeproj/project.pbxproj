@@ -3,19 +3,19 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 100;
+	objectVersion = 110;
 	objects = {
 
 /* Begin PBXBuildFile section */
-		F6010000305A000000000001 /* rsync in Embed Executables */ = {isa = PBXBuildFile; fileRef = F6010000305A000000000002 /* rsync */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
-		F6010000305A000000000006 /* rsync-NOTICE.md in Resources */ = {isa = PBXBuildFile; fileRef = F6010000305A000000000007 /* rsync-NOTICE.md */; };
-		F6010000305A000000000008 /* rsync-COPYING in Resources */ = {isa = PBXBuildFile; fileRef = F6010000305A000000000009 /* rsync-COPYING */; };
-		F6010000305A00000000000A /* popt-COPYING in Resources */ = {isa = PBXBuildFile; fileRef = F6010000305A00000000000B /* popt-COPYING */; };
-		F6010000305A00000000000C /* zlib-LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = F6010000305A00000000000D /* zlib-LICENSE */; };
+		F6010000305A000000000001 /* ThirdParty/rsync/rsync in Embed Executables */ = {isa = PBXBuildFile; fileRef = F6010000305A000000000002 /* ThirdParty/rsync/rsync */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		F6010000305A000000000006 /* ThirdParty/rsync/NOTICE.md in Resources */ = {isa = PBXBuildFile; fileRef = F6010000305A000000000007 /* ThirdParty/rsync/NOTICE.md */; };
+		F6010000305A000000000008 /* ThirdParty/rsync/COPYING in Resources */ = {isa = PBXBuildFile; fileRef = F6010000305A000000000009 /* ThirdParty/rsync/COPYING */; };
+		F6010000305A00000000000A /* ThirdParty/rsync/licenses/popt-COPYING in Resources */ = {isa = PBXBuildFile; fileRef = F6010000305A00000000000B /* ThirdParty/rsync/licenses/popt-COPYING */; };
+		F6010000305A00000000000C /* ThirdParty/rsync/licenses/zlib-LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = F6010000305A00000000000D /* ThirdParty/rsync/licenses/zlib-LICENSE */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		F6010000305A000000000004 /* MusiCards Sync test host proxy */ = {
+		F6010000305A000000000004 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = F6010000305A000000000010 /* Project object */;
 			proxyType = 1;
@@ -27,25 +27,23 @@
 /* Begin PBXCopyFilesBuildPhase section */
 		F6010000305A000000000003 /* Embed Executables */ = {
 			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
 			dstPath = "";
-			dstSubfolderSpec = 6;
+			dstSubfolder = Executables;
 			files = (
-				F6010000305A000000000001 /* rsync in Embed Executables */,
+				F6010000305A000000000001 /* ThirdParty/rsync/rsync in Embed Executables */,
 			);
 			name = "Embed Executables";
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		F6010000305A000000000002 /* rsync */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; path = ThirdParty/rsync/rsync; sourceTree = "<group>"; };
+		F6010000305A000000000002 /* ThirdParty/rsync/rsync */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; path = ThirdParty/rsync/rsync; sourceTree = "<group>"; };
+		F6010000305A000000000007 /* ThirdParty/rsync/NOTICE.md */ = {isa = PBXFileReference; lastKnownFileType = text.markdown; path = ThirdParty/rsync/NOTICE.md; sourceTree = "<group>"; };
+		F6010000305A000000000009 /* ThirdParty/rsync/COPYING */ = {isa = PBXFileReference; lastKnownFileType = text; path = ThirdParty/rsync/COPYING; sourceTree = "<group>"; };
+		F6010000305A00000000000B /* ThirdParty/rsync/licenses/popt-COPYING */ = {isa = PBXFileReference; lastKnownFileType = text; path = "ThirdParty/rsync/licenses/popt-COPYING"; sourceTree = "<group>"; };
+		F6010000305A00000000000D /* ThirdParty/rsync/licenses/zlib-LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = "ThirdParty/rsync/licenses/zlib-LICENSE"; sourceTree = "<group>"; };
 		F6010000305A000000000012 /* MusiCards Sync.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "MusiCards Sync.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		F6010000305A000000000013 /* MusiCards SyncTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "MusiCards SyncTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
-		F6010000305A000000000007 /* rsync-NOTICE.md */ = {isa = PBXFileReference; lastKnownFileType = text.markdown; path = ThirdParty/rsync/NOTICE.md; sourceTree = "<group>"; };
-		F6010000305A000000000009 /* rsync-COPYING */ = {isa = PBXFileReference; lastKnownFileType = text; path = ThirdParty/rsync/COPYING; sourceTree = "<group>"; };
-		F6010000305A00000000000B /* popt-COPYING */ = {isa = PBXFileReference; lastKnownFileType = text; path = ThirdParty/rsync/licenses/popt-COPYING; sourceTree = "<group>"; };
-		F6010000305A00000000000D /* zlib-LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = ThirdParty/rsync/licenses/zlib-LICENSE; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -69,17 +67,13 @@
 /* Begin PBXFrameworksBuildPhase section */
 		F6010000305A000000000031 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		F6010000305A000000000032 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
@@ -91,11 +85,11 @@
 				F6010000305A000000000020 /* MusiCards Sync */,
 				F6010000305A000000000021 /* MusiCards SyncTests */,
 				F6010000305A000000000022 /* Shared */,
-				F6010000305A000000000002 /* rsync */,
-				F6010000305A000000000007 /* rsync-NOTICE.md */,
-				F6010000305A000000000009 /* rsync-COPYING */,
-				F6010000305A00000000000B /* popt-COPYING */,
-				F6010000305A00000000000D /* zlib-LICENSE */,
+				F6010000305A000000000002 /* ThirdParty/rsync/rsync */,
+				F6010000305A000000000007 /* ThirdParty/rsync/NOTICE.md */,
+				F6010000305A000000000009 /* ThirdParty/rsync/COPYING */,
+				F6010000305A00000000000B /* ThirdParty/rsync/licenses/popt-COPYING */,
+				F6010000305A00000000000D /* ThirdParty/rsync/licenses/zlib-LICENSE */,
 			);
 			sourceTree = "<group>";
 		};
@@ -179,6 +173,7 @@
 				Base,
 			);
 			mainGroup = F6010000305A000000000040;
+			preferredProjectObjectVersion = 110;
 			productRefGroup = F6010000305A000000000041 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -192,38 +187,30 @@
 /* Begin PBXResourcesBuildPhase section */
 		F6010000305A000000000033 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
-				F6010000305A000000000006 /* rsync-NOTICE.md in Resources */,
-				F6010000305A000000000008 /* rsync-COPYING in Resources */,
-				F6010000305A00000000000A /* popt-COPYING in Resources */,
-				F6010000305A00000000000C /* zlib-LICENSE in Resources */,
+				F6010000305A000000000006 /* ThirdParty/rsync/NOTICE.md in Resources */,
+				F6010000305A000000000008 /* ThirdParty/rsync/COPYING in Resources */,
+				F6010000305A00000000000A /* ThirdParty/rsync/licenses/popt-COPYING in Resources */,
+				F6010000305A00000000000C /* ThirdParty/rsync/licenses/zlib-LICENSE in Resources */,
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		F6010000305A000000000035 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		F6010000305A000000000030 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		F6010000305A000000000034 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
@@ -231,7 +218,7 @@
 		F6010000305A000000000005 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = F6010000305A000000000011 /* MusiCards Sync */;
-			targetProxy = F6010000305A000000000004 /* MusiCards Sync test host proxy */;
+			targetProxy = F6010000305A000000000004 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -254,7 +241,10 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "MusiCards Sync";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/../Frameworks");
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "hu.hildgyorgy.MusiCards-Sync";
@@ -289,7 +279,10 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "MusiCards Sync";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/../Frameworks");
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "hu.hildgyorgy.MusiCards-Sync";
