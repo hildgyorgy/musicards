@@ -9,28 +9,18 @@
 
 ## 1. Snapshot
 
-- **Last updated:** 2026-08-30 (Europe/Budapest)
+- **Last updated:** 2026-10-04 (Europe/Budapest)
 - **Repository:** `musicards`
 - **Branch:** `main`
-- **HEAD:** `e8eb109` — `codex handoff!`
-- **Remote state at session start:** `main` matched `origin/main`.
-- **Working tree:** an uncommitted MusicBrainz/Track Details and Artist-card
-  reliability fix:
-  - `MusiCards/App/ContentView.swift`
-  - `MusiCards/App/MusiCardsAppModel.swift`
-  - `MusiCards/App/StateViews/ErrorStateView.swift`
-  - `MusiCards/Cards/ArtistCardContentView.swift`
-  - `MusiCards/Cards/TrackDetailPagerView.swift`
-  - `MusiCards/Cards/TracksCardContentView.swift`
-  - `MusiCards/Services/MusicBrainzService.swift`
-  - `MusiCards/Services/TrackDetailStore.swift`
-  - `MusiCardsTests/ArtistIndependentLoadingTests.swift` (new)
-  - `MusiCardsTests/MusicBrainzRetryTests.swift` (new)
-  - `MusiCardsTests/MusicBrainzSearchQueryTests.swift`
-  - `MusiCardsTests/SearchErrorSemanticsTests.swift`
-  - `MusiCardsTests/TrackDetailStoreTests.swift` (new)
-  - this handoff document
-- No unrelated user changes were present when this work began.
+- **Last completed application checkpoint before this documentation update:**
+  `5ba2b45` — `Prepare MusiCards 2.1 with search and library improvements`.
+- **Remote state at documentation review:** `main` matched `origin/main`.
+- **Working tree at documentation review:** clean.
+
+The checkpoint above deliberately identifies the last completed application
+change rather than claiming that this tracked document can contain the hash of
+its own future commit. Git and the user's newest instructions remain the source
+of truth.
 
 Always begin a new session with:
 
@@ -56,6 +46,14 @@ take precedence; update this document before handing the project off again.
   deliberately removed before the 2.0 release.
 - **Deployment targets in the project:** iOS 26.0 and macOS 26.0 for the main
   app target.
+
+### Current development version
+
+- **Version in the project:** 2.1 (build 9).
+- **Status:** committed to `main`; this document does not claim that 2.1 has
+  been submitted to or released on the App Store.
+- The public App Store baseline remains 2.0 (build 8) until the user confirms a
+  later distribution state.
 
 ### MusiCards Sync
 
@@ -134,7 +132,7 @@ The following work is already implemented and should be treated as the stable
 - Privacy manifests, signing/capability review, bundled-rsync provenance, and
   third-party licence material were completed before release.
 
-### Post-2.0 working-tree change
+### Post-2.0 / 2.1 development
 
 - MusicBrainz requests now silently retry at most five times after transient
   timeout, selected connectivity, HTTP 429, and HTTP 5xx failures. Backoff is
@@ -167,6 +165,24 @@ The following work is already implemented and should be treated as the stable
   Wikidata, and Wikipedia, but the 1.05-second MusicBrainz admission interval is
   now applied only to `musicbrainz.org` hosts. Wikidata/Wikipedia traffic no
   longer consumes MusicBrainz rate-limit slots.
+- Search now has an explicit `MY LIBRARY` / `MUSICBRAINZ` scope. Library-only
+  searches return owned catalogue results without starting a global
+  MusicBrainz request; the combined scope preserves library-first progressive
+  results and MusicBrainz enrichment.
+- User-entered comma syntax is parsed once into a typed `LibraryCatalogQuery`.
+  Providers no longer infer artist/release intent from punctuation or from an
+  artificial trailing comma.
+- Local availability remains strictly release-MBID based. Untagged albums no
+  longer mark similarly named MusicBrainz artists or release groups playable.
+- Library-only artist rows resolve to MusicBrainz only through an exact
+  case/diacritic/whitespace-normalized artist-name match; fuzzy first results
+  are not selected silently.
+- The Apple Music Now Playing row is visible again on the iOS Search card and
+  was verified manually on a physical iPhone.
+- `Tools/verify.sh` now provides one local preflight command for the complete
+  macOS test suite, generic iOS build, and MusiCards Sync tests.
+- Personal Xcode `xcuserdata` files are no longer tracked; each development
+  machine keeps its own breakpoints, bookmarks, and scheme-management state.
 
 Do not casually redesign these behaviours while starting a roadmap item. The
 2.0 release is the known-good baseline.
@@ -241,33 +257,34 @@ The repository has substantial XCTest coverage. Main areas include:
   view-model behaviour, index generation, remote destinations, bundled rsync,
   and Unicode normalization.
 
-Before handing off a code change, normally run in this order:
+Before handing off a code change, run affected focused tests while developing,
+then run the complete local preflight from the repository root:
 
-1. `git diff --check`
-2. affected unit tests
-3. MusiCards macOS build
-4. MusiCards iOS build
-5. MusiCards Sync build/tests when Sync or shared indexing code changed
+```sh
+./Tools/verify.sh
+```
 
-Most recent verification for the uncommitted MusicBrainz/Track Details and
-Artist-card fix on 2026-08-30:
+The script checks the complete tracked diff since `HEAD`, runs the MusiCards
+macOS tests, builds MusiCards for a generic iOS device, and runs the MusiCards
+Sync macOS tests. It stops at the first failure and does not change source files.
 
+Most recent complete verification for application checkpoint `5ba2b45` on
+2026-10-04:
+
+- the complete tracked diff passed the whitespace check;
 - all MusiCards macOS tests passed;
-- the focused retry/error-semantics/Track Details run passed 18 tests, including
-  8 new end-to-end retry policy tests and 3 Track Details state tests;
-- the focused Artist/cache/rate-limit regression run passed, including 3 new
-  independent Artist-section state tests;
-- MusiCards macOS compiled and linked as part of the full test run;
-- MusiCards generic iOS device build passed with code signing disabled;
-- `git diff --check` passed before the final handoff update.
+- the MusiCards generic iOS device build passed with code signing disabled;
+- all 62 MusiCards Sync tests passed;
+- Apple Music Now Playing was also verified manually on a physical iPhone.
 
 ## 7. Roadmap and next likely work
 
 The current roadmap is `Documentation/MusiCards_Roadmap.md`. Its four principal
 directions are:
 
-1. **My Library / full MusicBrainz catalogue switch** — recommended first,
-   initially scoped to Search.
+1. **My Library / full MusicBrainz catalogue switch** — the first, Search-only
+   scope is implemented; broader artist/release-group filtering remains an
+   optional product decision.
 2. **Bit-perfect/exclusive macOS output** — HAL device selection, hog mode,
    sample-rate control, hot-plug fallback, and diagnostics.
 3. **Navidrome → UPnP/DLNA renderer control** — MusiCards as control point only;
@@ -277,6 +294,12 @@ directions are:
 
 There is also a possible macOS mini-player idea.
 
+Before starting another roadmap feature, the agreed maintenance direction is
+to map and test `SearchViewModel` state transitions, then consolidate repeated
+search-start/reset logic without changing behaviour. A separate later cleanup
+may remove the redundant extracted rsync source tree while retaining its
+verified source archive, licence material, provenance, and build script.
+
 ### UPnP experiment already completed
 
 Do not restart UPnP discovery from assumptions. Existing real-hardware work is
@@ -284,8 +307,7 @@ documented in:
 
 - `Documentation/Experiments/MusiCards_Navidrome_AVM_handoff.md`
 - `Tools/UPnP/navidrome_avm_setnext_probe.command`
-- the currently untracked
-  `Documentation/MusiCards_Roadmap_No_3_ UPnP_Renderer_Task.md`
+- `Documentation/MusiCards_Roadmap_No_3_ UPnP_Renderer_Task.md`
 
 The experiment against an AVM Audio CS 2.3 and Navidrome already demonstrated:
 
@@ -359,7 +381,8 @@ Important invariants:
 
 At the end of a material session, update at least:
 
-1. **Snapshot:** date, branch, HEAD, remote relation, and exact dirty files.
+1. **Snapshot:** date, branch, last completed checkpoint, remote relation, and
+   exact dirty files.
 2. **Released products:** only when version/build/distribution state changed.
 3. **Completed state:** move newly finished work here in one concise bullet.
 4. **Roadmap:** mark what started, finished, changed direction, or was rejected.

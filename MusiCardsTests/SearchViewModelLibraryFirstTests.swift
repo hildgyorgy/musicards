@@ -53,6 +53,191 @@ final class SearchViewModelLibraryFirstTests: XCTestCase {
         XCTAssertTrue(viewModel.artistRows.isEmpty)
     }
 
+    @MainActor
+    func testBarcodeRetryRepeatsTheSameBarcodeRequest() async {
+        let service = SearchServiceStub()
+        service.behaviors["barcode:0123456789012"] = .failure(0)
+        let viewModel = makeViewModel(service: service)
+
+        viewModel.searchByBarcode("0 123456 789012")
+        await eventually { viewModel.searchError != nil }
+
+        viewModel.retrySearch()
+        await eventually { service.requestedQueries.count == 2 }
+
+        XCTAssertEqual(
+            service.requestedQueries,
+            ["barcode:0123456789012", "barcode:0123456789012"]
+        )
+    }
+
+    @MainActor
+    func testBarcodeSearchDoesNotAdvertisePagination() async {
+        let service = SearchServiceStub()
+        service.behaviors["barcode:0123456789012"] = .results(
+            (0..<20).map {
+                MBReleaseSearchResult(
+                    id: "barcode-release-\($0)",
+                    title: "Barcode Release \($0)"
+                )
+            },
+            0
+        )
+        let viewModel = makeViewModel(service: service)
+
+        viewModel.searchByBarcode("0123456789012")
+        await eventually { !viewModel.isSearching }
+
+        XCTAssertEqual(viewModel.releaseResults.count, 20)
+        XCTAssertFalse(viewModel.hasMoreResults)
+    }
+
+    @MainActor
+    func testRecognizedTrackRetryRepeatsRecordingResolution() async {
+        let service = SearchServiceStub()
+        service.recordingBehavior = .error(SearchTestError.failed, 0)
+        let viewModel = makeViewModel(service: service)
+
+        viewModel.searchByRecognizedTrack(
+            artist: "Miles Davis",
+            title: "So What"
+        )
+        await eventually { viewModel.searchError != nil }
+
+        viewModel.retrySearch()
+        await eventually { service.requestedRecordingQueries.count == 2 }
+
+        XCTAssertEqual(
+            service.requestedRecordingQueries,
+            ["Miles Davis|So What", "Miles Davis|So What"]
+        )
+        XCTAssertTrue(service.requestedQueries.isEmpty)
+    }
+
+    @MainActor
+    func testRecognizedTrackRetryKeepsItsOriginAfterReleaseGroupFailure() async {
+        let service = SearchServiceStub()
+        let candidate = MBReleaseSearchResult(
+            id: "release-a",
+            title: "Kind of Blue",
+            artistCredit: [
+                MBArtistCredit(
+                    name: "Miles Davis",
+                    artist: nil,
+                    joinPhrase: nil
+                )
+            ]
+        )
+        service.recordingBehavior = .results([
+            MBRecordingSearchResult(
+                id: "recording-a",
+                title: "So What",
+                artistCredit: candidate.artistCredit,
+                releases: [candidate]
+            )
+        ], 0)
+        service.loadedReleases["release-a"] = MBRelease(
+            id: "release-a",
+            title: "Kind of Blue",
+            artistCredit: candidate.artistCredit,
+            date: nil,
+            country: nil,
+            barcode: nil,
+            disambiguation: nil,
+            labelInfo: nil,
+            media: [
+                MBMedium(
+                    position: 1,
+                    trackCount: 1,
+                    format: "CD",
+                    tracks: [MBTrack(title: "So What")]
+                )
+            ],
+            releaseGroup: MBReleaseGroupRef(
+                id: "group-a",
+                title: "Kind of Blue"
+            ),
+            relations: nil,
+            annotation: nil
+        )
+        service.releaseGroupPages["group-a"] = [
+            0: .error(SearchTestError.failed, 0)
+        ]
+        let viewModel = makeViewModel(service: service)
+
+        viewModel.searchByRecognizedTrack(
+            artist: "Miles Davis",
+            title: "So What"
+        )
+        await eventually { viewModel.searchError != nil }
+
+        viewModel.retrySearch()
+        await eventually { service.requestedReleaseGroupIDs.count == 2 }
+
+        XCTAssertEqual(
+            service.requestedRecordingQueries,
+            ["Miles Davis|So What", "Miles Davis|So What"]
+        )
+    }
+
+    @MainActor
+    func testRecognizedTrackClearsPreviousReleaseMergeState() async {
+        let provider = SearchLibraryProvider(source: .local)
+        provider.catalogReleases = [
+            LibraryCatalogRelease(
+                releaseID: "owned-release",
+                title: "So What",
+                artistName: "Miles Davis"
+            )
+        ]
+        let service = SearchServiceStub()
+        let viewModel = SearchViewModel(
+            service: service,
+            libraryManager: LibraryManager(provider: provider),
+            searchDebounceNanoseconds: 0
+        )
+
+        viewModel.searchQuery = "Miles Davis, So What"
+        viewModel.queryDidChange()
+        await eventually {
+            viewModel.releaseResults.map(\.id) == ["owned-release"]
+        }
+
+        viewModel.searchByRecognizedTrack(
+            artist: "Miles Davis",
+            title: "So What"
+        )
+        await eventually { !viewModel.isSearching }
+        XCTAssertTrue(viewModel.releaseResults.isEmpty)
+
+        provider.availabilitySubject.send()
+        try? await Task.sleep(nanoseconds: 30_000_000)
+
+        XCTAssertTrue(viewModel.releaseResults.isEmpty)
+    }
+
+    @MainActor
+    func testRecognizedTrackWithSameQueryDoesNotSuppressNextUserSearch() async {
+        let service = SearchServiceStub()
+        let viewModel = makeViewModel(service: service)
+
+        viewModel.searchQuery = "Miles Davis, So What"
+        viewModel.queryDidChange()
+        await eventually { !viewModel.isSearching }
+
+        viewModel.searchByRecognizedTrack(
+            artist: "Miles Davis",
+            title: "So What"
+        )
+        await eventually { !viewModel.isSearching }
+
+        viewModel.searchQuery = "John Coltrane"
+        viewModel.queryDidChange()
+        await eventually {
+            service.requestedArtistQueries.contains("John Coltrane")
+        }
+    }
+
     func testSearchCardLabelFollowsExistingSearchMode() {
         XCTAssertEqual(SearchMode.search.cardLabel, "Search")
         XCTAssertEqual(
@@ -700,16 +885,24 @@ private final class SearchServiceStub: MusicBrainzSearchServing {
         case error(Error, UInt64)
     }
 
+    enum RecordingBehavior {
+        case results([MBRecordingSearchResult], UInt64)
+        case error(Error, UInt64)
+    }
+
     var behaviors: [String: Behavior] = [:]
     var releasePages: [String: [Int: [MBReleaseSearchResult]]] = [:]
     var artistPages: [String: [Int: ArtistBehavior]] = [:]
     var releaseGroupPages: [String: [Int: ReleaseGroupBehavior]] = [:]
+    var recordingBehavior: RecordingBehavior = .results([], 0)
+    var loadedReleases: [String: MBRelease] = [:]
     private(set) var requestedQueries: [String] = []
     private(set) var requestedReleaseOffsets: [Int] = []
     private(set) var completedReleaseQueries: [String] = []
     private(set) var requestedArtistQueries: [String] = []
     private(set) var requestedArtistOffsets: [Int] = []
     private(set) var requestedReleaseGroupIDs: [String] = []
+    private(set) var requestedRecordingQueries: [String] = []
 
     func searchReleases(
         query: String,
@@ -786,10 +979,21 @@ private final class SearchServiceStub: MusicBrainzSearchServing {
         limit: Int,
         offset: Int
     ) async throws -> [MBRecordingSearchResult] {
-        []
+        requestedRecordingQueries.append("\(artistName ?? "")|\(trackTitle)")
+        switch recordingBehavior {
+        case .results(let results, let delay):
+            try? await Task.sleep(nanoseconds: delay)
+            return results
+        case .error(let error, let delay):
+            try? await Task.sleep(nanoseconds: delay)
+            throw error
+        }
     }
 
     func loadRelease(id: String) async throws -> MBRelease {
+        if let release = loadedReleases[id] {
+            return release
+        }
         throw SearchTestError.failed
     }
 }

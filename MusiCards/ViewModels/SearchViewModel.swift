@@ -12,6 +12,13 @@ import Combine
 @MainActor
 final class SearchViewModel: ObservableObject {
 
+    private enum SearchRequest {
+        case typed
+        case barcode(String)
+        case recognizedTrack(artist: String, title: String)
+        case releaseGroup
+    }
+
     // MARK: - Single search field (search mode)
     @Published var searchQuery: String = ""
 
@@ -49,6 +56,7 @@ final class SearchViewModel: ObservableObject {
     private let searchDebounceNanoseconds: UInt64
     private let searchBehavior: SearchBehavior
     private var searchGeneration: UInt64 = 0
+    private var activeSearchRequest: SearchRequest?
     private var lastScheduledNormalizedQuery: String?
     private var activeReleaseSearchQuery: String?
     private var libraryReleaseRows: [SearchReleaseRow] = []
@@ -142,6 +150,7 @@ final class SearchViewModel: ObservableObject {
         resetReleaseSearchMergeState()
         resetArtistSearchMergeState()
         promotedReleaseIDs = []
+        activeSearchRequest = q.count >= 3 ? .typed : nil
 
         guard q.count >= 3 else {
             releaseResults = []
@@ -184,16 +193,20 @@ final class SearchViewModel: ObservableObject {
         isLoadingMoreVersions = false
         currentReleaseGroupID = nil
         resetReleaseSearchMergeState()
+        resetArtistSearchMergeState()
         promotedReleaseIDs = []
+        activeSearchRequest = nil
     }
 
     func searchByBarcode(_ barcode: String) {
+        let normalized = barcode.filter(\.isNumber)
+
         searchTask?.cancel()
         cancelPaginationTasks()
         searchGeneration &+= 1
         let generation = searchGeneration
         currentOffset = 0
-        hasMoreResults = true
+        hasMoreResults = false
         isLoadingMore = false
         searchError = nil
         isSearching = true
@@ -203,9 +216,9 @@ final class SearchViewModel: ObservableObject {
         artistRows = []
         releaseResults = []
         resetReleaseSearchMergeState()
+        resetArtistSearchMergeState()
         promotedReleaseIDs = []
-
-        let normalized = barcode.filter(\.isNumber)
+        activeSearchRequest = .barcode(normalized)
 
         searchTask = Task {
             defer {
@@ -222,7 +235,7 @@ final class SearchViewModel: ObservableObject {
                 releaseResults = []
                 artistRows = []
                 currentOffset = results.count
-                hasMoreResults = results.count == pageSize
+                hasMoreResults = false
                 searchError = nil
 
                 await prepareReleaseRowsSequentially(
@@ -244,106 +257,145 @@ final class SearchViewModel: ObservableObject {
         }
     }
 #if os(iOS)
-func searchByRecognizedTrack(_ match: ShazamMatch) {
-    searchTask?.cancel()
-    cancelPaginationTasks()
-    searchGeneration &+= 1
-    let generation = searchGeneration
-
-    currentOffset = 0
-    hasMoreResults = false
-    isLoadingMore = false
-    searchError = nil
-    isSearching = true
-
-    mode = .search
-    artistRows = []
-    releaseResults = []
-    promotedReleaseIDs = []
-
-    let artist = match.artist.trimmingCharacters(in: .whitespacesAndNewlines)
-    let title = match.title.trimmingCharacters(in: .whitespacesAndNewlines)
-
-    guard !artist.isEmpty, !title.isEmpty else {
-        isSearching = false
-        return
+    func searchByRecognizedTrack(_ match: ShazamMatch) {
+        searchByRecognizedTrack(
+            artist: match.artist,
+            title: match.title
+        )
     }
+#endif
 
-    suppressNextQueryChange = true
-    searchQuery = "\(artist), \(title)"
+    func searchByRecognizedTrack(artist rawArtist: String, title rawTitle: String) {
+        searchTask?.cancel()
+        cancelPaginationTasks()
+        searchGeneration &+= 1
+        let generation = searchGeneration
 
-    searchTask = Task {
-        defer {
-            if generation == searchGeneration { isSearching = false }
+        currentOffset = 0
+        hasMoreResults = false
+        isLoadingMore = false
+        searchError = nil
+        isSearching = true
+
+        mode = .search
+        artistRows = []
+        releaseResults = []
+        resetReleaseSearchMergeState()
+        resetArtistSearchMergeState()
+        promotedReleaseIDs = []
+
+        let artist = rawArtist.trimmingCharacters(in: .whitespacesAndNewlines)
+        let title = rawTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !artist.isEmpty, !title.isEmpty else {
+            activeSearchRequest = nil
+            isSearching = false
+            return
         }
 
-        do {
-            let recordings = try await musicBrainzService.searchRecordings(
-                trackTitle: title,
-                artistName: artist,
-                limit: 20,
-                offset: 0
-            )
-            guard generation == searchGeneration else { return }
+        activeSearchRequest = .recognizedTrack(artist: artist, title: title)
 
-            let trackReleases = flattenRecordingResults(recordings)
+        let recognizedQuery = "\(artist), \(title)"
+        if searchQuery != recognizedQuery {
+            suppressNextQueryChange = true
+            searchQuery = recognizedQuery
+        } else {
+            suppressNextQueryChange = false
+            lastScheduledNormalizedQuery = recognizedQuery
+        }
 
-            for candidate in trackReleases.prefix(20) {
-                guard artistMatchRank(candidate.artistCredit, artistQuery: artist) <= 1 else {
-                    continue
-                }
+        searchTask = Task {
+            defer {
+                if generation == searchGeneration { isSearching = false }
+            }
 
-                guard let detailedRelease = try? await musicBrainzService.loadRelease(id: candidate.id) else {
-                    continue
-                }
+            do {
+                let recordings = try await musicBrainzService.searchRecordings(
+                    trackTitle: title,
+                    artistName: artist,
+                    limit: 20,
+                    offset: 0
+                )
                 guard generation == searchGeneration else { return }
 
-                guard releaseContainsTrackTitle(detailedRelease, trackTitle: title) else {
-                    continue
-                }
+                let trackReleases = flattenRecordingResults(recordings)
 
-                if let releaseGroupID = detailedRelease.releaseGroup?.id {
-                    loadReleaseGroupResults(
-                        releaseGroupID: releaseGroupID,
-                        releaseTitle: detailedRelease.releaseGroup?.title ?? candidate.title,
-                        artistName: artist
+                for candidate in trackReleases.prefix(20) {
+                    guard artistMatchRank(
+                        candidate.artistCredit,
+                        artistQuery: artist
+                    ) <= 1 else {
+                        continue
+                    }
+
+                    guard let detailedRelease = try? await musicBrainzService.loadRelease(
+                        id: candidate.id
+                    ) else {
+                        continue
+                    }
+                    guard generation == searchGeneration else { return }
+
+                    guard releaseContainsTrackTitle(
+                        detailedRelease,
+                        trackTitle: title
+                    ) else {
+                        continue
+                    }
+
+                    if let releaseGroupID = detailedRelease.releaseGroup?.id {
+                        loadReleaseGroupResults(
+                            releaseGroupID: releaseGroupID,
+                            releaseTitle: detailedRelease.releaseGroup?.title
+                                ?? candidate.title,
+                            artistName: artist,
+                            preserveActiveRequest: true
+                        )
+                        return
+                    }
+
+                    releaseResults = []
+                    artistRows = []
+                    currentOffset = 1
+                    hasMoreResults = false
+
+                    await prepareReleaseRowsSequentially(
+                        from: [candidate],
+                        append: false,
+                        generation: generation
                     )
                     return
                 }
 
                 releaseResults = []
                 artistRows = []
-                currentOffset = 1
                 hasMoreResults = false
+                searchError = nil
 
-                await prepareReleaseRowsSequentially(
-                    from: [candidate],
-                    append: false,
-                    generation: generation
-                )
+            } catch is CancellationError {
                 return
+            } catch {
+                if Self.isCancellation(error) { return }
+                guard generation == searchGeneration else { return }
+                releaseResults = []
+                artistRows = []
+                hasMoreResults = false
+                searchError = error
             }
-
-            releaseResults = []
-            artistRows = []
-            hasMoreResults = false
-            searchError = nil
-
-        } catch is CancellationError {
-            return
-        } catch {
-            if Self.isCancellation(error) { return }
-            guard generation == searchGeneration else { return }
-            releaseResults = []
-            artistRows = []
-            hasMoreResults = false
-            searchError = error
         }
     }
-}
-#endif
 
     func retrySearch() {
+        switch activeSearchRequest {
+        case .barcode(let barcode):
+            searchByBarcode(barcode)
+            return
+        case .recognizedTrack(let artist, let title):
+            searchByRecognizedTrack(artist: artist, title: title)
+            return
+        case .typed, .releaseGroup, .none:
+            break
+        }
+
         searchTask?.cancel()
         cancelPaginationTasks()
         searchGeneration &+= 1
@@ -358,6 +410,7 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
             releaseResults = []
             artistRows = []
             resetReleaseSearchMergeState()
+            resetArtistSearchMergeState()
             promotedReleaseIDs = []
 
             let q = normalizedSearchQuery
@@ -547,7 +600,8 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
     func loadReleaseGroupResults(
         releaseGroupID: String,
         releaseTitle: String,
-        artistName: String
+        artistName: String,
+        preserveActiveRequest: Bool = false
     ) {
         searchTask?.cancel()
         cancelPaginationTasks()
@@ -557,6 +611,9 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
         displayTitle = releaseTitle
         displayArtist = artistName
         mode = .releaseGroupResults(releaseGroupID: releaseGroupID)
+        if !preserveActiveRequest {
+            activeSearchRequest = .releaseGroup
+        }
 
         // Reset version pagination
         versionsOffset = 0
@@ -567,6 +624,8 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
 
         releaseResults = []
         artistRows = []
+        resetReleaseSearchMergeState()
+        resetArtistSearchMergeState()
         searchError = nil
         isSearching = true
         isLoadingMore = false

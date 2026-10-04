@@ -116,19 +116,28 @@ Ha bitperfekt/kizárólagos mód aktív, és két egymást követő szám **elt�
 
 ### Jelenlegi állapot
 
-- **Keresési lista**: blendelt, nem választható szét – a `SearchViewModel`-ben a `mergeLibraryFirst`/`stablePlayableFirst` mindig library-first sorrendben mutatja a MusicBrainz- és library-találatokat együtt.
+- **Keresési lista**: az első, szűk változat elkészült. A Search kártyán a
+  `MY LIBRARY` / `MUSICBRAINZ` scope-kapcsoló választ a `libraryOnly` és a
+  `libraryAndMusicBrainz` működés között. Library-only módban a keresés nem
+  indít globális MusicBrainz-kérést; a kombinált mód library-first találatokat
+  mutat, majd MusicBrainz-adatokkal egészíti ki őket.
 - **Artist-oldal** (`loadArtist` a `MusiCardsAppModel`-ben): meglepő, jó hír – ez **már most is 100%-ban tiszta MusicBrainz-katalógus**, semmilyen library-szűrés nincs rajta. A "teljes katalógus exploration" élmény tehát ott már eleve létezik.
 
-### A munka
+### Elkészült és nyitott kérdések
 
-A fő bizonytalanság itt **nem technikai, hanem termékdöntés**: meddig terjedjen ki a "My Library" mód?
+- **Elkészült:** a keresési lista scope-váltása, library-only hálózati
+  rövidzárral és library-first kombinált találatokkal.
+- **Nyitott termékdöntés:** terjedjen-e ki a "My Library" mód a keresésen túl az
+  artist-oldalra vagy a release-group verzióböngészésre is?
 
-- **Szűken (csak a keresési lista)** – kicsi feladat: egy mód-flag, ami "My Library" módban kihagyja a MusicBrainz-lekérdezést, és csak a `libraryReleaseRows`-t mutatja. A legtöbb alapkő (`libraryManager.containsRelease`, a meglévő merge-logika) már megvan hozzá.
-- **Kiterjesztve (artist-oldal, release-group verzió-böngészés is)** – közepes feladat: owned/not-owned szűrést kellene bevezetni olyan helyeken, ahol ma egyáltalán nincs.
+- **Kiterjesztett változat (artist-oldal, release-group verzióböngészés):**
+  továbbra is közepes feladat lenne, mert owned/not-owned szűrést kellene
+  bevezetni olyan helyeken, ahol ma nincs.
 
-**Javaslat:** szűken indulni (csak a keresés), és csak akkor bővíteni, ha használat közben tényleges hiányérzet jelentkezik.
+**Javaslat:** a már elkészült Search-only változatot használat közben
+értékelni, és csak tényleges hiányérzet esetén bővíteni.
 
-**Nehézség: Kicsi–közepes**, attól függően, mennyire terjed ki a mód a keresésen túlra.
+**Hátralévő nehézség: Közepes**, ha a scope a keresésen túlra is kiterjed.
 
 ---
 
@@ -136,7 +145,9 @@ A fő bizonytalanság itt **nem technikai, hanem termékdöntés**: meddig terje
 
 A sorrend nem véletlenszerű – tényleges függőségekre és kockázat-elszigetelésre épül.
 
-1. **My Library/katalógus váltás** – nem nyúl a törékeny lejátszó-motorhoz, gyors siker, és a termékdöntést (mennyire terjedjen ki) olcsó kipróbálni és módosítani, amíg még kicsi a felület.
+1. **My Library/katalógus váltás** – a Search-only első változat elkészült.
+   Használati tapasztalat alapján később külön dönthető el, szükséges-e az
+   artist- és release-group nézetekre is kiterjeszteni.
 
 2. **Bitperfekt** – ez adja meg a lejátszó-motorban azt az alap-primitívet ("azonos rátájú szám → gyors váltás, eltérő rátájú → tudatos, rövid csend"), amire a gapless (4. pont) építeni fog. Ha ezt előbb csináljuk meg és teszteljük önmagában, a gapless-nél egy bevált, stabil eszköz-konfigurációs réteg fölé építünk, nem egyszerre két mozgó alkatrészt hegesztünk össze.
 
@@ -146,4 +157,3 @@ A sorrend nem véletlenszerű – tényleges függőségekre és kockázat-elszi
 
 Mind a négy önállóan is értékes munkacsomag – nem kell egyben megcsinálni, és a sorrend pont azt szolgálja, hogy egyik se dolgozzon a másik ellen menet közben.
 ## macOS alatt esetleg egy “miniplayer” nézet
-
