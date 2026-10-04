@@ -308,7 +308,7 @@ final class NavidromeLibraryProviderTests: XCTestCase {
 
         XCTAssertTrue(provider.containsArtist(named: "Patricia Barber"))
         XCTAssertTrue(provider.containsArtist(named: "Guest"))
-        XCTAssertTrue(provider.containsArtist(named: "Catalog Only Artist"))
+        XCTAssertFalse(provider.containsArtist(named: "Catalog Only Artist"))
         XCTAssertFalse(provider.containsArtist(named: "Patricia"))
         XCTAssertFalse(provider.containsArtist(named: "Barber"))
         XCTAssertTrue(
@@ -379,18 +379,21 @@ final class NavidromeLibraryProviderTests: XCTestCase {
         )
 
         XCTAssertTrue(
-            provider.searchCatalog(query: "Nirvana, Nevermind", limit: 50)
+            provider.searchCatalog(
+                query: .releases(artist: "Nirvana", text: "Nevermind"),
+                limit: 50
+            )
                 .isEmpty
         )
         await provider.refreshCatalog()
         let detailRequestsAfterRefresh = await client.requestedDetailIDs()
 
         let releaseMatches = provider.searchCatalog(
-            query: "Nirvana, Never-mind",
+            query: .releases(artist: "Nirvana", text: "Never-mind"),
             limit: 50
         )
         let trackMatches = provider.searchCatalog(
-            query: "Nirvana, Teen Spirit",
+            query: .releases(artist: "Nirvana", text: "Teen Spirit"),
             limit: 50
         )
         let detailRequestsAfterSearch = await client.requestedDetailIDs()

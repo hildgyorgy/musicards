@@ -33,7 +33,7 @@ final class LocalLibraryProvider: LibraryProvider {
     }
 
     func searchCatalog(
-        query: String,
+        query: LibraryCatalogQuery,
         limit: Int
     ) -> [LibraryCatalogRelease] {
         store.searchCatalog(query: query, limit: limit)

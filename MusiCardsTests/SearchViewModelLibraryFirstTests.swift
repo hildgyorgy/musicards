@@ -4,6 +4,27 @@ import XCTest
 @testable import MusiCards
 
 final class SearchViewModelLibraryFirstTests: XCTestCase {
+    func testLibraryCatalogQueryMakesCommaSyntaxExplicit() {
+        XCTAssertEqual(
+            SearchViewModel.libraryCatalogQuery(from: "Miles Davis"),
+            .artists(matching: "Miles Davis")
+        )
+        XCTAssertEqual(
+            SearchViewModel.libraryCatalogQuery(from: "Miles Davis,"),
+            .releases(artist: "Miles Davis", text: nil)
+        )
+        XCTAssertEqual(
+            SearchViewModel.libraryCatalogQuery(
+                from: "Miles Davis, Kind of Blue"
+            ),
+            .releases(artist: "Miles Davis", text: "Kind of Blue")
+        )
+        XCTAssertEqual(
+            SearchViewModel.libraryCatalogQuery(from: ", Kind of Blue"),
+            .releases(artist: nil, text: "Kind of Blue")
+        )
+    }
+
     @MainActor
     func testLibraryOnlyReleaseSearchDoesNotCallMusicBrainz() async {
         let service = SearchServiceStub()
@@ -633,7 +654,10 @@ private final class SearchLibraryProvider: LibraryProvider {
     }
 
     func refreshCatalog() async {}
-    func searchCatalog(query: String, limit: Int) -> [LibraryCatalogRelease] {
+    func searchCatalog(
+        query: LibraryCatalogQuery,
+        limit: Int
+    ) -> [LibraryCatalogRelease] {
         LibraryCatalogSearch.search(
             catalogReleases,
             query: query,

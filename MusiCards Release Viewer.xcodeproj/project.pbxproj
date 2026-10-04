@@ -693,7 +693,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = MusiCards/MusiCardsMac/MusiCardsMac.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 9;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 963B9MS98N;
 				ENABLE_APP_SANDBOX = YES;
@@ -716,7 +716,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 2.0;
+				MARKETING_VERSION = 2.1;
 				PRODUCT_BUNDLE_IDENTIFIER = hu.hildgyorgy.musicards;
 				PRODUCT_NAME = MusiCards;
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -748,7 +748,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = MusiCards/MusiCardsMac/MusiCardsMac.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 9;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 963B9MS98N;
 				ENABLE_APP_SANDBOX = YES;
@@ -771,7 +771,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 2.0;
+				MARKETING_VERSION = 2.1;
 				PRODUCT_BUNDLE_IDENTIFIER = hu.hildgyorgy.musicards;
 				PRODUCT_NAME = MusiCards;
 				PROVISIONING_PROFILE_SPECIFIER = "";

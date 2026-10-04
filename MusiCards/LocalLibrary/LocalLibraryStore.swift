@@ -186,7 +186,7 @@ final class LocalLibraryStore: ObservableObject {
     }
 
     func searchCatalog(
-        query: String,
+        query: LibraryCatalogQuery,
         limit: Int
     ) -> [LibraryCatalogRelease] {
         lookup.searchCatalog(query: query, limit: limit)

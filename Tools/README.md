@@ -65,3 +65,21 @@ On iOS, MusiCards reads only `library.json` while connecting. It does not scan o
 download the complete music collection, and it never generates the index. An
 individual remote audio file is needed only when that track is selected for
 playback.
+
+## Project verification
+
+Run the complete local verification from anywhere inside the repository:
+
+```sh
+./Tools/verify.sh
+```
+
+The script stops at the first failure and performs these checks in order:
+
+1. checks the current Git diff for whitespace errors;
+2. runs the MusiCards test suite on macOS;
+3. builds MusiCards for a generic iOS device;
+4. runs the MusiCards Sync test suite on macOS.
+
+It requires the Xcode version used by the project and does not modify source
+files or attempt to fix failures automatically.

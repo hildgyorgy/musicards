@@ -144,7 +144,12 @@ final class LibraryManagerTests: XCTestCase {
         )
 
         XCTAssertEqual(
-            manager.searchCatalog(query: "Shared Artist, Shared Album")
+            manager.searchCatalog(
+                query: .releases(
+                    artist: "Shared Artist",
+                    text: "Shared Album"
+                )
+            )
                 .map(\.releaseID),
             ["local-release"]
         )
@@ -152,7 +157,12 @@ final class LibraryManagerTests: XCTestCase {
         manager.setActiveSource(.navidrome)
 
         XCTAssertEqual(
-            manager.searchCatalog(query: "Shared Artist, Shared Album")
+            manager.searchCatalog(
+                query: .releases(
+                    artist: "Shared Artist",
+                    text: "Shared Album"
+                )
+            )
                 .map(\.releaseID),
             ["navidrome-release"]
         )
@@ -282,7 +292,7 @@ private final class LibraryProviderSpy: LibraryProvider {
     }
 
     func searchCatalog(
-        query: String,
+        query: LibraryCatalogQuery,
         limit: Int
     ) -> [LibraryCatalogRelease] {
         LibraryCatalogSearch.search(

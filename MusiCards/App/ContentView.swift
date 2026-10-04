@@ -211,6 +211,7 @@ struct ContentView: View {
                 libraryManager: appModel.libraryManager,
                 recentArtists: appModel.recentArtists,
                 recentReleases: appModel.recentReleases,
+                nowPlayingRelease: appModel.nowPlayingRelease,
                 onSelectRelease: { row in
                     appModel.selectRelease(row)
                     appModel.addRecentRelease(row)
@@ -226,6 +227,11 @@ struct ContentView: View {
                 onSelectRecentRelease: { release in
                     appModel.selectRecentRelease(release)
                 },
+                onSelectNowPlayingRelease: {
+                    #if os(iOS)
+                        appModel.openNowPlayingVersions()
+                    #endif
+                }
             )
         case .release:
             if appModel.isLoadingRelease {

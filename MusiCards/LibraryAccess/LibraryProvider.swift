@@ -15,7 +15,7 @@ protocol LibraryProvider: AnyObject {
     func refreshCatalog() async
     func refreshCatalogIfNeeded() async
     func searchCatalog(
-        query: String,
+        query: LibraryCatalogQuery,
         limit: Int
     ) -> [LibraryCatalogRelease]
     func prepareTrackAvailability(forRelease releaseID: String) async

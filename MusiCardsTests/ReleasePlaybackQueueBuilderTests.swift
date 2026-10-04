@@ -217,7 +217,7 @@ private final class QueueLibraryProvider: LibraryProvider {
     func refreshCatalog() async {}
 
     func searchCatalog(
-        query: String,
+        query: LibraryCatalogQuery,
         limit: Int
     ) -> [LibraryCatalogRelease] {
         []

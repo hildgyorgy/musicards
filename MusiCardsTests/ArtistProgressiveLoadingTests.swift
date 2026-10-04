@@ -10,6 +10,45 @@ final class ArtistProgressiveLoadingTests: XCTestCase {
         XCTAssertEqual(row.lifeSpan, "1970–")
     }
 
+    func testLibraryArtistResolutionSkipsFuzzyFirstResult() {
+        let matches = [
+            MBArtistSearchResult(
+                id: "fuzzy",
+                name: "Patricia Barber Quartet",
+                lifeSpan: nil
+            ),
+            MBArtistSearchResult(
+                id: "exact",
+                name: "Patrícia  Barber",
+                lifeSpan: nil
+            )
+        ]
+
+        let match = MusiCardsAppModel.exactArtistMatch(
+            named: "Patricia Barber",
+            in: matches
+        )
+
+        XCTAssertEqual(match?.id, "exact")
+    }
+
+    func testLibraryArtistResolutionRejectsOnlyFuzzyResults() {
+        let matches = [
+            MBArtistSearchResult(
+                id: "fuzzy",
+                name: "Patricia Barber Quartet",
+                lifeSpan: nil
+            )
+        ]
+
+        XCTAssertNil(
+            MusiCardsAppModel.exactArtistMatch(
+                named: "Patricia Barber",
+                in: matches
+            )
+        )
+    }
+
     func testDiscographyGroupingKeepsTypeOrderAndNewestFirst() {
         let groups = [
             MBReleaseGroupSummary(id: "single", title: "Single", primaryType: "Single", secondaryTypes: nil, firstReleaseDate: "2020", disambiguation: nil),

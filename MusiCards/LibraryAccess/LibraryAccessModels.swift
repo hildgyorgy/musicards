@@ -57,21 +57,28 @@ nonisolated struct LibraryCatalogRelease: Equatable, Sendable {
     }
 }
 
+/// Explicit search intent passed through the library provider boundary.
+/// User-entered comma syntax is parsed once by SearchViewModel; providers do
+/// not infer search behavior from punctuation.
+nonisolated enum LibraryCatalogQuery: Equatable, Sendable {
+    case artists(matching: String)
+    case releases(artist: String?, text: String?)
+    case releaseID(String)
+}
+
 /// Shared, deterministic catalog matching used by Local and Navidrome.
-/// This mirrors the proven library-first web search: comma syntax scopes the
-/// left side to artist and the right side to release/track; otherwise every
-/// normalized token may occur across artist, release and track metadata.
+/// Artist terms match artist metadata. Release text matches release and track
+/// titles, preserving the existing library-first search behavior.
 nonisolated enum LibraryCatalogSearch {
     static func search(
         _ releases: [LibraryCatalogRelease],
-        query: String,
+        query: LibraryCatalogQuery,
         limit: Int = 50
     ) -> [LibraryCatalogRelease] {
-        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, limit > 0 else { return [] }
+        guard limit > 0 else { return [] }
 
         return releases.enumerated().compactMap { index, release in
-            score(release, query: trimmed).map {
+            score(release, query: query).map {
                 (release: release, score: $0, index: index)
             }
         }.sorted { lhs, rhs in
@@ -97,28 +104,40 @@ nonisolated enum LibraryCatalogSearch {
 
     private static func score(
         _ release: LibraryCatalogRelease,
-        query: String
+        query: LibraryCatalogQuery
     ) -> Int? {
-        let normalizedReleaseID = release.releaseID
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
-        let normalizedQueryID = query
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
-        if normalizedReleaseID == normalizedQueryID {
-            return 1_000
-        }
-
         let artist = normalizedText(release.artistName)
         let title = normalizedText(release.title)
         let tracks = release.trackTitles.map(normalizedText)
-        let commaIndex = query.firstIndex(of: ",")
-        let matches: Bool
+        let artistQuery: String
+        let titleQuery: String
 
-        if let commaIndex {
-            let artistTokens = tokens(String(query[..<commaIndex]))
-            let releaseStart = query.index(after: commaIndex)
-            let releaseTokens = tokens(String(query[releaseStart...]))
+        switch query {
+        case .releaseID(let releaseID):
+            let normalizedReleaseID = release.releaseID
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+            let normalizedQueryID = releaseID
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+            return normalizedReleaseID == normalizedQueryID ? 1_000 : nil
+
+        case .artists(let queryText):
+            artistQuery = normalizedText(queryText)
+            titleQuery = ""
+            let artistTokens = tokens(queryText)
+            guard includesEvery(artist, tokens: artistTokens) else {
+                return nil
+            }
+
+        case .releases(let artistText, let releaseText):
+            artistQuery = normalizedText(artistText ?? "")
+            titleQuery = normalizedText(releaseText ?? "")
+            let artistTokens = tokens(artistText ?? "")
+            let releaseTokens = tokens(releaseText ?? "")
+            guard !artistTokens.isEmpty || !releaseTokens.isEmpty else {
+                return nil
+            }
             let artistMatches = artistTokens.isEmpty
                 || includesEvery(artist, tokens: artistTokens)
             let releaseMatches = releaseTokens.isEmpty
@@ -126,41 +145,16 @@ nonisolated enum LibraryCatalogSearch {
                 || tracks.contains {
                     includesEvery($0, tokens: releaseTokens)
                 }
-            matches = artistMatches && releaseMatches
-                && (!artistTokens.isEmpty || !releaseTokens.isEmpty)
-        } else {
-            let queryTokens = tokens(query)
-            let allText = ([artist, title] + tracks).joined(separator: " ")
-            matches = includesEvery(allText, tokens: queryTokens)
+            guard artistMatches && releaseMatches else { return nil }
         }
 
-        guard matches else { return nil }
-
-        let titleQuery: String
-        let artistQuery: String
-        if let commaIndex {
-            artistQuery = normalizedText(String(query[..<commaIndex]))
-            titleQuery = normalizedText(
-                String(query[query.index(after: commaIndex)...])
-            )
-        } else {
-            let normalizedQuery = normalizedText(query)
-            artistQuery = normalizedQuery
-            titleQuery = normalizedQuery
-        }
         var result = 10
         if !titleQuery.isEmpty, title == titleQuery { result += 100 }
         if !artistQuery.isEmpty, artist == artistQuery { result += 80 }
         if !titleQuery.isEmpty, title.hasPrefix(titleQuery) { result += 40 }
         if !artistQuery.isEmpty, artist.hasPrefix(artistQuery) { result += 30 }
 
-        let trackQuery: String
-        if let commaIndex {
-            trackQuery = String(query[query.index(after: commaIndex)...])
-        } else {
-            trackQuery = query
-        }
-        let trackNeedle = normalizedText(trackQuery)
+        let trackNeedle = titleQuery
         if !trackNeedle.isEmpty,
            tracks.contains(where: { $0.contains(trackNeedle) }) {
             result += 20

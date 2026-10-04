@@ -476,9 +476,12 @@ final class MusiCardsAppModel: ObservableObject {
                 guard let self else { return }
                 do {
                     let matches = try await musicBrainzService.searchArtists(
-                        query: "artist:\(row.name)", limit: 5, offset: 0
+                        query: row.name, limit: 5, offset: 0
                     )
-                    guard let match = matches.first else { return }
+                    guard let match = Self.exactArtistMatch(
+                        named: row.name,
+                        in: matches
+                    ) else { return }
                     selectArtist(
                         id: match.id,
                         name: match.name,
@@ -492,6 +495,29 @@ final class MusiCardsAppModel: ObservableObject {
             return
         }
         selectArtist(id: row.id, name: row.name, lifeSpan: row.lifeSpan.nilIfEmpty)
+    }
+
+    nonisolated static func exactArtistMatch(
+        named artistName: String,
+        in matches: [MBArtistSearchResult]
+    ) -> MBArtistSearchResult? {
+        let expectedName = normalizedArtistName(artistName)
+        guard !expectedName.isEmpty else { return nil }
+        return matches.first {
+            normalizedArtistName($0.name) == expectedName
+        }
+    }
+
+    nonisolated private static func normalizedArtistName(
+        _ artistName: String
+    ) -> String {
+        artistName
+            .split(whereSeparator: { $0.isWhitespace })
+            .joined(separator: " ")
+            .folding(
+                options: [.caseInsensitive, .diacriticInsensitive],
+                locale: Locale(identifier: "en_US_POSIX")
+            )
     }
 
     func selectArtist(id: String) {

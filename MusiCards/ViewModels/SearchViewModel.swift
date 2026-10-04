@@ -710,9 +710,11 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
         releaseTitle: String,
         artistName: String
     ) async -> [SearchReleaseRow] {
-        let query = "\(artistName), \(releaseTitle)"
         let candidates = libraryManager.searchCatalog(
-            query: query,
+            query: .releases(
+                artist: artistName,
+                text: releaseTitle
+            ),
             limit: librarySearchLimit
         )
         guard !candidates.isEmpty else { return [] }
@@ -926,7 +928,7 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
 
     private func updateLibraryReleaseResults(query: String) {
         libraryReleaseRows = libraryManager.searchCatalog(
-            query: query,
+            query: Self.libraryCatalogQuery(from: query),
             limit: librarySearchLimit
         ).map(makeLibraryReleaseRow)
         publishMergedReleaseResults()
@@ -935,10 +937,7 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
     private func updateLibraryArtistResults(query: String) {
         var seen = Set<String>()
         libraryArtistRows = libraryManager.searchCatalog(
-            // Artist searches must not match release or track text. The
-            // trailing comma selects the library searcher's artist-only
-            // branch while keeping the existing source-independent matcher.
-            query: "\(query),",
+            query: .artists(matching: query),
             limit: librarySearchLimit
         ).compactMap { release in
             let name = release.artistName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -950,6 +949,33 @@ func searchByRecognizedTrack(_ match: ShazamMatch) {
         if searchBehavior == .scoped {
             publishMergedArtistResults()
         }
+    }
+
+    nonisolated static func libraryCatalogQuery(
+        from rawQuery: String
+    ) -> LibraryCatalogQuery {
+        let query = normalizeSearchQuery(rawQuery)
+        if MBIdentifiers.isMBID(query) {
+            return .releaseID(query)
+        }
+        if MBIdentifiers.isBareBarcode(query) {
+            return .releases(artist: nil, text: query)
+        }
+        guard let commaIndex = query.firstIndex(of: ",") else {
+            return .artists(matching: query)
+        }
+        let releaseStart = query.index(after: commaIndex)
+        return .releases(
+            artist: nonemptySearchPart(String(query[..<commaIndex])),
+            text: nonemptySearchPart(String(query[releaseStart...]))
+        )
+    }
+
+    nonisolated private static func nonemptySearchPart(
+        _ value: String
+    ) -> String? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     private func publishMergedArtistResults() {

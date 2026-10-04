@@ -257,7 +257,7 @@ final class NavidromeLibraryProvider: ObservableObject, LibraryProvider {
     }
 
     func searchCatalog(
-        query: String,
+        query: LibraryCatalogQuery,
         limit: Int
     ) -> [LibraryCatalogRelease] {
         return LibraryCatalogSearch.search(

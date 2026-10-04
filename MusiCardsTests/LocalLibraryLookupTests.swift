@@ -135,6 +135,27 @@ final class LocalLibraryLookupTests: XCTestCase {
         )
     }
 
+    func testUntaggedAlbumDoesNotMarkMusicBrainzResultsPlayable() {
+        let lookup = LocalLibraryLookup(files: [
+            file(
+                path: "Catalog Only/01 Song.flac",
+                artist: "Catalog Only Artist",
+                album: "Catalog Only Album",
+                releaseID: "",
+                recordingID: nil,
+                releaseTrackID: nil
+            )
+        ])
+
+        XCTAssertFalse(lookup.containsArtist(named: "Catalog Only Artist"))
+        XCTAssertFalse(
+            lookup.containsReleaseGroup(
+                title: "Catalog Only Album",
+                artistName: "Catalog Only Artist"
+            )
+        )
+    }
+
     func testCatalogSearchMatchesArtistReleaseTrackAndNormalization() {
         let nevermindID = "189002e7-3285-4e2e-92a3-7f6c30d407a2"
         let lookup = LocalLibraryLookup(files: [
@@ -173,20 +194,39 @@ final class LocalLibraryLookupTests: XCTestCase {
         ])
 
         XCTAssertEqual(
-            lookup.searchCatalog(query: "Nirvána, Nevermind").map(\.releaseID),
+            lookup.searchCatalog(
+                query: .artists(matching: "Nirvána")
+            ).map(\.releaseID),
             [nevermindID, "live-release"]
         )
         XCTAssertTrue(
-            lookup.searchCatalog(query: "Nirvana, Never-mind")
+            lookup.searchCatalog(
+                query: .artists(matching: "Nevermind")
+            ).isEmpty
+        )
+        XCTAssertEqual(
+            lookup.searchCatalog(
+                query: .releases(artist: "Nirvána", text: "Nevermind")
+            ).map(\.releaseID),
+            [nevermindID, "live-release"]
+        )
+        XCTAssertTrue(
+            lookup.searchCatalog(
+                query: .releases(artist: "Nirvana", text: "Never-mind")
+            )
                 .map(\.releaseID)
                 .contains(nevermindID)
         )
         XCTAssertEqual(
-            lookup.searchCatalog(query: "Nirvana, Teen Spirit").map(\.releaseID),
+            lookup.searchCatalog(
+                query: .releases(artist: "Nirvana", text: "Teen Spirit")
+            ).map(\.releaseID),
             [nevermindID]
         )
         XCTAssertEqual(
-            lookup.searchCatalog(query: nevermindID.uppercased()).map(\.releaseID),
+            lookup.searchCatalog(
+                query: .releaseID(nevermindID.uppercased())
+            ).map(\.releaseID),
             [nevermindID]
         )
     }

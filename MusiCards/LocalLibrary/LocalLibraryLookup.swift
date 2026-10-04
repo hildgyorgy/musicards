@@ -59,14 +59,13 @@ nonisolated struct LocalLibraryLookup {
         var legacyCandidates: [String: [LocalAudioFileSnapshot]] = [:]
 
         for file in files {
+            guard let releaseID = Self.nonemptyMBID(file.releaseMBID) else {
+                continue
+            }
             let artist = Self.normalizedLibraryText(file.artist)
             let album = Self.normalizedLibraryText(file.albumTitle)
             if !artist.isEmpty, !album.isEmpty {
                 artistsByAlbum[album, default: []].insert(artist)
-            }
-
-            guard let releaseID = Self.nonemptyMBID(file.releaseMBID) else {
-                continue
             }
             if let releaseTrackID = Self.nonemptyMBID(file.releaseTrackMBID) {
                 let key = Self.releaseTrackKey(
@@ -115,7 +114,7 @@ nonisolated struct LocalLibraryLookup {
     }
 
     func searchCatalog(
-        query: String,
+        query: LibraryCatalogQuery,
         limit: Int = 50
     ) -> [LibraryCatalogRelease] {
         LibraryCatalogSearch.search(

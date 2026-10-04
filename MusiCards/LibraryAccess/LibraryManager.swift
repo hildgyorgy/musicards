@@ -92,7 +92,7 @@ final class LibraryManager: ObservableObject {
     }
 
     func searchCatalog(
-        query: String,
+        query: LibraryCatalogQuery,
         limit: Int = 50
     ) -> [LibraryCatalogRelease] {
         provider.searchCatalog(query: query, limit: limit)
