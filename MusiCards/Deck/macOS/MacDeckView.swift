@@ -65,6 +65,7 @@ struct DeckView<ID: Hashable, CollapsedHeaderContent: View, HeaderContent: View,
                     DeckCardView(
                         card: card,
                         isActive: isActive,
+                        allowsWindowDragging: visualIndex == 0,
                         showsCollapsedHeader: showsCollapsedHeader(card),
                         onTap: { handleTap(on: visualIndex) },
                         collapsedHeader: { collapsedHeaderProvider(card) },

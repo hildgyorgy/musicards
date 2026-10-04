@@ -8,6 +8,7 @@ import SwiftUI
 struct DeckCardView<ID: Hashable, CollapsedHeaderContent: View, HeaderContent: View, CardContent: View>: View {
     let card: DeckCard<ID>
     let isActive: Bool
+    let allowsWindowDragging: Bool
     let showsCollapsedHeader: Bool
     let onTap: () -> Void
     let collapsedHeader: CollapsedHeaderContent
@@ -17,6 +18,7 @@ struct DeckCardView<ID: Hashable, CollapsedHeaderContent: View, HeaderContent: V
     init(
         card: DeckCard<ID>,
         isActive: Bool,
+        allowsWindowDragging: Bool,
         showsCollapsedHeader: Bool,
         onTap: @escaping () -> Void,
         @ViewBuilder collapsedHeader: () -> CollapsedHeaderContent,
@@ -25,6 +27,7 @@ struct DeckCardView<ID: Hashable, CollapsedHeaderContent: View, HeaderContent: V
     ) {
         self.card = card
         self.isActive = isActive
+        self.allowsWindowDragging = allowsWindowDragging
         self.showsCollapsedHeader = showsCollapsedHeader
         self.onTap = onTap
         self.collapsedHeader = collapsedHeader()
@@ -68,17 +71,7 @@ struct DeckCardView<ID: Hashable, CollapsedHeaderContent: View, HeaderContent: V
     
     private var cardHeader: some View {
         ZStack {
-            PanHandleView(
-                isEnabled: true,
-                onTap: onTap,
-                onBegan: nil,
-                onChanged: { _ in },
-                onEnded: { _, _ in }
-            )
-            .contentShape(Rectangle())
-            .onHover { hovering in
-                isHoveringLabel = hovering
-            }
+            headerInteraction
 
             if isShowingCollapsedHeader {
                 collapsedHeader
@@ -98,6 +91,28 @@ struct DeckCardView<ID: Hashable, CollapsedHeaderContent: View, HeaderContent: V
             }
         }
         .frame(height: cardHeaderHeight)
+    }
+
+    @ViewBuilder
+    private var headerInteraction: some View {
+        if allowsWindowDragging {
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture(perform: onTap)
+                .gesture(WindowDragGesture())
+                .allowsWindowActivationEvents()
+                .onHover { isHoveringLabel = $0 }
+        } else {
+            PanHandleView(
+                isEnabled: true,
+                onTap: onTap,
+                onBegan: nil,
+                onChanged: { _ in },
+                onEnded: { _, _ in }
+            )
+            .contentShape(Rectangle())
+            .onHover { isHoveringLabel = $0 }
+        }
     }
 
     private var isShowingCollapsedHeader: Bool {
