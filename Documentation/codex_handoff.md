@@ -13,8 +13,9 @@
 - **Repository:** `musicards`
 - **Branch:** `main`
 - **Last completed application checkpoint before this documentation update:**
-  `5ba2b45` — `Prepare MusiCards 2.1 with search and library improvements`.
-- **Remote state at documentation review:** `main` matched `origin/main`.
+  `c3d9c1c` — `Polish playback output, Shazam search, and Wikipedia links`.
+- **Remote state at documentation review:** `main` matched `origin/main` after
+  the user pushed `c3d9c1c`.
 - **Working tree at documentation review:** clean.
 
 The checkpoint above deliberately identifies the last completed application
@@ -32,6 +33,34 @@ git log -5 --oneline --decorate
 If the snapshot above differs from Git, Git and the user's newest instructions
 take precedence; update this document before handing the project off again.
 
+### Next session: AVM at the Mac Studio
+
+The user plans to continue on 2026-10-05 at the office, where the physical
+AVM Audio CS 2.3 is available. On that computer, pull/fetch first, check Git
+state, then read this file, `PLAYER_ARCHITECTURE.md`, the AVM experiment handoff,
+and the UPnP task brief linked in §7. Explain the proposed next step and ask
+before changing code; this is the user's explicit collaboration preference.
+
+- **Agreed UI:** source and output selection belong on the home screen as a
+  deliberate playback setup. The collapsed and expanded players only *display*
+  the active output; they do not switch it. The home-screen `OUTPUT` pill is
+  currently a status label, not an active selector. Do not make a misleading
+  button before UPnP selection actually exists.
+- **System routes already work:** a plugged-in Chord Mojo 2 is selected by iOS;
+  on macOS the user can select it or AirPlay in Control Center. MusiCards shows
+  the active route automatically. No separate in-app Mojo/AirPlay picker is
+  needed for this stage. UPnP renderers such as the AVM are the future explicit
+  output choice, discovered on the local network.
+- **No production UPnP control exists yet.** The AVM experiment proved direct
+  Navidrome → renderer streaming and `SetNextAVTransportURI`; it is not an app
+  implementation. The next session should validate the AVM and current design
+  assumptions before choosing the first small implementation slice.
+- **Hardware checks still needed:** the new macOS Core Audio route observer
+  builds and passes automated tests, but actual AVM discovery/casting and live
+  output changes on the Mac Studio have not been verified in this session.
+- **Security boundary:** never log or commit authenticated Navidrome stream
+  URLs, passwords, salts, tokens, or new private LAN addresses.
+
 ## 2. Released products
 
 ### MusiCards
@@ -47,13 +76,15 @@ take precedence; update this document before handing the project off again.
 - **Deployment targets in the project:** iOS 26.0 and macOS 26.0 for the main
   app target.
 
-### Current development version
+### Submitted 2.1 and current development version
 
-- **Version in the project:** 2.1 (build 9).
-- **Status:** committed to `main`; this document does not claim that 2.1 has
-  been submitted to or released on the App Store.
-- The public App Store baseline remains 2.0 (build 8) until the user confirms a
-  later distribution state.
+- **Version in the project:** 2.1 (build 10).
+- **Distribution state reported by the user:** 2.1 has been sent to the App
+  Store. Approval and public availability have **not** been confirmed. Do not
+  assume the submitted binary contains every change in `c3d9c1c`; some final
+  cleanup was committed after the user reported the submission.
+- **Last confirmed public version:** 2.0 (build 8), pending confirmation of
+  2.1 approval/release.
 
 ### MusiCards Sync
 
@@ -183,6 +214,21 @@ The following work is already implemented and should be treated as the stable
   macOS test suite, generic iOS build, and MusiCards Sync tests.
 - Personal Xcode `xcuserdata` files are no longer tracked; each development
   machine keeps its own breakpoints, bookmarks, and scheme-management state.
+- The macOS window can be dragged again; the fix is committed as `95e8795`.
+- Search state-reset helpers are consolidated, and barcode/Shazam retry keeps
+  its original request type. A Shazam-to-manual-edit edge case is also fixed
+  and regression-tested.
+- The player now displays the active system output reactively in collapsed and
+  expanded views, with source/output details in the expanded player. The home
+  screen says `PLAYBACK SETUP` and shows the active output without offering an
+  in-app output switch yet. iPad built-in output is named `THIS IPAD`.
+- iOS observes audio-route notifications; macOS observes Core Audio default
+  device, device-name/data-source, transport, and nominal sample-rate changes.
+  A two-second timer remains only as fallback if the default-device listener
+  cannot be installed. Playback position ticks no longer query the route.
+- Artist Wikipedia links use consistent language labels. English is preferred;
+  otherwise an available artist-native language is preferred, with a bounded
+  optional Wikidata lookup and fallback behavior.
 
 Do not casually redesign these behaviours while starting a roadmap item. The
 2.0 release is the known-good baseline.
@@ -198,7 +244,9 @@ Important seams and files:
   - selection/load coordination;
   - injection of library and playback services.
 - `MusiCards/Playback/PlaybackEngine.swift`
-  - platform-neutral playback-engine contract.
+  - platform-neutral playback-engine contract and current output inspection.
+- `MusiCards/Playback/MacOutputRouteObserver.swift`
+  - event-driven macOS system-output route observation.
 - `MusiCards/Playback/PlaybackController.swift`
   - queue, transport state, selection generations, and orchestration;
   - heavily tested and safety-critical: avoid unnecessary changes.
@@ -268,14 +316,20 @@ The script checks the complete tracked diff since `HEAD`, runs the MusiCards
 macOS tests, builds MusiCards for a generic iOS device, and runs the MusiCards
 Sync macOS tests. It stops at the first failure and does not change source files.
 
-Most recent complete verification for application checkpoint `5ba2b45` on
-2026-10-04:
+Most recent complete `./Tools/verify.sh` verification was for application
+checkpoint `5ba2b45` on 2026-10-04:
 
 - the complete tracked diff passed the whitespace check;
 - all MusiCards macOS tests passed;
 - the MusiCards generic iOS device build passed with code signing disabled;
 - all 62 MusiCards Sync tests passed;
 - Apple Music Now Playing was also verified manually on a physical iPhone.
+
+After `c3d9c1c`, the MusiCards macOS XCTest suite passed, the generic iOS
+Simulator build passed, and `git diff --check` was clean. These were separate
+checks, **not** a fresh complete `./Tools/verify.sh` run; MusiCards Sync tests
+were not rerun for this checkpoint. The user also confirmed automatic Mojo 2
+route display on iPhone and output changes through macOS Control Center.
 
 ## 7. Roadmap and next likely work
 
@@ -294,11 +348,11 @@ directions are:
 
 There is also a possible macOS mini-player idea.
 
-Before starting another roadmap feature, the agreed maintenance direction is
-to map and test `SearchViewModel` state transitions, then consolidate repeated
-search-start/reset logic without changing behaviour. A separate later cleanup
-may remove the redundant extracted rsync source tree while retaining its
-verified source archive, licence material, provenance, and build script.
+The `SearchViewModel` state-reset consolidation is done. The agreed next
+feature is Navidrome → AVM UPnP playback, with the physical renderer available
+at the office. A separate later cleanup may remove the redundant extracted
+rsync source tree while retaining its verified source archive, licence
+material, provenance, and build script.
 
 ### UPnP experiment already completed
 
@@ -320,6 +374,9 @@ The experiment against an AVM Audio CS 2.3 and Navidrome already demonstrated:
 The detailed UPnP task document explicitly rejects the abandoned vendor-specific
 QPlay approach. Standard AVTransport with a moving Current/Next window is the
 planned direction. No UPnP production implementation has been started yet.
+Treat that task document as a design proposal, not a current-code guarantee:
+recheck its routing and queue assumptions against the present code and the
+user's agreed home-screen output UX before implementing it.
 
 Do not begin a roadmap item solely because it is listed here. Confirm the user's
 next requested priority first.
