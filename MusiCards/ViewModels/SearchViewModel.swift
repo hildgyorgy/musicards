@@ -138,10 +138,7 @@ final class SearchViewModel: ObservableObject {
         guard q != lastScheduledNormalizedQuery else { return }
         lastScheduledNormalizedQuery = q
         
-        searchTask?.cancel()
-        cancelPaginationTasks()
-        searchGeneration &+= 1
-        let generation = searchGeneration
+        let generation = beginNewSearchGeneration()
         currentOffset = 0
         hasMoreResults = true
         isLoadingMore = false
@@ -176,35 +173,24 @@ final class SearchViewModel: ObservableObject {
     }
 
     func switchToSearch() {
-        searchTask?.cancel()
-        cancelPaginationTasks()
-        searchGeneration &+= 1
+        beginNewSearchGeneration()
         lastScheduledNormalizedQuery = ""
         mode = .search
         searchQuery = ""
-        releaseResults = []
-        artistRows = []
+        clearSearchResultState()
         searchError = nil
         isSearching = false
         isLoadingMore = false
         // Reset version pagination
-        versionsOffset = 0
-        hasMoreVersions = false
-        isLoadingMoreVersions = false
+        resetReleaseGroupPagination()
         currentReleaseGroupID = nil
-        resetReleaseSearchMergeState()
-        resetArtistSearchMergeState()
-        promotedReleaseIDs = []
         activeSearchRequest = nil
     }
 
     func searchByBarcode(_ barcode: String) {
         let normalized = barcode.filter(\.isNumber)
 
-        searchTask?.cancel()
-        cancelPaginationTasks()
-        searchGeneration &+= 1
-        let generation = searchGeneration
+        let generation = beginNewSearchGeneration()
         currentOffset = 0
         hasMoreResults = false
         isLoadingMore = false
@@ -213,11 +199,7 @@ final class SearchViewModel: ObservableObject {
         mode = .search
         lastScheduledNormalizedQuery = ""
         searchQuery = ""
-        artistRows = []
-        releaseResults = []
-        resetReleaseSearchMergeState()
-        resetArtistSearchMergeState()
-        promotedReleaseIDs = []
+        clearSearchResultState()
         activeSearchRequest = .barcode(normalized)
 
         searchTask = Task {
@@ -266,10 +248,7 @@ final class SearchViewModel: ObservableObject {
 #endif
 
     func searchByRecognizedTrack(artist rawArtist: String, title rawTitle: String) {
-        searchTask?.cancel()
-        cancelPaginationTasks()
-        searchGeneration &+= 1
-        let generation = searchGeneration
+        let generation = beginNewSearchGeneration()
 
         currentOffset = 0
         hasMoreResults = false
@@ -278,11 +257,7 @@ final class SearchViewModel: ObservableObject {
         isSearching = true
 
         mode = .search
-        artistRows = []
-        releaseResults = []
-        resetReleaseSearchMergeState()
-        resetArtistSearchMergeState()
-        promotedReleaseIDs = []
+        clearSearchResultState()
 
         let artist = rawArtist.trimmingCharacters(in: .whitespacesAndNewlines)
         let title = rawTitle.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -396,10 +371,7 @@ final class SearchViewModel: ObservableObject {
             break
         }
 
-        searchTask?.cancel()
-        cancelPaginationTasks()
-        searchGeneration &+= 1
-        let generation = searchGeneration
+        let generation = beginNewSearchGeneration()
         searchError = nil
         isLoadingMore = false
         hasMoreResults = true
@@ -407,11 +379,7 @@ final class SearchViewModel: ObservableObject {
         switch mode {
         case .search:
             currentOffset = 0
-            releaseResults = []
-            artistRows = []
-            resetReleaseSearchMergeState()
-            resetArtistSearchMergeState()
-            promotedReleaseIDs = []
+            clearSearchResultState()
 
             let q = normalizedSearchQuery
             guard q.count >= 3 else { return }
@@ -425,9 +393,7 @@ final class SearchViewModel: ObservableObject {
             releaseResults = []
             artistRows = []
             promotedReleaseIDs = []
-            versionsOffset = 0
-            hasMoreVersions = false
-            isLoadingMoreVersions = false
+            resetReleaseGroupPagination()
             isSearching = true
 
             searchTask = Task {
@@ -603,10 +569,7 @@ final class SearchViewModel: ObservableObject {
         artistName: String,
         preserveActiveRequest: Bool = false
     ) {
-        searchTask?.cancel()
-        cancelPaginationTasks()
-        searchGeneration &+= 1
-        let generation = searchGeneration
+        let generation = beginNewSearchGeneration()
 
         displayTitle = releaseTitle
         displayArtist = artistName
@@ -616,16 +579,10 @@ final class SearchViewModel: ObservableObject {
         }
 
         // Reset version pagination
-        versionsOffset = 0
-        hasMoreVersions = false
-        isLoadingMoreVersions = false
+        resetReleaseGroupPagination()
         currentReleaseGroupID = releaseGroupID
-        promotedReleaseIDs = []
 
-        releaseResults = []
-        artistRows = []
-        resetReleaseSearchMergeState()
-        resetArtistSearchMergeState()
+        clearSearchResultState()
         searchError = nil
         isSearching = true
         isLoadingMore = false
@@ -951,6 +908,28 @@ final class SearchViewModel: ObservableObject {
                   query == normalizedSearchQuery else { return }
             hasMoreResults = false
         }
+    }
+
+    @discardableResult
+    private func beginNewSearchGeneration() -> UInt64 {
+        searchTask?.cancel()
+        cancelPaginationTasks()
+        searchGeneration &+= 1
+        return searchGeneration
+    }
+
+    private func clearSearchResultState() {
+        releaseResults = []
+        artistRows = []
+        resetReleaseSearchMergeState()
+        resetArtistSearchMergeState()
+        promotedReleaseIDs = []
+    }
+
+    private func resetReleaseGroupPagination() {
+        versionsOffset = 0
+        hasMoreVersions = false
+        isLoadingMoreVersions = false
     }
 
     private func cancelPaginationTasks() {
