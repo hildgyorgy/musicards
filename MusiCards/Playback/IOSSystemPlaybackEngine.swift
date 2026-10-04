@@ -225,6 +225,7 @@ final class IOSSystemPlaybackEngine: NSObject, PlaybackEngine {
         core.disposeOutputUnit()
         try configureAudioSession(sourceSampleRate: decodedPCM.sampleRate)
         try configureOutputUnit(for: decodedPCM)
+        eventHandler?(.outputConfigurationChanged)
     }
 
     private func recoverFromRouteDisconnectInterruption() throws {

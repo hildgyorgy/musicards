@@ -238,6 +238,44 @@ final class SearchViewModelLibraryFirstTests: XCTestCase {
         }
     }
 
+    @MainActor
+    func testRecognizedTrackDoesNotSuppressUserEditBeforeViewChangeCallback() async {
+        let service = SearchServiceStub()
+        let viewModel = makeViewModel(service: service)
+
+        viewModel.searchQuery = "Previous artist"
+        viewModel.queryDidChange()
+        await eventually { !viewModel.isSearching }
+
+        viewModel.searchByRecognizedTrack(
+            artist: "Miles Davis",
+            title: "So What"
+        )
+        // The search card may not yet be mounted to deliver its onChange.
+        viewModel.searchQuery = "John Coltrane"
+        viewModel.queryDidChange()
+
+        await eventually {
+            service.requestedArtistQueries.contains("John Coltrane")
+        }
+    }
+
+    @MainActor
+    func testRecognizedTrackViewChangeDoesNotStartTextSearch() async {
+        let service = SearchServiceStub()
+        let viewModel = makeViewModel(service: service)
+
+        viewModel.searchByRecognizedTrack(
+            artist: "Miles Davis",
+            title: "So What"
+        )
+        viewModel.queryDidChange()
+        await eventually { !viewModel.isSearching }
+
+        XCTAssertTrue(service.requestedQueries.isEmpty)
+        XCTAssertTrue(service.requestedArtistQueries.isEmpty)
+    }
+
     func testSearchCardLabelFollowsExistingSearchMode() {
         XCTAssertEqual(SearchMode.search.cardLabel, "Search")
         XCTAssertEqual(

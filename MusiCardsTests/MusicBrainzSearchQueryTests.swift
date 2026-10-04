@@ -79,20 +79,37 @@ final class MusicBrainzSearchQueryTests: XCTestCase {
         )
     }
 
-    func testWikipediaLanguagePreferenceUsesEnglishThenDeviceThenSimple() {
+    func testWikipediaLanguagePreferenceUsesEnglishThenArtistThenFallback() {
         XCTAssertEqual(
             MusicBrainzService.preferredWikipediaLanguage(
                 availableLanguages: ["de", "en", "hu"],
+                nativeLanguages: ["de"],
                 preferredLanguages: ["hu-HU"]
             ),
             "en"
         )
         XCTAssertEqual(
             MusicBrainzService.preferredWikipediaLanguage(
+                availableLanguages: ["de", "es", "hu"],
+                nativeLanguages: ["es"],
+                preferredLanguages: ["hu-HU"]
+            ),
+            "es"
+        )
+        XCTAssertEqual(
+            MusicBrainzService.preferredWikipediaLanguage(
                 availableLanguages: ["de", "hu"],
+                nativeLanguages: ["es"],
                 preferredLanguages: ["hu-HU"]
             ),
             "hu"
+        )
+        XCTAssertEqual(
+            MusicBrainzService.preferredWikipediaLanguage(
+                availableLanguages: ["es"],
+                preferredLanguages: ["hu-HU"]
+            ),
+            "es"
         )
         XCTAssertEqual(
             MusicBrainzService.preferredWikipediaLanguage(
@@ -107,6 +124,97 @@ final class MusicBrainzSearchQueryTests: XCTestCase {
                 preferredLanguages: ["hu-HU"]
             ),
             "de"
+        )
+    }
+
+    func testWikidataNativeLanguageResolvesToWikipediaLanguageCode() {
+        let artist: [String: Any] = [
+            "claims": [
+                "P103": [
+                    [
+                        "rank": "normal",
+                        "mainsnak": [
+                            "datavalue": ["value": ["id": "Q1321"]]
+                        ]
+                    ]
+                ]
+            ]
+        ]
+        let languages: [String: Any] = [
+            "entities": [
+                "Q1321": [
+                    "claims": [
+                        "P424": [
+                            [
+                                "rank": "normal",
+                                "mainsnak": [
+                                    "datavalue": ["value": "es"]
+                                ]
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+        ]
+
+        let ids = MusicBrainzService.nativeLanguageItemIDs(in: artist)
+        XCTAssertEqual(ids, ["Q1321"])
+        XCTAssertEqual(
+            MusicBrainzService.wikimediaLanguageCodes(
+                in: languages,
+                for: ids
+            ),
+            ["es"]
+        )
+    }
+
+    @MainActor
+    func testWikipediaSummarySelectsArtistLanguageWhenEnglishIsMissing()
+        async throws {
+        let artistData = Data("""
+        {"entities":{"Q999":{"claims":{"P103":[{"rank":"normal","mainsnak":{"datavalue":{"value":{"id":"Q1321"}}}}]},"sitelinks":{"eswiki":{"title":"Artista","url":"https://es.wikipedia.org/wiki/Artista"},"frwiki":{"title":"Artiste","url":"https://fr.wikipedia.org/wiki/Artiste"}}}}}
+        """.utf8)
+        let languageData = Data("""
+        {"entities":{"Q1321":{"claims":{"P424":[{"rank":"normal","mainsnak":{"datavalue":{"value":"es"}}}]}}}}
+        """.utf8)
+        let summaryData = Data("""
+        {"extract":"Spanish artist biography"}
+        """.utf8)
+        let service = MusicBrainzService(
+            rateLimiter: RateLimiter(minimumInterval: 0),
+            retryDelays: [],
+            requestExecutor: { request in
+                let url = try XCTUnwrap(request.url)
+                let data: Data
+                if url.path.contains("Special:EntityData/Q999.json") {
+                    data = artistData
+                } else if url.path == "/w/api.php" {
+                    data = languageData
+                } else if url.host == "es.wikipedia.org" {
+                    data = summaryData
+                } else {
+                    throw URLError(.badURL)
+                }
+                return (
+                    data,
+                    try XCTUnwrap(HTTPURLResponse(
+                        url: url,
+                        statusCode: 200,
+                        httpVersion: nil,
+                        headerFields: nil
+                    ))
+                )
+            }
+        )
+
+        let summary = try await service.fetchWikipediaSummary(
+            from: try XCTUnwrap(URL(string: "https://www.wikidata.org/wiki/Q999"))
+        )
+        XCTAssertEqual(summary?.languageCode, "es")
+        XCTAssertEqual(summary?.extract, "Spanish artist biography")
+        XCTAssertEqual(
+            summary?.pageURL.absoluteString,
+            "https://es.wikipedia.org/wiki/Artista"
         )
     }
 

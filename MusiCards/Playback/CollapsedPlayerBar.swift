@@ -13,6 +13,7 @@ struct CollapsedPlayerBar: View {
     @ObservedObject var controller: PlaybackController
     let contentInset: CGFloat?
     let isPlaceholder: Bool
+    let showsOutputStatus: Bool
 
     @State private var scrubPosition: TimeInterval = 0
     @State private var isScrubbing = false
@@ -20,11 +21,13 @@ struct CollapsedPlayerBar: View {
     init(
         controller: PlaybackController,
         contentInset: CGFloat? = nil,
-        isPlaceholder: Bool = false
+        isPlaceholder: Bool = false,
+        showsOutputStatus: Bool = true
     ) {
         self.controller = controller
         self.contentInset = contentInset
         self.isPlaceholder = isPlaceholder
+        self.showsOutputStatus = showsOutputStatus
     }
 
     var body: some View {
@@ -58,7 +61,7 @@ struct CollapsedPlayerBar: View {
             }
             .padding(.trailing, 14)
 
-            VStack(spacing: 4) {
+            VStack(spacing: 0) {
                 HStack(spacing: 8) {
                     Text(isPlaceholder ? "" : controller.currentItem?.track.title ?? "")
                         .font(titleFont)
@@ -73,6 +76,7 @@ struct CollapsedPlayerBar: View {
                         .foregroundStyle(.secondary)
                 }
                 .allowsHitTesting(false)
+                .frame(height: metadataRowHeight)
 
                 if isPlaceholder {
                     Capsule(style: .continuous)
@@ -88,6 +92,21 @@ struct CollapsedPlayerBar: View {
                                 ? "Drag to seek"
                                 : "Seeking is unavailable for this track"
                         )
+                }
+
+                if !isPlaceholder && showsOutputStatus {
+                    Text("→ \(controller.outputRoute.displayName)")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .frame(height: metadataRowHeight)
+                        .accessibilityLabel(
+                            "Output: \(controller.outputRoute.displayName)"
+                        )
+                } else {
+                    Color.clear
+                        .frame(height: metadataRowHeight)
                 }
             }
         }
@@ -234,6 +253,7 @@ struct CollapsedPlayerBar: View {
     private let controlFont: Font = .body
     private let titleFont: Font = .caption.weight(.medium)
     private let timeFont: Font = .caption
+    private let metadataRowHeight: CGFloat = 18
     private let seekHitHeight: CGFloat = 16
     private let idleSeekHeight: CGFloat = 3
     private let activeSeekHeight: CGFloat = 7
@@ -244,6 +264,7 @@ struct CollapsedPlayerBar: View {
     private let controlFont: Font = .title3
     private let titleFont: Font = .subheadline.weight(.medium)
     private let timeFont: Font = .caption
+    private let metadataRowHeight: CGFloat = 20
     private let seekHitHeight: CGFloat = 20
     private let idleSeekHeight: CGFloat = 3
     private let activeSeekHeight: CGFloat = 7

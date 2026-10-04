@@ -5,6 +5,9 @@
 
 import Combine
 import Foundation
+#if os(iOS)
+import AVFAudio
+#endif
 #if DEBUG
 import OSLog
 #endif
@@ -21,11 +24,16 @@ final class PlaybackController: ObservableObject {
     @Published private(set) var position: TimeInterval = 0
     @Published private(set) var preparedDuration: TimeInterval?
     @Published private(set) var preparedAudioFormat: PlaybackAudioFormat?
+    @Published private(set) var outputRoute = AudioOutputRouteInspector.current()
 
     private let engine: PlaybackEngine
     private let assetResolver: (any PlaybackAssetResolving)?
     private var preparedItemID: PlaybackQueueItem.ID?
     private var playbackGeneration: UInt64 = 0
+    private var outputRouteObservation: AnyCancellable?
+    #if os(macOS)
+    private var macOutputRouteObserver: MacOutputRouteObserver?
+    #endif
 
     init(
         engine: PlaybackEngine,
@@ -36,6 +44,31 @@ final class PlaybackController: ObservableObject {
         engine.eventHandler = { [weak self] event in
             self?.handle(event)
         }
+        #if os(iOS)
+        outputRouteObservation = NotificationCenter.default.publisher(
+            for: AVAudioSession.routeChangeNotification,
+            object: AVAudioSession.sharedInstance()
+        ).sink { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.refreshOutputRoute()
+            }
+        }
+        #elseif os(macOS)
+        macOutputRouteObserver = MacOutputRouteObserver { [weak self] in
+            self?.refreshOutputRoute()
+        }
+        if macOutputRouteObserver?.hasSystemListener == false {
+            // Retain the previous fallback only when Core Audio cannot install
+            // its default-device notification.
+            outputRouteObservation = Timer.publish(
+                every: 2,
+                on: .main,
+                in: .common
+            ).autoconnect().sink { [weak self] _ in
+                self?.refreshOutputRoute()
+            }
+        }
+        #endif
     }
 
     var currentItem: PlaybackQueueItem? {
@@ -254,14 +287,18 @@ final class PlaybackController: ObservableObject {
     private func handle(_ event: PlaybackEngineEvent) {
         switch event {
         case .prepared(let duration, let audioFormat):
+            refreshOutputRoute()
             preparedDuration = duration ?? currentItem?.track.duration
             preparedAudioFormat = audioFormat
         case .started:
+            refreshOutputRoute()
             status = .playing
         case .paused:
             status = .paused
         case .positionChanged(let position):
             self.position = max(position, 0)
+        case .outputConfigurationChanged:
+            refreshOutputRoute()
         case .finished:
             Task {
                 if hasNext {
@@ -274,6 +311,13 @@ final class PlaybackController: ObservableObject {
             preparedItemID = nil
             preparedAudioFormat = nil
             status = .failed(failure)
+        }
+    }
+
+    private func refreshOutputRoute() {
+        let currentRoute = AudioOutputRouteInspector.current()
+        if outputRoute != currentRoute {
+            outputRoute = currentRoute
         }
     }
 

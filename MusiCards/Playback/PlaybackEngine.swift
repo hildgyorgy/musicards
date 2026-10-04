@@ -7,6 +7,7 @@ import Foundation
 
 #if os(iOS)
 import AVFAudio
+import UIKit
 #elseif os(macOS)
 import CoreAudio
 #endif
@@ -66,6 +67,32 @@ struct AudioOutputRoute: Equatable {
     let deviceID: UInt32?
     let deviceName: String
     let transport: AudioOutputTransport
+    let sampleRate: Double?
+
+    var displayName: String {
+        #if os(iOS)
+        let builtInDeviceName = UIDevice.current.userInterfaceIdiom == .pad
+            ? "THIS IPAD" : "THIS IPHONE"
+        return displayName(builtInDeviceName: builtInDeviceName)
+        #else
+        return deviceName.uppercased()
+        #endif
+    }
+
+    func displayName(builtInDeviceName: String) -> String {
+        transport == .builtIn ? builtInDeviceName : deviceName.uppercased()
+    }
+
+    var sampleRateText: String? {
+        guard transport.allowsDeviceSampleRateMatching,
+              let sampleRate, sampleRate > 0 else {
+            return nil
+        }
+        if sampleRate >= 1_000 {
+            return String(format: "%.1f kHz", sampleRate / 1_000)
+        }
+        return String(format: "%.0f Hz", sampleRate)
+    }
 }
 
 enum AudioOutputRouteInspector {
@@ -76,21 +103,24 @@ enum AudioOutputRouteInspector {
             return AudioOutputRoute(
                 deviceID: nil,
                 deviceName: "SYSTEM OUTPUT",
-                transport: .unknown
+                transport: .unknown,
+                sampleRate: nil
             )
         }
 
         return AudioOutputRoute(
             deviceID: nil,
             deviceName: output.portName.nilIfBlank ?? "SYSTEM OUTPUT",
-            transport: transport(for: output.portType)
+            transport: transport(for: output.portType),
+            sampleRate: AVAudioSession.sharedInstance().sampleRate
         )
         #elseif os(macOS)
         guard let deviceID = defaultMacOutputDeviceID() else {
             return AudioOutputRoute(
                 deviceID: nil,
                 deviceName: "SYSTEM OUTPUT",
-                transport: .unknown
+                transport: .unknown,
+                sampleRate: nil
             )
         }
 
@@ -107,13 +137,15 @@ enum AudioOutputRouteInspector {
         return AudioOutputRoute(
             deviceID: deviceID,
             deviceName: deviceName,
-            transport: transport
+            transport: transport,
+            sampleRate: macNominalSampleRate(deviceID)
         )
         #else
         return AudioOutputRoute(
             deviceID: nil,
             deviceName: "SYSTEM OUTPUT",
-            transport: .unknown
+            transport: .unknown,
+            sampleRate: nil
         )
         #endif
     }
@@ -144,7 +176,30 @@ enum AudioOutputRouteInspector {
         }
     }
     #elseif os(macOS)
-    private static func defaultMacOutputDeviceID() -> AudioDeviceID? {
+    private static func macNominalSampleRate(
+        _ deviceID: AudioDeviceID
+    ) -> Double? {
+        var sampleRate: Float64 = 0
+        var size = UInt32(MemoryLayout<Float64>.size)
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyNominalSampleRate,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        guard AudioObjectGetPropertyData(
+            deviceID,
+            &address,
+            0,
+            nil,
+            &size,
+            &sampleRate
+        ) == noErr, sampleRate > 0 else {
+            return nil
+        }
+        return sampleRate
+    }
+
+    static func defaultMacOutputDeviceID() -> AudioDeviceID? {
         var deviceID = AudioDeviceID(kAudioObjectUnknown)
         var size = UInt32(MemoryLayout<AudioDeviceID>.size)
         var address = AudioObjectPropertyAddress(
@@ -336,6 +391,7 @@ enum PlaybackEngineEvent: Equatable {
     case started
     case paused
     case positionChanged(TimeInterval)
+    case outputConfigurationChanged
     case finished
     case failed(PlaybackFailure)
 }

@@ -287,12 +287,7 @@ struct ArtistCardContentView: View {
     }
 
     private func readMoreTitle(for wikipedia: WikipediaSummary) -> String {
-        guard wikipedia.languageCode != "en" else {
-            return "Read more →"
-        }
-        return "Read more on Wikipedia · "
-            + wikipedia.languageCode.uppercased()
-            + " →"
+        "Wikipedia · \(wikipedia.languageCode.uppercased()) →"
     }
 
     private func typeSectionHeader(_ title: String) -> some View {

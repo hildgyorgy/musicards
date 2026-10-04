@@ -83,12 +83,16 @@ struct PlayerCardContentView: View {
             .scrollIndicators(.hidden)
 
             VStack(spacing: 0) {
-                playerMetadataLabel(fileAndOutputTitle(item))
+                playerMetadataLabel(sourceTitle(item))
+                    .padding(.bottom, 4)
+
+                playerMetadataLabel(outputTitle)
                     .padding(.bottom, playerFooterInfoSpacing)
 
                 CollapsedPlayerBar(
                     controller: controller,
-                    contentInset: 0
+                    contentInset: 0,
+                    showsOutputStatus: false
                 )
                 .frame(height: expandedTransportHeight)
             }
@@ -202,23 +206,19 @@ struct PlayerCardContentView: View {
         return components.isEmpty ? "TRACK" : components.joined(separator: " / ").uppercased()
     }
 
-    private func fileAndOutputTitle(_ item: PlaybackQueueItem) -> String {
-        let output = AudioOutputRouteInspector.current()
-        let routeComponents = ([
-            sourceName(item.source),
-            output.transport.displayName,
-            output.deviceName.nilIfEmpty?.uppercased()
-        ] as [String?])
-            .compactMap { $0 }
-            .reduce(into: [String]()) { result, component in
-                if result.last?.caseInsensitiveCompare(component) != .orderedSame {
-                    result.append(component)
-                }
-            }
-        let route = routeComponents
-            .joined(separator: " → ")
+    private func sourceTitle(_ item: PlaybackQueueItem) -> String {
+        let source = sourceName(item.source)
         let format = audioFormatText(displayedAudioFormat(for: item))
-        return format.isEmpty ? route : "\(route)\n\(format)"
+        let details = format.isEmpty ? source : "\(source) • \(format)"
+        return "SOURCE:\n\(details)"
+    }
+
+    private var outputTitle: String {
+        let output = controller.outputRoute
+        let details = [output.displayName, output.sampleRateText]
+            .compactMap { $0 }
+            .joined(separator: " • ")
+        return "OUTPUT:\n\(details)"
     }
 
     private func displayedAudioFormat(
@@ -264,18 +264,19 @@ struct PlayerCardContentView: View {
 
         var components = [format.codec.uppercased()]
 
-        if let bitrate = format.bitrate, bitrate > 0 {
-            components.append("\(Int((bitrate / 1_000).rounded())) kbps")
+        if let bitDepth = format.bitDepth {
+            components.append("\(bitDepth) bit")
         }
 
-        let sampleRate = format.sampleRate >= 1_000
-            ? String(format: "%.1f kHz", format.sampleRate / 1_000)
-            : String(format: "%.0f Hz", format.sampleRate)
-
-        if let bitDepth = format.bitDepth {
-            components.append("\(sampleRate) / \(bitDepth) bit")
-        } else if format.sampleRate > 0 {
+        if format.sampleRate > 0 {
+            let sampleRate = format.sampleRate >= 1_000
+                ? String(format: "%.1f kHz", format.sampleRate / 1_000)
+                : String(format: "%.0f Hz", format.sampleRate)
             components.append(sampleRate)
+        }
+
+        if let bitrate = format.bitrate, bitrate > 0 {
+            components.append("\(Int((bitrate / 1_000).rounded())) kbps")
         }
 
         switch format.channelCount {
@@ -289,7 +290,7 @@ struct PlayerCardContentView: View {
             break
         }
 
-        return components.joined(separator: " • ")
+        return components.joined(separator: " / ")
     }
 
     #if os(iOS)
@@ -306,11 +307,5 @@ struct PlayerCardContentView: View {
     private func formatTime(_ time: TimeInterval) -> String {
         let seconds = max(Int(time.rounded(.down)), 0)
         return String(format: "%d:%02d", seconds / 60, seconds % 60)
-    }
-}
-
-private extension String {
-    var nilIfEmpty: String? {
-        isEmpty ? nil : self
     }
 }

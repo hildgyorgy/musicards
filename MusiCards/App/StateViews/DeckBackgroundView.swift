@@ -13,6 +13,7 @@ struct DeckBackgroundView: View {
     @ObservedObject var localLibrary: LocalLibraryStore
     @ObservedObject var libraryManager: LibraryManager
     @ObservedObject var navidromeConnection: NavidromeConnectionStore
+    let playbackController: PlaybackController
     @Binding var activeLibrarySource: LibrarySource?
     let onSelectMusicFolder: ((URL) -> Void)?
     let onCreateOrUpdateLibraryIndex: ((URL) -> Void)?
@@ -31,6 +32,7 @@ struct DeckBackgroundView: View {
         localLibrary: LocalLibraryStore,
         libraryManager: LibraryManager,
         navidromeConnection: NavidromeConnectionStore,
+        playbackController: PlaybackController,
         activeLibrarySource: Binding<LibrarySource?>,
         onSelectMusicFolder: ((URL) -> Void)? = nil,
         onCreateOrUpdateLibraryIndex: ((URL) -> Void)? = nil,
@@ -41,6 +43,7 @@ struct DeckBackgroundView: View {
         self.localLibrary = localLibrary
         self.libraryManager = libraryManager
         self.navidromeConnection = navidromeConnection
+        self.playbackController = playbackController
         self._activeLibrarySource = activeLibrarySource
         self.onSelectMusicFolder = onSelectMusicFolder
         self.onCreateOrUpdateLibraryIndex = onCreateOrUpdateLibraryIndex
@@ -102,9 +105,10 @@ struct DeckBackgroundView: View {
                     )
 
                 VStack(spacing: 12) {
-                    homePrompt(connectionHeading)
+                    homePrompt("PLAYBACK SETUP")
                     connectionButton
                     activeLibraryPrompt
+                    outputStatus
 
                     if let report = compatibilityReport {
                         homePrompt(report)
@@ -174,7 +178,7 @@ struct DeckBackgroundView: View {
                     }
 
                 VStack(spacing: 14) {
-                    homePrompt(connectionHeading)
+                    homePrompt("PLAYBACK SETUP")
 
                     Button {
                         isLibraryActionsPresented = true
@@ -201,6 +205,7 @@ struct DeckBackgroundView: View {
                     .accessibilityLabel(connectionAccessibilityLabel)
 
                     activeLibraryPrompt
+                    outputStatus
 
                     if let report = compatibilityReport {
                         homePrompt(report)
@@ -251,6 +256,10 @@ struct DeckBackgroundView: View {
             .foregroundStyle(.primary)
     }
 
+    private var outputStatus: some View {
+        PlaybackOutputStatusView(controller: playbackController)
+    }
+
     private var connectionButton: some View {
         Button {
             #if os(macOS)
@@ -293,14 +302,9 @@ struct DeckBackgroundView: View {
         }
     }
 
-    private var connectionHeading: String {
-        if isActiveLibraryLoading { return "CONNECTING…" }
-        return isLibraryConnected ? "YOU HAVE SUCCESSFULLY" : "TO PLAY:"
-    }
-
     private var connectionButtonTitle: String {
         if isActiveLibraryLoading { return "CONNECTING" }
-        return isLibraryConnected ? "CONNECTED" : "CONNECT"
+        return "SOURCE"
     }
 
     private var connectionAccessibilityLabel: String {
@@ -410,6 +414,53 @@ struct DeckBackgroundView: View {
             + 24
     }
     #endif
+}
+
+private struct PlaybackOutputStatusView: View {
+    @ObservedObject var controller: PlaybackController
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Text("OUTPUT")
+                .font(.footnote.weight(.semibold))
+                .tracking(4)
+                .foregroundStyle(
+                    colorScheme == .dark ? Color.black : .white
+                )
+                .padding(.horizontal, 30)
+                .frame(height: pillHeight)
+                .background {
+                    Capsule(style: .continuous)
+                        .fill(Color.primary)
+                        .shadow(
+                            color: .black.opacity(0.22),
+                            radius: 8,
+                            y: 4
+                        )
+                }
+
+            Text(controller.outputRoute.displayName)
+                .font(.system(.footnote, design: .monospaced))
+                .tracking(2)
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+        }
+        .padding(.top, 12)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(
+            "Current output: \(controller.outputRoute.displayName)"
+        )
+    }
+
+    private var pillHeight: CGFloat {
+        #if os(iOS)
+        32
+        #else
+        28
+        #endif
+    }
 }
 
 private enum FolderImportAction {

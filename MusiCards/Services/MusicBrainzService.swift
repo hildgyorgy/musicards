@@ -224,7 +224,10 @@ struct MusicBrainzService {
         }
     }
 
-    private func performRequest(from url: URL) async throws -> Data {
+    private func performRequest(
+        from url: URL,
+        timeoutInterval: TimeInterval? = nil
+    ) async throws -> Data {
         if Self.requiresMusicBrainzRateLimit(url) {
             try await rateLimiter.waitIfNeeded()
         }
@@ -232,6 +235,9 @@ struct MusicBrainzService {
 
         var request = URLRequest(url: url)
         request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+        if let timeoutInterval {
+            request.timeoutInterval = timeoutInterval
+        }
 
         let data: Data
         let response: URLResponse
@@ -637,8 +643,18 @@ struct MusicBrainzService {
             )
         }
 
+        let availableLanguages = Set(pages.map(\.languageCode))
+        var nativeLanguages: [String] = []
+        if !availableLanguages.contains("en"),
+           availableLanguages.count > 1 {
+            nativeLanguages = try await nativeWikipediaLanguages(
+                for: entity
+            )
+        }
+
         guard let languageCode = Self.preferredWikipediaLanguage(
-            availableLanguages: Set(pages.map(\.languageCode)),
+            availableLanguages: availableLanguages,
+            nativeLanguages: nativeLanguages,
             preferredLanguages: Locale.preferredLanguages
         ),
               let page = pages.first(where: {
@@ -680,18 +696,115 @@ struct MusicBrainzService {
 
     nonisolated static func preferredWikipediaLanguage(
         availableLanguages: Set<String>,
+        nativeLanguages: [String] = [],
         preferredLanguages: [String]
     ) -> String? {
         let available = Set(availableLanguages.map { $0.lowercased() })
+        if available.contains("en") { return "en" }
+        for language in nativeLanguages.map({ $0.lowercased() })
+            where available.contains(language) {
+            return language
+        }
+        if available.count == 1 { return available.first }
+
         let preferred = preferredLanguages.compactMap {
             normalizedWikipediaLanguage($0)
         }
-        let priority = ["en"] + preferred + ["simple"]
+        let priority = preferred + ["simple"]
 
         for language in priority where available.contains(language) {
             return language
         }
         return available.sorted().first
+    }
+
+    private func nativeWikipediaLanguages(
+        for artistEntity: [String: Any]
+    ) async throws -> [String] {
+        let languageIDs = Self.nativeLanguageItemIDs(in: artistEntity)
+        guard !languageIDs.isEmpty else { return [] }
+
+        var components = URLComponents(
+            string: "https://www.wikidata.org/w/api.php"
+        )
+        components?.queryItems = [
+            URLQueryItem(name: "action", value: "wbgetentities"),
+            URLQueryItem(name: "ids", value: languageIDs.joined(separator: "|")),
+            URLQueryItem(name: "props", value: "claims"),
+            URLQueryItem(name: "format", value: "json")
+        ]
+        guard let url = components?.url else { return [] }
+
+        do {
+            // This lookup is optional. A short single attempt avoids delaying
+            // the excerpt when Wikidata language metadata is unavailable.
+            let data = try await performRequest(
+                from: url,
+                timeoutInterval: 5
+            )
+            guard let json = try JSONSerialization.jsonObject(with: data)
+                as? [String: Any] else {
+                return []
+            }
+            return Self.wikimediaLanguageCodes(
+                in: json,
+                for: languageIDs
+            )
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            return []
+        }
+    }
+
+    nonisolated static func nativeLanguageItemIDs(
+        in entity: [String: Any]
+    ) -> [String] {
+        guard let claims = entity["claims"] as? [String: Any],
+              let statements = claims["P103"] as? [[String: Any]] else {
+            return []
+        }
+
+        let ordered = statements.filter { $0["rank"] as? String == "preferred" }
+            + statements.filter { $0["rank"] as? String != "preferred" }
+        var ids: [String] = []
+        for statement in ordered where
+            statement["rank"] as? String != "deprecated" {
+            guard let mainSnak = statement["mainsnak"] as? [String: Any],
+                  let dataValue = mainSnak["datavalue"] as? [String: Any],
+                  let value = dataValue["value"] as? [String: Any],
+                  let id = value["id"] as? String,
+                  id.hasPrefix("Q"), !ids.contains(id) else {
+                continue
+            }
+            ids.append(id)
+        }
+        return ids
+    }
+
+    nonisolated static func wikimediaLanguageCodes(
+        in json: [String: Any],
+        for itemIDs: [String]
+    ) -> [String] {
+        guard let entities = json["entities"] as? [String: Any] else {
+            return []
+        }
+        return itemIDs.compactMap { id in
+            guard let entity = entities[id] as? [String: Any],
+                  let claims = entity["claims"] as? [String: Any],
+                  let statements = claims["P424"] as? [[String: Any]] else {
+                return nil
+            }
+            return statements.compactMap { statement -> String? in
+                guard statement["rank"] as? String != "deprecated",
+                      let mainSnak = statement["mainsnak"] as? [String: Any],
+                      let dataValue = mainSnak["datavalue"] as? [String: Any],
+                      let code = dataValue["value"] as? String else {
+                    return nil
+                }
+                return code.lowercased()
+            }.first
+        }
     }
 
     nonisolated static func wikipediaSummaryURL(

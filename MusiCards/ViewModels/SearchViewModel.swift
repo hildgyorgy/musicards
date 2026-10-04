@@ -49,7 +49,6 @@ final class SearchViewModel: ObservableObject {
     private var searchTask: Task<Void, Never>?
     private var searchPaginationTask: Task<Void, Never>?
     private var releaseVersionPaginationTask: Task<Void, Never>?
-    private var suppressNextQueryChange = false
     private var libraryAvailabilityObservation: AnyCancellable?
     private let musicBrainzService: any MusicBrainzSearchServing
     private let libraryManager: LibraryManager
@@ -128,12 +127,6 @@ final class SearchViewModel: ObservableObject {
 
     func queryDidChange() {
         let q = normalizedSearchQuery
-
-        if suppressNextQueryChange {
-            suppressNextQueryChange = false
-            lastScheduledNormalizedQuery = q
-            return
-        }
 
         guard q != lastScheduledNormalizedQuery else { return }
         lastScheduledNormalizedQuery = q
@@ -271,13 +264,8 @@ final class SearchViewModel: ObservableObject {
         activeSearchRequest = .recognizedTrack(artist: artist, title: title)
 
         let recognizedQuery = "\(artist), \(title)"
-        if searchQuery != recognizedQuery {
-            suppressNextQueryChange = true
-            searchQuery = recognizedQuery
-        } else {
-            suppressNextQueryChange = false
-            lastScheduledNormalizedQuery = recognizedQuery
-        }
+        lastScheduledNormalizedQuery = recognizedQuery
+        searchQuery = recognizedQuery
 
         searchTask = Task {
             defer {
