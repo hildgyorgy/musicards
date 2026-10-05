@@ -28,6 +28,12 @@ nonisolated private struct NavidromeMatchedSong: Sendable {
     let fallbackArtist: String
 }
 
+nonisolated private struct NavidromeTrackPositionKey: Hashable, Sendable {
+    let recordingID: String
+    let discNumber: Int
+    let trackNumber: Int
+}
+
 /// Cached Navidrome availability keyed by MusicBrainz release and recording IDs.
 @MainActor
 final class NavidromeLibraryProvider: ObservableObject, LibraryProvider {
@@ -46,6 +52,8 @@ final class NavidromeLibraryProvider: ObservableObject, LibraryProvider {
     private var recordingIDsByReleaseID = [String: Set<String>]()
     private var matchedSongsByReleaseID =
         [String: [String: NavidromeMatchedSong]]()
+    private var positionedSongsByReleaseID =
+        [String: [NavidromeTrackPositionKey: NavidromeMatchedSong]]()
     private var normalizedArtistCredits = Set<String>()
     private var normalizedArtistCreditsByAlbumTitle = [String: Set<String>]()
     private var catalogRefreshTask: Task<Void, Never>?
@@ -197,6 +205,9 @@ final class NavidromeLibraryProvider: ObservableObject, LibraryProvider {
             matchedSongsByReleaseID = matchedSongsByReleaseID.filter {
                 refreshedAlbumIDsByReleaseID[$0.key] == albumIDsByReleaseID[$0.key]
             }
+            positionedSongsByReleaseID = positionedSongsByReleaseID.filter {
+                refreshedAlbumIDsByReleaseID[$0.key] == albumIDsByReleaseID[$0.key]
+            }
             releaseIDs = refreshedReleaseIDs
             albumIDsByReleaseID = refreshedAlbumIDsByReleaseID
             catalogReleasesByID = refreshedCatalogReleasesByID
@@ -291,6 +302,8 @@ final class NavidromeLibraryProvider: ObservableObject, LibraryProvider {
                 Self.uniqueRecordingIDs(in: detail.songs)
             matchedSongsByReleaseID[releaseID] =
                 Self.uniqueMatchedSongs(in: detail)
+            positionedSongsByReleaseID[releaseID] =
+                Self.uniquelyPositionedSongs(in: detail)
             if let existing = catalogReleasesByID[releaseID] {
                 catalogReleasesByID[releaseID] = LibraryCatalogRelease(
                     releaseID: existing.releaseID,
@@ -332,22 +345,15 @@ final class NavidromeLibraryProvider: ObservableObject, LibraryProvider {
     }
 
     func containsTrack(_ identity: LibraryTrackIdentity) -> Bool {
-        guard identity.allowsRecordingFallback,
-              let releaseID = Self.releaseID(from: identity.releaseID),
-              let recordingID = Self.recordingID(from: identity.recordingID)
-        else {
-            return false
-        }
-        return recordingIDsByReleaseID[releaseID]?.contains(recordingID) == true
+        matchedSong(for: identity) != nil
     }
 
     func playableTrack(
         for identity: LibraryTrackIdentity
     ) -> LibraryPlayableTrack? {
-        guard identity.allowsRecordingFallback,
-              let releaseID = Self.releaseID(from: identity.releaseID),
+        guard let releaseID = Self.releaseID(from: identity.releaseID),
               let recordingID = Self.recordingID(from: identity.recordingID),
-              let match = matchedSongsByReleaseID[releaseID]?[recordingID]
+              let match = matchedSong(for: identity)
         else {
             return nil
         }
@@ -376,12 +382,7 @@ final class NavidromeLibraryProvider: ObservableObject, LibraryProvider {
         _ reference: PlaybackAssetReference
     ) async throws -> PlaybackSource {
         guard reference.source == source,
-              let match = matchedSongsByReleaseID.values.lazy
-                .compactMap({ matches in
-                    matches.values.first {
-                        $0.song.id == reference.providerItemID
-                    }
-                }).first,
+              let match = cachedMatch(withSongID: reference.providerItemID),
               let mediaSize = match.song.size,
               mediaSize > 0 else {
             throw PlaybackAssetResolutionError.assetUnavailable
@@ -417,6 +418,7 @@ final class NavidromeLibraryProvider: ObservableObject, LibraryProvider {
         catalogReleasesByID.removeAll()
         recordingIDsByReleaseID.removeAll()
         matchedSongsByReleaseID.removeAll()
+        positionedSongsByReleaseID.removeAll()
         normalizedArtistCredits.removeAll()
         normalizedArtistCreditsByAlbumTitle.removeAll()
         catalogSummary = LibraryCatalogSummary()
@@ -543,6 +545,81 @@ final class NavidromeLibraryProvider: ObservableObject, LibraryProvider {
             )
         }
         return matches
+    }
+
+    nonisolated private static func uniquelyPositionedSongs(
+        in album: OpenSubsonicAlbum
+    ) -> [NavidromeTrackPositionKey: NavidromeMatchedSong] {
+        let albumArtist = album.artist?.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        ) ?? ""
+        let fallbackArtist = albumArtist.isEmpty
+            ? album.artists.map(\.name).joined(separator: ", ")
+            : albumArtist
+        var candidates = [
+            NavidromeTrackPositionKey: [NavidromeMatchedSong]
+        ]()
+
+        for song in album.songs {
+            guard let recordingID = recordingID(from: song.musicBrainzID),
+                  let discNumber = song.discNumber,
+                  discNumber > 0,
+                  let trackNumber = song.track,
+                  trackNumber > 0 else {
+                continue
+            }
+            let key = NavidromeTrackPositionKey(
+                recordingID: recordingID,
+                discNumber: discNumber,
+                trackNumber: trackNumber
+            )
+            candidates[key, default: []].append(
+                NavidromeMatchedSong(
+                    song: song,
+                    fallbackArtist: fallbackArtist
+                )
+            )
+        }
+
+        return candidates.compactMapValues { matches in
+            matches.count == 1 ? matches[0] : nil
+        }
+    }
+
+    private func matchedSong(
+        for identity: LibraryTrackIdentity
+    ) -> NavidromeMatchedSong? {
+        guard let releaseID = Self.releaseID(from: identity.releaseID),
+              let recordingID = Self.recordingID(from: identity.recordingID)
+        else {
+            return nil
+        }
+
+        if let mediumPosition = identity.mediumPosition,
+           let trackPosition = identity.trackPosition {
+            let key = NavidromeTrackPositionKey(
+                recordingID: recordingID,
+                discNumber: mediumPosition,
+                trackNumber: trackPosition
+            )
+            if let match = positionedSongsByReleaseID[releaseID]?[key] {
+                return match
+            }
+        }
+
+        guard identity.allowsRecordingFallback else { return nil }
+        return matchedSongsByReleaseID[releaseID]?[recordingID]
+    }
+
+    private func cachedMatch(withSongID songID: String) -> NavidromeMatchedSong? {
+        if let match = matchedSongsByReleaseID.values.lazy.compactMap({ matches in
+            matches.values.first { $0.song.id == songID }
+        }).first {
+            return match
+        }
+        return positionedSongsByReleaseID.values.lazy.compactMap({ matches in
+            matches.values.first { $0.song.id == songID }
+        }).first
     }
 
     nonisolated private static func playbackAudioFormat(

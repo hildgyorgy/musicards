@@ -138,6 +138,8 @@ nonisolated struct OpenSubsonicArtist: Decodable, Equatable, Sendable {
 nonisolated struct OpenSubsonicSong: Decodable, Equatable, Sendable {
     let id: String
     let musicBrainzID: String?
+    let discNumber: Int?
+    let track: Int?
     let title: String?
     let suffix: String?
     let contentType: String?
@@ -151,6 +153,8 @@ nonisolated struct OpenSubsonicSong: Decodable, Equatable, Sendable {
     enum CodingKeys: String, CodingKey {
         case id
         case musicBrainzID = "musicBrainzId"
+        case discNumber
+        case track
         case title
         case suffix
         case contentType
@@ -165,6 +169,8 @@ nonisolated struct OpenSubsonicSong: Decodable, Equatable, Sendable {
     init(
         id: String,
         musicBrainzID: String?,
+        discNumber: Int? = nil,
+        track: Int? = nil,
         title: String? = nil,
         suffix: String? = nil,
         contentType: String? = nil,
@@ -177,6 +183,8 @@ nonisolated struct OpenSubsonicSong: Decodable, Equatable, Sendable {
     ) {
         self.id = id
         self.musicBrainzID = musicBrainzID
+        self.discNumber = discNumber
+        self.track = track
         self.title = title
         self.suffix = suffix
         self.contentType = contentType

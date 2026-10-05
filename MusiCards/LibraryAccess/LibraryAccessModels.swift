@@ -21,6 +21,24 @@ nonisolated struct LibraryTrackIdentity: Hashable, Sendable {
     let releaseTrackID: String?
     let recordingID: String?
     let allowsRecordingFallback: Bool
+    let mediumPosition: Int?
+    let trackPosition: Int?
+
+    init(
+        releaseID: String,
+        releaseTrackID: String?,
+        recordingID: String?,
+        allowsRecordingFallback: Bool,
+        mediumPosition: Int? = nil,
+        trackPosition: Int? = nil
+    ) {
+        self.releaseID = releaseID
+        self.releaseTrackID = releaseTrackID
+        self.recordingID = recordingID
+        self.allowsRecordingFallback = allowsRecordingFallback
+        self.mediumPosition = mediumPosition
+        self.trackPosition = trackPosition
+    }
 }
 
 /// Minimal release metadata exposed by any already-loaded library catalog.

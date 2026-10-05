@@ -233,6 +233,57 @@ final class NavidromeLibraryProviderTests: XCTestCase {
     }
 
     @MainActor
+    func testHybridSACDUsesDiscAndTrackPositionForDuplicateRecording() async {
+        let client = CatalogClientStub(
+            pages: [
+                0: [album(id: "one", musicBrainzID: listReleaseID)]
+            ],
+            details: [
+                "one": album(
+                    id: "one",
+                    musicBrainzID: listReleaseID,
+                    songs: [
+                        song(
+                            id: "sacd-track",
+                            musicBrainzID: duplicateRecordingID,
+                            discNumber: 2,
+                            track: 1
+                        )
+                    ]
+                )
+            ]
+        )
+        let provider = NavidromeLibraryProvider(
+            connection: CatalogConnectionStub(),
+            client: client
+        )
+
+        await provider.refreshCatalog()
+        await provider.prepareTrackAvailability(forRelease: listReleaseID)
+
+        let cdIdentity = trackIdentity(
+            recordingID: duplicateRecordingID,
+            allowsRecordingFallback: false,
+            mediumPosition: 1,
+            trackPosition: 1
+        )
+        let sacdIdentity = trackIdentity(
+            recordingID: duplicateRecordingID,
+            allowsRecordingFallback: false,
+            mediumPosition: 2,
+            trackPosition: 1
+        )
+
+        XCTAssertFalse(provider.containsTrack(cdIdentity))
+        XCTAssertNil(provider.playableTrack(for: cdIdentity))
+        XCTAssertTrue(provider.containsTrack(sacdIdentity))
+        XCTAssertEqual(
+            provider.playableTrack(for: sacdIdentity)?.id,
+            "sacd-track"
+        )
+    }
+
+    @MainActor
     func testTrackAvailabilityDoesNotGuessBetweenDuplicateReleaseAlbums() async {
         let client = CatalogClientStub(
             pages: [
@@ -428,6 +479,8 @@ final class NavidromeLibraryProviderTests: XCTestCase {
     private func song(
         id: String,
         musicBrainzID: String?,
+        discNumber: Int? = nil,
+        track: Int? = nil,
         title: String? = nil,
         suffix: String? = nil,
         contentType: String? = nil,
@@ -437,6 +490,8 @@ final class NavidromeLibraryProviderTests: XCTestCase {
         OpenSubsonicSong(
             id: id,
             musicBrainzID: musicBrainzID,
+            discNumber: discNumber,
+            track: track,
             title: title,
             suffix: suffix,
             contentType: contentType,
@@ -447,13 +502,17 @@ final class NavidromeLibraryProviderTests: XCTestCase {
 
     private func trackIdentity(
         recordingID: String?,
-        allowsRecordingFallback: Bool = true
+        allowsRecordingFallback: Bool = true,
+        mediumPosition: Int? = nil,
+        trackPosition: Int? = nil
     ) -> LibraryTrackIdentity {
         LibraryTrackIdentity(
             releaseID: listReleaseID,
             releaseTrackID: "release-track",
             recordingID: recordingID,
-            allowsRecordingFallback: allowsRecordingFallback
+            allowsRecordingFallback: allowsRecordingFallback,
+            mediumPosition: mediumPosition,
+            trackPosition: trackPosition
         )
     }
 }

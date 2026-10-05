@@ -157,13 +157,35 @@ final class ReleasePlaybackQueueBuilder {
         releaseTrackID: String?,
         recordingID: String?
     ) -> LibraryTrackIdentity {
-        LibraryTrackIdentity(
+        var mediumPosition: Int?
+        var trackPosition: Int?
+        let allowsRecordingFallback = release.hasUniqueOccurrence(
+            ofRecordingID: recordingID
+        )
+        for (mediumIndex, medium) in (release.media ?? []).enumerated() {
+            guard releaseTrackID != nil || allowsRecordingFallback else {
+                break
+            }
+            guard let track = (medium.tracks ?? []).first(where: {
+                if let releaseTrackID {
+                    return $0.id == releaseTrackID
+                }
+                return $0.recording?.id == recordingID
+            }) else {
+                continue
+            }
+            mediumPosition = medium.position ?? mediumIndex + 1
+            trackPosition = track.position
+            break
+        }
+
+        return LibraryTrackIdentity(
             releaseID: release.id,
             releaseTrackID: releaseTrackID,
             recordingID: recordingID,
-            allowsRecordingFallback: release.hasUniqueOccurrence(
-                ofRecordingID: recordingID
-            )
+            allowsRecordingFallback: allowsRecordingFallback,
+            mediumPosition: mediumPosition,
+            trackPosition: trackPosition
         )
     }
 

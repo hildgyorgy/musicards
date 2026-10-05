@@ -163,6 +163,35 @@ final class ReleasePlaybackQueueBuilderTests: XCTestCase {
     }
 
     @MainActor
+    func testHybridSelectionPassesMediumAndTrackPositionToProvider() throws {
+        let release = try makeHybridRelease()
+        let provider = QueueLibraryProvider(source: .navidrome)
+        let manager = LibraryManager(provider: provider)
+        let builder = ReleasePlaybackQueueBuilder(libraryManager: manager)
+
+        _ = builder.canBuildQueue(
+            for: release,
+            selection: ReleasePlaybackSelection(
+                releaseTrackID: "sacd-track",
+                recordingID: "shared-recording"
+            )
+        )
+
+        XCTAssertTrue(
+            provider.requestedIdentities.contains(
+                LibraryTrackIdentity(
+                    releaseID: "hybrid-release",
+                    releaseTrackID: "sacd-track",
+                    recordingID: "shared-recording",
+                    allowsRecordingFallback: false,
+                    mediumPosition: 2,
+                    trackPosition: 1
+                )
+            )
+        )
+    }
+
+    @MainActor
     private func makeRelease() throws -> MBRelease {
         try JSONDecoder().decode(
             MBRelease.self,
@@ -194,6 +223,40 @@ final class ReleasePlaybackQueueBuilderTests: XCTestCase {
             )
         )
     }
+
+    @MainActor
+    private func makeHybridRelease() throws -> MBRelease {
+        try JSONDecoder().decode(
+            MBRelease.self,
+            from: Data(
+                """
+                {
+                  "id": "hybrid-release",
+                  "title": "Hybrid Release",
+                  "media": [{
+                    "position": 1,
+                    "format": "Hybrid SACD (CD layer)",
+                    "tracks": [{
+                      "id": "cd-track",
+                      "position": 1,
+                      "title": "Track",
+                      "recording": {"id": "shared-recording"}
+                    }]
+                  }, {
+                    "position": 2,
+                    "format": "Hybrid SACD (SACD layer, 2 channels)",
+                    "tracks": [{
+                      "id": "sacd-track",
+                      "position": 1,
+                      "title": "Track",
+                      "recording": {"id": "shared-recording"}
+                    }]
+                  }]
+                }
+                """.utf8
+            )
+        )
+    }
 }
 
 @MainActor
@@ -205,6 +268,7 @@ private final class QueueLibraryProvider: LibraryProvider {
     var playableTracks = [String: LibraryPlayableTrack]()
     var resolvedSources = [PlaybackAssetReference: PlaybackSource]()
     var resolvedReferences = [PlaybackAssetReference]()
+    var requestedIdentities = [LibraryTrackIdentity]()
 
     init(source: LibrarySource = .local) {
         self.source = source
@@ -234,6 +298,7 @@ private final class QueueLibraryProvider: LibraryProvider {
     func playableTrack(
         for identity: LibraryTrackIdentity
     ) -> LibraryPlayableTrack? {
+        requestedIdentities.append(identity)
         guard let releaseTrackID = identity.releaseTrackID else { return nil }
         return playableTracks[releaseTrackID]
     }

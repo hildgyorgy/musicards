@@ -270,6 +270,8 @@ final class NavidromeConnectionTests: XCTestCase {
                   "song": [{
                     "id": "song-1",
                     "musicBrainzId": "bf99cae5-3b83-437a-a266-7126bd5653bf",
+                    "discNumber": 2,
+                    "track": 3,
                     "title": "Hi-Res Track",
                     "suffix": "flac",
                     "contentType": "audio/flac",
@@ -296,6 +298,8 @@ final class NavidromeConnectionTests: XCTestCase {
             "bf99cae5-3b83-437a-a266-7126bd5653bf"
         )
         let song = try XCTUnwrap(envelope.response.album?.songs.first)
+        XCTAssertEqual(song.discNumber, 2)
+        XCTAssertEqual(song.track, 3)
         XCTAssertEqual(song.title, "Hi-Res Track")
         XCTAssertEqual(song.suffix, "flac")
         XCTAssertEqual(song.contentType, "audio/flac")

@@ -151,6 +151,7 @@ struct TracksCardContentView: View {
                                 title: title,
                                 subtitle: length ?? "",
                                 mediumIndex: index,
+                                mediumPosition: medium.position ?? index + 1,
                                 isMovement: isMovement
                             )
                             expandableTrackRow(trackRow)
@@ -272,7 +273,9 @@ struct TracksCardContentView: View {
                 releaseTrackID: row.releaseTrackID,
                 recordingID: row.recordingID,
                 allowsRecordingFallback: release?
-                    .hasUniqueOccurrence(ofRecordingID: row.recordingID) == true
+                    .hasUniqueOccurrence(ofRecordingID: row.recordingID) == true,
+                mediumPosition: row.mediumPosition,
+                trackPosition: row.number
             )
         )
     }
@@ -483,7 +486,8 @@ struct TracksCardContentView: View {
                     number: track.position,
                     title: track.title,
                     subtitle: track.length.map(formatMilliseconds) ?? "",
-                    mediumIndex: index
+                    mediumIndex: index,
+                    mediumPosition: medium.position ?? index + 1
                 )
             }
 
@@ -576,6 +580,7 @@ private struct TrackRow: Identifiable {
     let title: String
     let subtitle: String
     let mediumIndex: Int
+    let mediumPosition: Int
     var isMovement: Bool = false
 
     var id: String {
