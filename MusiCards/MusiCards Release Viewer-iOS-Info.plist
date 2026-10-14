@@ -19,5 +19,7 @@
 	<string>MusiCards uses the camera to scan music release barcodes</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>MusiCards uses the microphone to identify music.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>MusiCards uses your local network to find and control audio players you choose.</string>
 </dict>
 </plist>

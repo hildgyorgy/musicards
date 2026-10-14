@@ -9,13 +9,13 @@
 
 ## 1. Snapshot
 
-- **Last updated:** 2026-10-04 (Europe/Budapest)
+- **Last updated:** 2026-10-14 (Europe/Budapest)
 - **Repository:** `musicards`
 - **Branch:** `main`
 - **Last completed application checkpoint before this documentation update:**
-  `c3d9c1c` — `Polish playback output, Shazam search, and Wikipedia links`.
-- **Remote state at documentation review:** `main` matched `origin/main` after
-  the user pushed `c3d9c1c`.
+  `769941f` — `sacd hires layer playing`.
+- **Remote state before this documentation edit:** `main` matched
+  `origin/main` at `769941f`.
 - **Working tree at documentation review:** clean.
 
 The checkpoint above deliberately identifies the last completed application
@@ -33,13 +33,13 @@ git log -5 --oneline --decorate
 If the snapshot above differs from Git, Git and the user's newest instructions
 take precedence; update this document before handing the project off again.
 
-### Next session: AVM at the Mac Studio
+### Next development: AVM renderer integration
 
-The user plans to continue on 2026-10-05 at the office, where the physical
-AVM Audio CS 2.3 is available. On that computer, pull/fetch first, check Git
-state, then read this file, `PLAYER_ARCHITECTURE.md`, the AVM experiment handoff,
-and the UPnP task brief linked in §7. Explain the proposed next step and ask
-before changing code; this is the user's explicit collaboration preference.
+The physical AVM Audio CS 2.3 is the first real target renderer. Before
+implementation, read this file, `PLAYER_ARCHITECTURE.md`, the AVM experiment
+handoff and the UPnP task brief linked in §7. Start with the smallest isolated,
+unit-tested discovery/SOAP/metadata layer, then validate it against the real
+AVM before routing the main app's playback through it.
 
 - **Agreed UI:** source and output selection belong on the home screen as a
   deliberate playback setup. The collapsed and expanded players only *display*
@@ -51,10 +51,13 @@ before changing code; this is the user's explicit collaboration preference.
   the active route automatically. No separate in-app Mojo/AirPlay picker is
   needed for this stage. UPnP renderers such as the AVM are the future explicit
   output choice, discovered on the local network.
-- **No production UPnP control exists yet.** The AVM experiment proved direct
-  Navidrome → renderer streaming and `SetNextAVTransportURI`; it is not an app
-  implementation. The next session should validate the AVM and current design
-  assumptions before choosing the first small implementation slice.
+- **The first production UPnP foundation now exists.** Active SSDP discovery,
+  MediaRenderer/device-description parsing, service URL resolution and
+  AVTransport action inspection live under `MusiCards/Playback/UPnP/` with
+  unit tests. It is intentionally not wired to the output UI or playback
+  controller yet. The next slice should validate discovery against the real
+  AVM, then add isolated SOAP transport control before changing playback
+  routing.
 - **Hardware checks still needed:** the new macOS Core Audio route observer
   builds and passes automated tests, but actual AVM discovery/casting and live
   output changes on the Mac Studio have not been verified in this session.
@@ -339,18 +342,23 @@ directions are:
 1. **My Library / full MusicBrainz catalogue switch** — the first, Search-only
    scope is implemented; broader artist/release-group filtering remains an
    optional product decision.
-2. **Bit-perfect/exclusive macOS output** — HAL device selection, hog mode,
-   sample-rate control, hot-plug fallback, and diagnostics.
-3. **Navidrome → UPnP/DLNA renderer control** — MusiCards as control point only;
-   audio flows directly from Navidrome to the renderer.
-4. **Gapless playback** — pre-resolution/preloading and later engine-level
-   seamless buffer handoff; likely the highest-risk item.
+2. **Navidrome → UPnP/DLNA renderer control** — now the next priority.
+   MusiCards remains the MusicBrainz-rich control point and display; audio
+   flows directly from Navidrome to the renderer. Renderer-side continuous
+   transitions via `SetNextAVTransportURI` belong to this work package.
+3. **Bit-perfect/exclusive local macOS output** — intentionally deferred;
+   HAL device selection, hog mode and related local-player refinements can be
+   revisited later.
+4. **Local/in-app gapless playback** — intentionally deferred because it is
+   the highest-risk Core Audio engine change. This does not defer the
+   renderer-side `SetNextAVTransportURI` path above.
 
 There is also a possible macOS mini-player idea.
 
-The `SearchViewModel` state-reset consolidation is done. The agreed next
-feature is Navidrome → AVM UPnP playback, with the physical renderer available
-at the office. A separate later cleanup may remove the redundant extracted
+The `SearchViewModel` state-reset consolidation is done. On 2026-10-14 the
+user explicitly confirmed that Navidrome → AVM/UPnP playback is now the next
+product priority, ahead of local hog mode and local gapless playback. A
+separate later cleanup may remove the redundant extracted
 rsync source tree while retaining its verified source archive, licence
 material, provenance, and build script.
 
@@ -373,10 +381,33 @@ The experiment against an AVM Audio CS 2.3 and Navidrome already demonstrated:
 
 The detailed UPnP task document explicitly rejects the abandoned vendor-specific
 QPlay approach. Standard AVTransport with a moving Current/Next window is the
-planned direction. No UPnP production implementation has been started yet.
-Treat that task document as a design proposal, not a current-code guarantee:
+planned direction. The discovery/description foundation was started on
+2026-10-14; SOAP transport, playback routing and UI integration remain open.
+Treat the task document as a design proposal, not a current-code guarantee:
 recheck its routing and queue assumptions against the present code and the
 user's agreed home-screen output UX before implementing it.
+
+### General renderer setup is a product requirement
+
+The AVM Audio CS 2.3 is the first reference device, not a device-specific
+product target. Other users must be able to configure their own standard
+UPnP/DLNA MediaRenderer and Navidrome server without understanding Tailscale,
+SOAP or authenticated stream URLs.
+
+- Discover renderers automatically and present their friendly names.
+- Keep the existing HTTPS-only Navidrome address as the normal app connection.
+- First try that existing address for renderer playback. If the renderer cannot
+  reach it (for example because it is Tailscale-only), guide the user to enter
+  one optional **home-network Navidrome address for players**. Reuse the same
+  saved Navidrome account; do not ask for duplicate credentials or create a
+  second library profile.
+- Explain the optional address in user language, with examples such as
+  `http://navidrome.local:4533` and `http://192.168.1.20:4533`. Keep it hidden
+  until external-renderer setup actually needs it.
+- Provide a clear connection/playback test and actionable errors.
+- Build against standard AVTransport. Detect optional capabilities such as
+  `SetNextAVTransportURI`; use them when available and degrade gracefully when
+  a renderer does not support them. Do not add AVM-only logic to the core path.
 
 Do not begin a roadmap item solely because it is listed here. Confirm the user's
 next requested priority first.

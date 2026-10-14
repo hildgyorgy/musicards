@@ -40,6 +40,22 @@ Bővítés a **meglévő `MacSystemPlaybackEngine`-en belül**, nem új `Playbac
 
 **Cél:** a Navidrome-könyvtárból UPnP-n keresztül vezérelni egy dedikált rendert (pl. AVM CS 2.3) – az app **kizárólag kontroller és kijelző**, semmilyen audio-adat nem megy át rajta, se a Mac-et, se a telefont nem terheli.
 
+### Aktuális állapot (2026-10-14)
+
+Az első, még lejátszást nem módosító alapréteg elkészült:
+
+- aktív SSDP M-SEARCH és válaszfeldolgozás;
+- szabványos MediaRenderer-eszközleírás feldolgozása;
+- AVTransport, RenderingControl és ConnectionManager szolgáltatás-URL-ek;
+- a legmagasabb hirdetett AVTransport-verzió kiválasztása;
+- Play/Pause/Stop/Seek/SetNext akciók felismerése az SCPD-ből;
+- iOS/macOS helyi hálózati használati leírás;
+- automatizált parser- és capability-tesztek.
+
+Még nincs bekötve a fő alkalmazás outputválasztásába, és SOAP transportvezérlés
+sincs benne. A következő lépés a valós AVM-felderítés ellenőrzése, majd az
+izolált AVTransport SOAP-kliens.
+
 ### A döntő egyszerűsítés
 
 A user explicit döntése, hogy **csak Navidrome-forrás menjen UPnP-n**, kihagyja a legbonyolultabb részt: nem kell helyi fájlokat kiszolgáló beágyazott HTTP-szervert építeni. A Navidrome `/rest/stream?...&format=raw` URL-je – amit ma a `HTTPRandomAccessByteSource` fogyaszt – **egy az egyben átadható** a renderer `SetAVTransportURI` akciójának; a renderer közvetlenül a Navidrome szerverről húzza le a bájtokat.
@@ -149,11 +165,30 @@ A sorrend nem véletlenszerű – tényleges függőségekre és kockázat-elszi
    Használati tapasztalat alapján később külön dönthető el, szükséges-e az
    artist- és release-group nézetekre is kiterjeszteni.
 
-2. **Bitperfekt** – ez adja meg a lejátszó-motorban azt az alap-primitívet ("azonos rátájú szám → gyors váltás, eltérő rátájú → tudatos, rövid csend"), amire a gapless (4. pont) építeni fog. Ha ezt előbb csináljuk meg és teszteljük önmagában, a gapless-nél egy bevált, stabil eszköz-konfigurációs réteg fölé építünk, nem egyszerre két mozgó alkatrészt hegesztünk össze.
+2. **UPnP/DLNA renderer-kimenet Navidrome-forráshoz** – ez a következő
+   kiemelt fejlesztési irány. A MusiCards itt nem általános helyi lejátszókkal
+   próbál versenyezni: MusicBrainz-alapú böngésző, gazdag metaadat-kijelző és
+   hálózati control point marad, miközben a hang közvetlenül a Navidrome
+   szerverről jut a dedikált audiophile rendererre. A valós AVM-kísérlet már
+   igazolta a közvetlen raw streamet, a seeket és a
+   `SetNextAVTransportURI`-alapú automatikus számváltást. Az első cél ezért
+   egy tesztelhető renderer-réteg, majd a kimenetválasztás beépítése a fő
+   alkalmazásba. A részletes munkaterv:
+   `Documentation/MusiCards_Roadmap_No_3_ UPnP_Renderer_Task.md`.
 
-3. **UPnP kontroller** – teljesen független a Mac/iOS motor belső állapotától, technikailag bármikor jöhetne, akár párhuzamosan is a 2. ponttal. A 2. és 3. közötti sorrend nem architektúra kérdése, hanem érdeklődés/prioritás kérdése – nincs köztük technikai függőség.
+3. **Bitperfekt/exkluzív helyi macOS-kimenet** – értékes, de hátrasorolt
+   fejlesztés. A jelenlegi helyi és Navidrome-lejátszás már stabil és jól
+   használható; hog mode-os helyi lejátszóból sok kiforrott alternatíva van,
+   ezért ez kevésbé különbözteti meg a MusiCardsot.
 
-4. **Gapless** – ez a legköltségesebb és legkockázatosabb belenyúlás a motor belsejébe, ezért utoljára. Két dolog is megkönnyíti, ha addigra megvan: a bitperfekt munkából örökölt ráta-váltási logika (2. pont), és a UPnP motor, aminél a gapless jó eséllyel szinte ingyen adódik a `SetNextAVTransportURI`-ból (3. pont). Ha ezt csinálnánk először, kétszer nyúlnánk hozzá ugyanazokhoz a fájlokhoz, feleslegesen.
+4. **Helyi és appon belüli gapless playback** – szintén hátrasorolt, mert ez
+   a legköltségesebb és legkockázatosabb beavatkozás a Core Audio motorba.
+   Ez nem vonatkozik a UPnP renderer saját, `SetNextAVTransportURI`-alapú
+   folyamatos számváltására: az a renderer-integráció része marad, és nem
+   igényli a helyi dekódoló/renderelő motor átépítését.
 
-Mind a négy önállóan is értékes munkacsomag – nem kell egyben megcsinálni, és a sorrend pont azt szolgálja, hogy egyik se dolgozzon a másik ellen menet közben.
+Mind a négy önállóan is értékes munkacsomag. A sorrend most tudatos
+termékdöntést tükröz: előbb azt az egyedi MusicBrainz + Navidrome + külső
+renderer élményt építjük meg, amelyre kevés jó alternatíva létezik; a helyi
+audiophile motor finomításai később is hozzáadhatók.
 ## macOS alatt esetleg egy “miniplayer” nézet
