@@ -9,8 +9,6 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
-	<key>NSLocalNetworkUsageDescription</key>
-	<string>MusiCards uses your local network to find and control audio players you choose.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>
