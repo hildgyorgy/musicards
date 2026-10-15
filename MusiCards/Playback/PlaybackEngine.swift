@@ -391,6 +391,7 @@ enum PlaybackEngineEvent: Equatable {
     case started
     case paused
     case positionChanged(TimeInterval)
+    case volumeChanged(PlaybackVolumeState)
     case outputConfigurationChanged
     case finished
     case failed(PlaybackFailure)

@@ -12,13 +12,15 @@ nonisolated struct OpenSubsonicRequestBuilder: Sendable {
     func pingRequest(
         profile: NavidromeServerProfile,
         password: String,
-        salt: String
+        salt: String,
+        allowsInsecureLocalHTTP: Bool = false
     ) throws -> URLRequest {
         try authenticatedRequest(
             endpoint: "ping",
             profile: profile,
             password: password,
-            salt: salt
+            salt: salt,
+            allowsInsecureLocalHTTP: allowsInsecureLocalHTTP
         )
     }
 
@@ -76,20 +78,77 @@ nonisolated struct OpenSubsonicRequestBuilder: Sendable {
         )
     }
 
+    /// A renderer-fetchable stream URL. Unlike the app's own byte-source
+    /// request this carries OpenSubsonic authentication in the URL because the
+    /// UPnP renderer performs the HTTP request itself.
+    func rendererStreamURL(
+        profile: NavidromeServerProfile,
+        password: String,
+        salt: String,
+        songID: String
+    ) throws -> URL {
+        guard var components = URLComponents(
+            url: profile.baseURL,
+            resolvingAgainstBaseURL: false
+        ),
+        let scheme = components.scheme?.lowercased(),
+        scheme == "https" || scheme == "http" else {
+            throw NavidromeConnectionError.secureConnectionRequired
+        }
+        guard components.host != nil,
+              components.user == nil,
+              components.password == nil,
+              components.query == nil,
+              components.fragment == nil else {
+            throw NavidromeConnectionError.invalidBaseURL
+        }
+
+        var path = components.path
+        while path.count > 1, path.hasSuffix("/") {
+            path.removeLast()
+        }
+        components.path = path.hasSuffix("/rest")
+            ? path + "/stream.view"
+            : path + "/rest/stream.view"
+        components.queryItems = [
+            URLQueryItem(name: "c", value: clientName),
+            URLQueryItem(name: "f", value: "json"),
+            URLQueryItem(name: "format", value: "raw"),
+            URLQueryItem(name: "id", value: songID),
+            URLQueryItem(name: "maxBitRate", value: "0"),
+            URLQueryItem(name: "s", value: salt),
+            URLQueryItem(
+                name: "t",
+                value: OpenSubsonicAuthentication.token(
+                    password: password,
+                    salt: salt
+                )
+            ),
+            URLQueryItem(name: "u", value: profile.username),
+            URLQueryItem(name: "v", value: apiVersion)
+        ]
+
+        guard let url = components.url else {
+            throw NavidromeConnectionError.invalidBaseURL
+        }
+        return url
+    }
+
     private func authenticatedRequest(
         endpoint endpointName: String,
         profile: NavidromeServerProfile,
         password: String,
         salt: String,
         additionalParameters: [String: String] = [:],
-        accept: String = "application/json"
+        accept: String = "application/json",
+        allowsInsecureLocalHTTP: Bool = false
     ) throws -> URLRequest {
         guard var components = URLComponents(
             url: profile.baseURL,
             resolvingAgainstBaseURL: false
         ),
         let scheme = components.scheme?.lowercased(),
-        scheme == "https" else {
+        scheme == "https" || (allowsInsecureLocalHTTP && scheme == "http") else {
             throw NavidromeConnectionError.secureConnectionRequired
         }
         guard components.host != nil,

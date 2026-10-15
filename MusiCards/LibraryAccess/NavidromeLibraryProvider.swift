@@ -4,6 +4,13 @@ import Foundation
 @MainActor
 protocol NavidromeCatalogConnectionProviding: AnyObject {
     func catalogCredentials() throws -> NavidromeCatalogCredentials
+    func rendererCredentials() throws -> NavidromeCatalogCredentials
+}
+
+extension NavidromeCatalogConnectionProviding {
+    func rendererCredentials() throws -> NavidromeCatalogCredentials {
+        try catalogCredentials()
+    }
 }
 
 nonisolated protocol OpenSubsonicCatalogClientProtocol: Sendable {

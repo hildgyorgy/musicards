@@ -2,15 +2,17 @@ import SwiftUI
 
 struct RendererDiscoveryView: View {
     @ObservedObject var browser: UPnPRendererBrowser
+    @ObservedObject var navidromeConnection: NavidromeConnectionStore
     @Environment(\.dismiss) private var dismiss
     @State private var rendererAddress = ""
+    @State private var rendererServerAddress = ""
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 header
 
-                Text("Discovery preview. Playback remains on this device.")
+                Text("Select one renderer, then provide a Navidrome address it can reach.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
 
@@ -21,7 +23,10 @@ struct RendererDiscoveryView: View {
         .scrollIndicators(.hidden)
         .frame(minWidth: 360, idealWidth: 440, minHeight: 360, idealHeight: 520)
         .onAppear {
-            if browser.state == .idle {
+            browser.beginRendererSelection()
+            rendererServerAddress = navidromeConnection.rendererServerURL?
+                .absoluteString ?? ""
+            if !browser.hasStartedAutomaticDiscovery {
                 browser.refresh()
             }
         }
@@ -39,97 +44,228 @@ struct RendererDiscoveryView: View {
 
             Spacer()
 
-            Button("DONE") { dismiss() }
-                .font(.system(.footnote, design: .monospaced).weight(.semibold))
-                .buttonStyle(.plain)
+            Button("CANCEL") {
+                browser.cancelRendererSelection()
+                dismiss()
+            }
+            .font(.system(.footnote, design: .monospaced).weight(.semibold))
+            .buttonStyle(.plain)
+
+            Button("OK") {
+                browser.commitRendererSelection()
+                dismiss()
+            }
+            .font(.system(.footnote, design: .monospaced).weight(.bold))
+            .buttonStyle(.borderedProminent)
         }
     }
 
     @ViewBuilder
     private var content: some View {
-        switch browser.state {
-        case .idle, .searching:
-            VStack(spacing: 12) {
-                ProgressView()
-                Text("Searching the local network…")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+        rendererServerSection
+
+        LazyVStack(spacing: 14) {
+            ForEach(UPnPRendererBrowser.DiscoveryMethod.allCases) { method in
+                discoverySection(method)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 48)
-
-        case let .failed(message):
-            messageView(message)
-            addressDiscovery
-
-        case .ready:
-            if browser.renderers.isEmpty {
-                Text("No UPnP/DLNA MediaRenderer responded.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 24)
-            } else {
-                LazyVStack(spacing: 12) {
-                    ForEach(browser.renderers) { renderer in
-                        rendererRow(renderer)
-                    }
-                }
-            }
-
-            addressDiscovery
-
-            Button("SEARCH AGAIN") { browser.refresh() }
-                .font(.system(.footnote, design: .monospaced).weight(.semibold))
-                .buttonStyle(.plain)
-                .frame(maxWidth: .infinity)
-                .padding(.top, 8)
         }
+
+        Button("RUN AUTOMATIC TESTS AGAIN") { browser.refresh() }
+            .font(.system(.footnote, design: .monospaced).weight(.semibold))
+            .buttonStyle(.plain)
+            .disabled(browser.isSearching)
+            .frame(maxWidth: .infinity)
+            .padding(.top, 6)
     }
 
-    private var addressDiscovery: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("RENDERER IP ADDRESS")
-                .font(.system(.caption, design: .monospaced).weight(.semibold))
-                .foregroundStyle(.secondary)
+    private var rendererServerSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("NAVIDROME ADDRESS FOR RENDERER")
+                .font(.system(.caption, design: .monospaced).weight(.bold))
+                .tracking(1.2)
+
+            Text(
+                "Use a home-network address the renderer can open, for example http://umbrel.local:4533. The app keeps using the normal HTTPS address and reuses the same saved account."
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+
+            TextField(
+                "http://umbrel.local:4533",
+                text: $rendererServerAddress
+            )
+            .textFieldStyle(.roundedBorder)
+            #if os(iOS)
+            .textInputAutocapitalization(.never)
+            .keyboardType(.URL)
+            #endif
 
             HStack(spacing: 10) {
-                TextField("192.168.1.50", text: $rendererAddress)
-                    .textFieldStyle(.roundedBorder)
-                    #if os(iOS)
-                    .keyboardType(.numbersAndPunctuation)
-                    .textInputAutocapitalization(.never)
-                    #endif
-
-                Button("FIND") {
-                    browser.refresh(rendererAddress: rendererAddress)
+                Button {
+                    Task {
+                        await navidromeConnection
+                            .verifyAndSaveRendererServerURL(
+                                rendererServerAddress
+                            )
+                    }
+                } label: {
+                    Text(
+                        navidromeConnection.isVerifyingRendererServer
+                            ? "VERIFYING…" : "VERIFY & SAVE"
+                    )
                 }
                 .font(.system(.footnote, design: .monospaced).weight(.semibold))
-                .buttonStyle(.bordered)
+                .buttonStyle(.borderedProminent)
                 .disabled(
-                    rendererAddress.trimmingCharacters(
-                        in: .whitespacesAndNewlines
-                    ).isEmpty
+                    navidromeConnection.isVerifyingRendererServer
+                        || rendererServerAddress.trimmingCharacters(
+                            in: .whitespacesAndNewlines
+                        ).isEmpty
                 )
+
+                Button("USE NORMAL ADDRESS") {
+                    navidromeConnection.useNormalServerAddressForRenderer()
+                    rendererServerAddress = ""
+                }
+                .font(.system(.caption, design: .monospaced).weight(.semibold))
+                .buttonStyle(.plain)
             }
 
-            Text("For renderers that do not answer multicast discovery. A successful address is remembered on this device.")
+            if let message = navidromeConnection.rendererServerStatusMessage {
+                Text(message)
+                    .font(.caption)
+                    .foregroundStyle(.green)
+            }
+            if let message = navidromeConnection.rendererServerErrorMessage {
+                Text(message)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 14))
+    }
+
+    private func discoverySection(
+        _ method: UPnPRendererBrowser.DiscoveryMethod
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(method.title)
+                .font(.system(.caption, design: .monospaced).weight(.bold))
+                .tracking(1.2)
+
+            Text(method.explanation)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+
+            stageResult(browser.state(for: method))
+
+            if method == .subnetSweep {
+                Button("RUN DEEP SEARCH") { browser.deepSearch() }
+                    .font(.system(.footnote, design: .monospaced).weight(.semibold))
+                    .buttonStyle(.borderedProminent)
+                    .disabled(browser.isSearching)
+            }
+
+            if method == .manualAddress {
+                manualAddressControls
+            }
         }
-        .padding(.top, 4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 14))
+    }
+
+    @ViewBuilder
+    private func stageResult(
+        _ state: UPnPRendererBrowser.DiscoveryStageState
+    ) -> some View {
+        switch state {
+        case .waiting:
+            resultLabel("WAITING", color: .secondary)
+        case .searching:
+            HStack(spacing: 8) {
+                ProgressView().controlSize(.small)
+                resultLabel("SEARCHING…", color: .secondary)
+            }
+        case .noResult:
+            resultLabel("NO RENDERER FOUND", color: .orange)
+        case let .unavailable(message):
+            VStack(alignment: .leading, spacing: 3) {
+                resultLabel("NOT AVAILABLE", color: .secondary)
+                Text(message)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        case let .failed(message):
+            VStack(alignment: .leading, spacing: 3) {
+                resultLabel("ERROR", color: .red)
+                Text(message)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        case let .found(renderers):
+            VStack(spacing: 8) {
+                ForEach(renderers) { renderer in
+                    rendererRow(renderer)
+                }
+            }
+        }
+    }
+
+    private func resultLabel(_ text: String, color: Color) -> some View {
+        Text(text)
+            .font(.system(.caption, design: .monospaced).weight(.semibold))
+            .foregroundStyle(color)
+    }
+
+    private var manualAddressControls: some View {
+        HStack(spacing: 10) {
+            TextField("192.168.---.---", text: $rendererAddress)
+                .textFieldStyle(.roundedBorder)
+                #if os(iOS)
+                .keyboardType(.numbersAndPunctuation)
+                .textInputAutocapitalization(.never)
+                #endif
+
+            Button("FIND") {
+                browser.findRenderer(at: rendererAddress)
+            }
+            .font(.system(.footnote, design: .monospaced).weight(.semibold))
+            .buttonStyle(.bordered)
+            .disabled(
+                browser.isSearching
+                    || rendererAddress.trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    ).isEmpty
+            )
+        }
     }
 
     private func rendererRow(_ renderer: UPnPRendererDescriptor) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(renderer.friendlyName)
-                .font(.headline)
+            HStack(alignment: .firstTextBaseline) {
+                Text(renderer.friendlyName)
+                    .font(.headline)
+                Spacer()
+                resultLabel("FOUND", color: .green)
+                selectionButton(for: renderer)
+            }
 
             if let modelName = renderer.modelName {
                 Text(modelName)
                     .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+
+            if let host = renderer.descriptionURL.host {
+                Text(host)
+                    .font(.system(.caption, design: .monospaced))
                     .foregroundStyle(.secondary)
             }
 
@@ -164,23 +300,28 @@ struct RendererDiscoveryView: View {
             .disabled(browser.checkingRendererIDs.contains(renderer.id))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
-        .background(.primary.opacity(0.055), in: RoundedRectangle(cornerRadius: 14))
+        .padding(12)
+        .background(.primary.opacity(0.055), in: RoundedRectangle(cornerRadius: 10))
     }
 
-    private func messageView(_ message: String) -> some View {
-        VStack(spacing: 16) {
-            Text(message)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-
-            Button("SEARCH AGAIN") { browser.refresh() }
-                .font(.system(.footnote, design: .monospaced).weight(.semibold))
-                .buttonStyle(.bordered)
+    private func selectionButton(
+        for renderer: UPnPRendererDescriptor
+    ) -> some View {
+        let isSelected = browser.isDraftSelected(renderer)
+        return Button {
+            browser.toggleDraftSelection(of: renderer)
+        } label: {
+            Image(systemName: isSelected ? "checkmark.square.fill" : "square")
+                .font(.title3)
+                .foregroundStyle(isSelected ? Color.accentColor : .secondary)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 40)
+        .buttonStyle(.plain)
+        .accessibilityLabel(
+            isSelected
+                ? "Deselect \(renderer.friendlyName)"
+                : "Select \(renderer.friendlyName)"
+        )
+        .accessibilityValue(isSelected ? "Selected" : "Not selected")
     }
 
     private func capabilityText(_ capabilities: UPnPRendererCapabilities) -> String {

@@ -62,17 +62,35 @@ AVM before routing the main app's playback through it.
   Debug build, tapping the home-screen `OUTPUT` area opens discovery results.
   Each renderer can be asked for `GetTransportInfo` and `GetPositionInfo` via
   real SOAP calls; state and position are shown in the sheet. The normal
-  playback route is deliberately unchanged, and Release builds still render
-  the `OUTPUT` area as a noninteractive status label.
+  Release builds still render the `OUTPUT` area as a noninteractive status
+  label.
+- **The first functional output route is now wired in the working tree.** A
+  confirmed renderer selection routes Navidrome tracks through a new composite
+  playback engine. It creates a salted-token raw stream URL, sends DIDL-Lite
+  metadata with `SetAVTransportURI`, controls Play/Pause/Stop/Seek over SOAP,
+  and polls transport/position state. Navidrome bytes flow directly to the
+  renderer; local files deliberately fail with a clear Navidrome-only message.
+  Changing output stops the old route and resumes a currently playing item on
+  the newly selected route. The renderer name is also shown in both player
+  presentations. The AVM accepts the transport commands, but the first playback
+  attempt exposed a separate network-address issue: it cannot reach the user's
+  normal Tailscale-only Navidrome URL.
 - **macOS UDP permissions:** the first real launch showed that the sandbox
   could send SSDP but could not receive its UDP replies. The macOS target now
   has both `com.apple.security.network.client` and
   `com.apple.security.network.server`; the latter was explicitly approved by
   the user and is required for incoming UDP discovery responses.
-- **Hardware check needed next:** run a Debug build on the Mac Studio or iPhone
-  on the AVM's LAN, allow local-network access, open the `OUTPUT` lab, verify
-  that AVM Audio CS 2.3 appears, then use `CHECK TRANSPORT`. Actual casting and
-  output switching have not yet been added.
+- **Renderer-accessible Navidrome address is now implemented.** The renderer
+  lab accepts one optional local address such as
+  `http://navidrome.local:4533`, verifies it against Navidrome using the already
+  stored account, and persists it separately from the normal HTTPS/Tailscale
+  app connection. Plain HTTP is accepted only for local/private hosts. Only
+  authenticated renderer stream URLs use this address.
+- **Real AVM playback succeeded on macOS.** With the separate, verified local
+  Navidrome address the AVM produced sound through the real output route. Next,
+  validate the new volume/mute controls, metadata, pause, seek, next-track
+  advance and switching back to system output, then repeat the complete path
+  on iOS.
 - **AVM discovery quirk confirmed on real hardware:** the AVM at its current
   private address did not answer multicast M-SEARCH, but immediately answered
   the same request sent directly to its IP. The lab therefore has a renderer-IP
@@ -358,6 +376,21 @@ The generic iOS device build also passed with code signing disabled. This was
 not a complete `./Tools/verify.sh` run; MusiCards Sync was unchanged and its
 tests were not rerun.
 
+On 2026-10-15 the renderer discovery gained a layered fallback path: multicast
+M-SEARCH, cached successful hosts, passive `ssdp:alive` reception, and a
+user-triggered bounded `/24` unicast `DEEP SEARCH`; manual IP entry remains the
+final fallback. Deep Search deliberately ignores cached hosts so a real-device
+test cannot pass merely because the renderer was found manually before. The
+renderer lab presents these as five isolated diagnostic sections, so a result
+from one mechanism cannot be mistaken for a result from another. The first
+three checks run sequentially; Deep Search and manual address lookup remain
+explicit actions. The full MusiCards macOS XCTest suite and the unsigned
+generic iOS device build passed after the discovery foundation change; the
+five-section diagnostic refactor subsequently passed the full MusiCards macOS
+XCTest suite and unsigned iOS build again. The pre-existing MusiCards Sync
+project/scheme and MusiCards scheme working-tree edits were not changed or
+verified as part of this work.
+
 ## 7. Roadmap and next likely work
 
 The current roadmap is `Documentation/MusiCards_Roadmap.md`. Its four principal
@@ -406,8 +439,12 @@ The experiment against an AVM Audio CS 2.3 and Navidrome already demonstrated:
 The detailed UPnP task document explicitly rejects the abandoned vendor-specific
 QPlay approach. Standard AVTransport with a moving Current/Next window is the
 planned direction. The discovery/description foundation was started on
-2026-10-14; SOAP transport, playback routing and UI integration remain open.
-Treat the task document as a design proposal, not a current-code guarantee:
+2026-10-14; SOAP transport, the first Navidrome-to-renderer playback route and
+the debug output-selection UI are now implemented. The expanded player also
+has standard RenderingControl volume/mute control and polls the renderer so
+external changes are reflected. Hardware validation and the later queue work
+remain open. Treat the task document as a design proposal, not a current-code
+guarantee:
 recheck its routing and queue assumptions against the present code and the
 user's agreed home-screen output UX before implementing it.
 
@@ -420,15 +457,16 @@ SOAP or authenticated stream URLs.
 
 - Discover renderers automatically and present their friendly names.
 - Keep the existing HTTPS-only Navidrome address as the normal app connection.
-- First try that existing address for renderer playback. If the renderer cannot
-  reach it (for example because it is Tailscale-only), guide the user to enter
-  one optional **home-network Navidrome address for players**. Reuse the same
-  saved Navidrome account; do not ask for duplicate credentials or create a
+- The app can use that existing address for renderer playback, or the user can
+  enter one optional **home-network Navidrome address for players** when the
+  renderer cannot reach it (for example because it is Tailscale-only). The
+  implementation reuses the saved Navidrome account and does not create a
   second library profile.
 - Explain the optional address in user language, with examples such as
   `http://navidrome.local:4533` and `http://192.168.1.20:4533`. Keep it hidden
   until external-renderer setup actually needs it.
-- Provide a clear connection/playback test and actionable errors.
+- The renderer address is verified before it is saved; retain clear,
+  actionable playback errors as the hardware path is refined.
 - Build against standard AVTransport. Detect optional capabilities such as
   `SetNextAVTransportURI`; use them when available and degrade gracefully when
   a renderer does not support them. Do not add AVM-only logic to the core path.

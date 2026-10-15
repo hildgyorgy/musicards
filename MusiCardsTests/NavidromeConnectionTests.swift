@@ -212,6 +212,103 @@ final class NavidromeConnectionTests: XCTestCase {
         XCTAssertFalse(body.contains("p="))
     }
 
+    func testRendererStreamURLCarriesTokenButNeverPlainPassword() throws {
+        let profile = NavidromeServerProfile(
+            name: "Test Server",
+            baseURL: URL(string: "https://music.example.com/navidrome")!,
+            username: "listener"
+        )
+        let url = try OpenSubsonicRequestBuilder().rendererStreamURL(
+            profile: profile,
+            password: "super secret",
+            salt: "abcdef",
+            songID: "song/id"
+        )
+        let components = try XCTUnwrap(
+            URLComponents(url: url, resolvingAgainstBaseURL: false)
+        )
+        let query = Dictionary(
+            uniqueKeysWithValues: (components.queryItems ?? []).map {
+                ($0.name, $0.value ?? "")
+            }
+        )
+
+        XCTAssertEqual(components.path, "/navidrome/rest/stream.view")
+        XCTAssertEqual(query["f"], "json")
+        XCTAssertEqual(query["u"], "listener")
+        XCTAssertEqual(query["s"], "abcdef")
+        XCTAssertEqual(query["id"], "song/id")
+        XCTAssertEqual(query["format"], "raw")
+        XCTAssertEqual(query["maxBitRate"], "0")
+        XCTAssertEqual(
+            query["t"],
+            OpenSubsonicAuthentication.token(
+                password: "super secret",
+                salt: "abcdef"
+            )
+        )
+        XCTAssertFalse(url.absoluteString.contains("super"))
+        XCTAssertFalse(url.absoluteString.contains("secret"))
+        XCTAssertNil(query["p"])
+    }
+
+    func testRendererAddressAllowsLocalHTTPButRejectsPublicHTTP() throws {
+        XCTAssertEqual(
+            try NavidromeRendererServerURL.validated("umbrel.local:4533")
+                .absoluteString,
+            "http://umbrel.local:4533"
+        )
+        XCTAssertEqual(
+            try NavidromeRendererServerURL.validated("http://192.168.0.10:4533")
+                .host,
+            "192.168.0.10"
+        )
+        XCTAssertThrowsError(
+            try NavidromeRendererServerURL.validated(
+                "http://music.example.com:4533"
+            )
+        ) { error in
+            XCTAssertEqual(
+                error as? NavidromeRendererServerURLError,
+                .insecurePublicAddress
+            )
+        }
+    }
+
+    func testRendererRequestsCanExplicitlyUseVerifiedLocalHTTP() throws {
+        let profile = NavidromeServerProfile(
+            name: "Home LAN",
+            baseURL: URL(string: "http://umbrel.local:4533")!,
+            username: "listener"
+        )
+        let builder = OpenSubsonicRequestBuilder()
+
+        XCTAssertNoThrow(
+            try builder.pingRequest(
+                profile: profile,
+                password: "password",
+                salt: "abcdef",
+                allowsInsecureLocalHTTP: true
+            )
+        )
+        XCTAssertThrowsError(
+            try builder.pingRequest(
+                profile: profile,
+                password: "password",
+                salt: "abcdef"
+            )
+        )
+        XCTAssertEqual(
+            try builder.rendererStreamURL(
+                profile: profile,
+                password: "password",
+                salt: "abcdef",
+                songID: "song-1"
+            ).scheme,
+            "http"
+        )
+    }
+
     func testAlbumResponsesDecodeReleaseMusicBrainzID() throws {
         let data = Data(
             """

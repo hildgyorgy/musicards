@@ -73,6 +73,68 @@ nonisolated struct NavidromeCatalogCredentials: Sendable {
     let password: String
 }
 
+nonisolated enum NavidromeRendererServerURL {
+    static func validated(_ value: String) throws -> URL {
+        var trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            throw NavidromeRendererServerURLError.addressRequired
+        }
+        if !trimmed.contains("://") {
+            trimmed = "http://\(trimmed)"
+        }
+
+        guard let components = URLComponents(string: trimmed),
+              let scheme = components.scheme?.lowercased(),
+              scheme == "http" || scheme == "https",
+              let host = components.host,
+              !host.isEmpty,
+              components.user == nil,
+              components.password == nil,
+              components.query == nil,
+              components.fragment == nil,
+              let url = components.url else {
+            throw NavidromeRendererServerURLError.invalidAddress
+        }
+        if scheme == "http", !isLocalHost(host) {
+            throw NavidromeRendererServerURLError.insecurePublicAddress
+        }
+        return url
+    }
+
+    private static func isLocalHost(_ host: String) -> Bool {
+        let normalized = host.lowercased()
+        if normalized.hasSuffix(".local") || !normalized.contains(".") {
+            return true
+        }
+        let octets = normalized.split(separator: ".").compactMap {
+            Int(String($0))
+        }
+        guard octets.count == 4 else { return false }
+        if octets[0] == 10 || octets[0] == 127 { return true }
+        if octets[0] == 192, octets[1] == 168 { return true }
+        if octets[0] == 172, (16...31).contains(octets[1]) { return true }
+        return false
+    }
+}
+
+nonisolated enum NavidromeRendererServerURLError:
+    LocalizedError, Equatable, Sendable {
+    case addressRequired
+    case invalidAddress
+    case insecurePublicAddress
+
+    var errorDescription: String? {
+        switch self {
+        case .addressRequired:
+            "Enter the Navidrome address reachable from the renderer."
+        case .invalidAddress:
+            "The renderer's Navidrome address is not valid."
+        case .insecurePublicAddress:
+            "An HTTP renderer address must be a private or local-network address."
+        }
+    }
+}
+
 nonisolated enum NavidromeProfileValidationError: LocalizedError, Equatable, Sendable {
     case serverURLRequired
     case usernameRequired

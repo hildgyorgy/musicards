@@ -89,6 +89,11 @@ struct PlayerCardContentView: View {
                 playerMetadataLabel(outputTitle)
                     .padding(.bottom, playerFooterInfoSpacing)
 
+                if controller.canControlOutputVolume {
+                    RendererVolumeControl(controller: controller)
+                        .padding(.bottom, 6)
+                }
+
                 CollapsedPlayerBar(
                     controller: controller,
                     contentInset: 0,
@@ -214,8 +219,10 @@ struct PlayerCardContentView: View {
     }
 
     private var outputTitle: String {
-        let output = controller.outputRoute
-        let details = [output.displayName, output.sampleRateText]
+        let details = [
+            controller.outputDisplayName,
+            controller.outputSampleRateText
+        ]
             .compactMap { $0 }
             .joined(separator: " • ")
         return "OUTPUT:\n\(details)"
@@ -307,5 +314,112 @@ struct PlayerCardContentView: View {
     private func formatTime(_ time: TimeInterval) -> String {
         let seconds = max(Int(time.rounded(.down)), 0)
         return String(format: "%d:%02d", seconds / 60, seconds % 60)
+    }
+}
+
+private struct RendererVolumeControl: View {
+    @ObservedObject var controller: PlaybackController
+    @State private var draftLevel = 0.5
+    @State private var isAdjusting = false
+    @State private var volumeUpdateTask: Task<Void, Never>?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 10) {
+                Button {
+                    Task {
+                        await controller.setOutputMuted(
+                            !(controller.outputVolumeState?.isMuted ?? false)
+                        )
+                    }
+                } label: {
+                    Image(
+                        systemName: controller.outputVolumeState?.isMuted == true
+                            ? "speaker.slash.fill" : "speaker.wave.2.fill"
+                    )
+                    .frame(width: 24, height: 24)
+                }
+                .buttonStyle(.plain)
+                .disabled(controller.outputVolumeState == nil)
+                .accessibilityLabel(
+                    controller.outputVolumeState?.isMuted == true
+                        ? "Unmute network renderer" : "Mute network renderer"
+                )
+
+                Slider(
+                    value: $draftLevel,
+                    in: 0...1,
+                    onEditingChanged: { editing in
+                        isAdjusting = editing
+                        if !editing {
+                            sendFinalVolumeUpdate()
+                        }
+                    }
+                )
+                .disabled(controller.outputVolumeState == nil)
+                .accessibilityLabel("Network renderer volume")
+                .accessibilityValue("\(Int((draftLevel * 100).rounded())) percent")
+
+                Text("\(Int((draftLevel * 100).rounded()))")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .frame(width: 28, alignment: .trailing)
+            }
+
+            if let error = controller.outputVolumeErrorMessage {
+                Text(error)
+                    .font(.caption2)
+                    .foregroundStyle(.red)
+                    .lineLimit(2)
+            }
+        }
+        .task(id: controller.externalOutputDisplayName) {
+            await controller.refreshOutputVolume()
+            synchronizeDraftLevel()
+        }
+        .onChange(of: controller.outputVolumeState) {
+            guard !isAdjusting else { return }
+            synchronizeDraftLevel()
+        }
+        .onChange(of: draftLevel) {
+            guard isAdjusting else { return }
+            scheduleLiveVolumeUpdate()
+        }
+        .onDisappear {
+            volumeUpdateTask?.cancel()
+        }
+    }
+
+    private func synchronizeDraftLevel() {
+        if let level = controller.outputVolumeState?.level {
+            draftLevel = level
+        }
+    }
+
+    private func scheduleLiveVolumeUpdate() {
+        guard volumeUpdateTask == nil else { return }
+        volumeUpdateTask = Task {
+            do {
+                try await Task.sleep(for: .milliseconds(100))
+            } catch {
+                return
+            }
+            guard !Task.isCancelled else { return }
+            let level = draftLevel
+            await controller.setOutputVolume(level)
+            guard !Task.isCancelled else { return }
+            volumeUpdateTask = nil
+            if isAdjusting, level != draftLevel {
+                scheduleLiveVolumeUpdate()
+            }
+        }
+    }
+
+    private func sendFinalVolumeUpdate() {
+        volumeUpdateTask?.cancel()
+        let level = draftLevel
+        volumeUpdateTask = Task {
+            await controller.setOutputVolume(level)
+        }
     }
 }

@@ -14,16 +14,26 @@ final class NavidromeConnectionStore: ObservableObject {
     @Published private(set) var statusMessage: String?
     @Published private(set) var errorMessage: String?
     @Published private(set) var hasStoredPassword = false
+    @Published private(set) var rendererServerURL: URL?
+    @Published private(set) var isVerifyingRendererServer = false
+    @Published private(set) var rendererServerStatusMessage: String?
+    @Published private(set) var rendererServerErrorMessage: String?
 
     private struct PersistedConnection: Codable {
         let profile: NavidromeServerProfile
         let identity: NavidromeServerIdentity
     }
 
+    private struct PersistedRendererConnection: Codable {
+        let profileID: UUID
+        let baseURL: URL
+    }
+
     private let defaults: UserDefaults
     private let credentialStore: NavidromeCredentialStore
     private let client: OpenSubsonicClient
     private let storageKey = "NavidromeServerConnection.v1"
+    private let rendererStorageKey = "NavidromeRendererConnection.v1"
 
     init(
         defaults: UserDefaults = .standard,
@@ -101,6 +111,7 @@ final class NavidromeConnectionStore: ObservableObject {
                 try credentialStore.deletePassword(for: profileID)
             }
             defaults.removeObject(forKey: storageKey)
+            defaults.removeObject(forKey: rendererStorageKey)
             resetFields()
             statusMessage = "Navidrome server removed."
         } catch {
@@ -118,6 +129,61 @@ final class NavidromeConnectionStore: ObservableObject {
         return NavidromeCatalogCredentials(profile: profile, password: password)
     }
 
+    func rendererCredentials() throws -> NavidromeCatalogCredentials {
+        let credentials = try catalogCredentials()
+        guard let rendererServerURL else { return credentials }
+        let rendererProfile = NavidromeServerProfile(
+            id: credentials.profile.id,
+            name: credentials.profile.name,
+            baseURL: rendererServerURL,
+            username: credentials.profile.username
+        )
+        return NavidromeCatalogCredentials(
+            profile: rendererProfile,
+            password: credentials.password
+        )
+    }
+
+    func verifyAndSaveRendererServerURL(_ value: String) async {
+        guard !isVerifyingRendererServer else { return }
+        isVerifyingRendererServer = true
+        rendererServerStatusMessage = nil
+        rendererServerErrorMessage = nil
+        defer { isVerifyingRendererServer = false }
+
+        do {
+            let credentials = try catalogCredentials()
+            let baseURL = try NavidromeRendererServerURL.validated(value)
+            let rendererProfile = NavidromeServerProfile(
+                id: credentials.profile.id,
+                name: credentials.profile.name,
+                baseURL: baseURL,
+                username: credentials.profile.username
+            )
+            _ = try await client.identifyNavidrome(
+                profile: rendererProfile,
+                password: credentials.password,
+                allowsInsecureLocalHTTP: true
+            )
+            let saved = PersistedRendererConnection(
+                profileID: credentials.profile.id,
+                baseURL: baseURL
+            )
+            defaults.set(try JSONEncoder().encode(saved), forKey: rendererStorageKey)
+            rendererServerURL = baseURL
+            rendererServerStatusMessage = "Renderer address verified and saved."
+        } catch {
+            rendererServerErrorMessage = error.localizedDescription
+        }
+    }
+
+    func useNormalServerAddressForRenderer() {
+        defaults.removeObject(forKey: rendererStorageKey)
+        rendererServerURL = nil
+        rendererServerErrorMessage = nil
+        rendererServerStatusMessage = "The renderer will use the normal Navidrome address."
+    }
+
     private func loadSavedConnection() {
         guard let data = defaults.data(forKey: storageKey) else { return }
 
@@ -129,6 +195,7 @@ final class NavidromeConnectionStore: ObservableObject {
             serverURL = connection.profile.baseURL.absoluteString
             username = connection.profile.username
             hasStoredPassword = try credentialStore.password(for: connection.profile.id) != nil
+            loadRendererConnection(for: connection.profile.id)
 
             if connection.profile.baseURL.scheme?.lowercased() != "https" {
                 errorMessage = connection.profile.baseURL.scheme?.lowercased() == "http"
@@ -140,6 +207,19 @@ final class NavidromeConnectionStore: ObservableObject {
         }
     }
 
+    private func loadRendererConnection(for profileID: UUID) {
+        guard let data = defaults.data(forKey: rendererStorageKey),
+              let connection = try? JSONDecoder().decode(
+                PersistedRendererConnection.self,
+                from: data
+              ),
+              connection.profileID == profileID else {
+            rendererServerURL = nil
+            return
+        }
+        rendererServerURL = connection.baseURL
+    }
+
     private func resetFields() {
         serverName = ""
         serverURL = ""
@@ -148,6 +228,10 @@ final class NavidromeConnectionStore: ObservableObject {
         savedProfile = nil
         identity = nil
         hasStoredPassword = false
+        rendererServerURL = nil
+        isVerifyingRendererServer = false
+        rendererServerStatusMessage = nil
+        rendererServerErrorMessage = nil
         errorMessage = nil
     }
 }

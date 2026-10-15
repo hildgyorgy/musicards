@@ -40,11 +40,16 @@ Bővítés a **meglévő `MacSystemPlaybackEngine`-en belül**, nem új `Playbac
 
 **Cél:** a Navidrome-könyvtárból UPnP-n keresztül vezérelni egy dedikált rendert (pl. AVM CS 2.3) – az app **kizárólag kontroller és kijelző**, semmilyen audio-adat nem megy át rajta, se a Mac-et, se a telefont nem terheli.
 
-### Aktuális állapot (2026-10-14)
+### Aktuális állapot (2026-10-15)
 
-Az első, még lejátszást nem módosító alapréteg elkészült:
+Az alapréteg és az első, valós AVM-en már megszólaltatott lejátszási útvonal
+elkészült:
 
-- aktív SSDP M-SEARCH és válaszfeldolgozás;
+- aktív multicast SSDP M-SEARCH és válaszfeldolgozás;
+- a korábban sikeres renderer-címek automatikus, helyi újrapróbálása;
+- passzív `ssdp:alive` bejelentések figyelése a keresés ideje alatt;
+- külön, felhasználó által indítható `DEEP SEARCH`, amely legfeljebb a helyi
+  /24 alhálózatot kérdezi le célzott unicast SSDP-vel;
 - szabványos MediaRenderer-eszközleírás feldolgozása;
 - AVTransport, RenderingControl és ConnectionManager szolgáltatás-URL-ek;
 - a legmagasabb hirdetett AVTransport-verzió kiválasztása;
@@ -56,15 +61,33 @@ Az első, még lejátszást nem módosító alapréteg elkészült:
 - izolált AVTransport SOAP-kliens `GetTransportInfo` és `GetPositionInfo`
   lekérdezéssel, válasz- és hibafeldolgozással;
 - Debug buildben az `OUTPUT` területről megnyitható renderer-labor, amely
-  megmutatja a hálózaton talált eszközöket és lekéri az állapotukat;
-- kézzel megadható renderer-IP tartalék az olyan eszközökhöz, amelyek nem
-  válaszolnak multicast M-SEARCH-re; a sikeres cím csak helyben tárolódik és a
-  további keresések automatikusan újrapróbálják.
+  öt külön diagnosztikai szakaszban mutatja a multicast, megjegyzett cím,
+  `ssdp:alive`, alhálózati mélykeresés és kézi cím eredményét, valamint lekéri
+  a megtalált eszközök AVTransport-állapotát;
+- kézzel megadható renderer-IP végső tartalék; a sikeres cím csak helyben
+  tárolódik és a további normál keresések automatikusan újrapróbálják;
+- egyetlen renderer kiválasztása, megerősítése és tartós megjegyzése;
+- összetett playback engine, amely rendszerkimenet és UPnP renderer között
+  vált, miközben megakadályozza a párhuzamos helyi lejátszást;
+- Navidrome raw stream URL átadása `SetAVTransportURI`-val, DIDL-Lite
+  metaadattal;
+- opcionális, csak a renderer által használt helyi Navidrome-cím, amelyet az
+  app a meglévő accounttal ellenőriz és külön tárol; a normál appkapcsolat
+  továbbra is HTTPS/Tailscale marad, a sima HTTP pedig csak helyi/private
+  címhez fogadható el;
+- valódi Play/Pause/Stop/Seek parancsok, valamint pozíció- és
+  állapotlekérdezés;
+- RenderingControl-alapú hangerő- és mute-vezérlés az expanded playeren,
+  kétmásodpercenkénti visszaolvasással, hogy az AVM-en vagy másik appban
+  végzett módosítás is megjelenjen;
+- a kiválasztott renderer neve a nyitóoldalon és mindkét player nézetben.
 
-Még nincs bekötve a fő alkalmazás outputválasztásába, és nem ad lejátszási
-parancsot. A következő lépés a felderítés és az állapotlekérdezés ellenőrzése a
-valós AVM-en; ezután jöhet az egyetlen Navidrome-szám közvetlen átadása és a
-Play/Pause/Seek vezérlés.
+A helyi Navidrome-címmel az AVM macOS-ről már ténylegesen megszólalt. Az első
+próbában a vezérlést elfogadta, de a Tailscale-only Navidrome-címet nem érte el;
+ezért készült el a külön, ellenőrzött renderer-cím. Következőként a hangerőt és
+mute-ot kell valós AVM-en, majd a teljes útvonalat iOS-en ellenőrizni. A
+`SetNextAVTransportURI`, az újraindítás utáni
+állapot-rekonstrukció és a formátum-negotiáció még nincs bekötve.
 
 ### A döntő egyszerűsítés
 

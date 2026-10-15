@@ -81,6 +81,7 @@ final class MusiCardsAppModel: ObservableObject {
         PlatformNowPlayingCoordinator?
     private var playbackItemObservation: AnyCancellable?
     private var searchModeObservation: AnyCancellable?
+    private var rendererOutputObservation: AnyCancellable?
 
     private let musicBrainzService = MusicBrainzService()
     private let releaseDetailLoader: @Sendable (String) async throws -> MBRelease
@@ -131,9 +132,9 @@ final class MusiCardsAppModel: ObservableObject {
         searchBehavior: SearchBehavior = .scoped
     ) {
         let service = musicBrainzService
-        let playbackEngine = playbackEngine ?? PlaybackEngineFactory.makeDefault()
         let localLibrary = LocalLibraryStore()
         let navidromeConnection = NavidromeConnectionStore()
+        let rendererBrowser = UPnPRendererBrowser()
         let navidromeLibraryProvider = NavidromeLibraryProvider(
             connectionStore: navidromeConnection
         )
@@ -141,11 +142,40 @@ final class MusiCardsAppModel: ObservableObject {
             localProvider: LocalLibraryProvider(store: localLibrary),
             navidromeProvider: navidromeLibraryProvider
         )
+        let effectivePlaybackEngine: PlaybackEngine
+        if let playbackEngine {
+            effectivePlaybackEngine = playbackEngine
+        } else {
+            let rendererEngine = UPnPPlaybackEngine(
+                streamURLProvider: NavidromeRendererStreamURLProvider(
+                    connection: navidromeConnection
+                )
+            )
+            effectivePlaybackEngine = OutputRoutingPlaybackEngine(
+                systemEngine: PlaybackEngineFactory.makeDefault(),
+                rendererEngine: rendererEngine
+            ) {
+                if let renderer = rendererBrowser.selectedRenderer {
+                    return .renderer(renderer)
+                }
+                if rendererBrowser.hasSelectedRendererPreference {
+                    return .unavailable(
+                        name: rendererBrowser.selectedRendererDisplayName
+                            ?? "network renderer"
+                    )
+                }
+                return .system
+            }
+        }
         let playbackController = PlaybackController(
-            engine: playbackEngine,
+            engine: effectivePlaybackEngine,
             assetResolver: libraryManager
         )
-        let rendererBrowser = UPnPRendererBrowser()
+        rendererBrowser.selectionCommitHandler = { [weak playbackController] in
+            Task { @MainActor in
+                await playbackController?.outputSelectionDidChange()
+            }
+        }
         let releasePlaybackQueueBuilder = ReleasePlaybackQueueBuilder(
             libraryManager: libraryManager
         )
@@ -184,6 +214,12 @@ final class MusiCardsAppModel: ObservableObject {
         self.trackDetailStore = TrackDetailStore(service: service)
         self.classicalMetadataStore = ClassicalMetadataStore(service: service)
         self.playbackController = playbackController
+        self.rendererOutputObservation = rendererBrowser
+            .$selectedRendererDisplayName
+            .removeDuplicates()
+            .sink { [weak playbackController] name in
+                playbackController?.setExternalOutputDisplayName(name)
+            }
         self.searchModeObservation = self.searchViewModel.objectWillChange
             .sink { [weak self] in
                 // SearchViewModel publishes before its @Published value is
@@ -210,6 +246,9 @@ final class MusiCardsAppModel: ObservableObject {
         LibrarySourcePreference.save(restoredLibrarySource)
 
         loadRecents()
+        if rendererBrowser.hasSelectedRendererPreference {
+            rendererBrowser.refresh()
+        }
         Task { [weak self] in
             await self?.refreshRecentReleaseMetadataFromCache()
         }

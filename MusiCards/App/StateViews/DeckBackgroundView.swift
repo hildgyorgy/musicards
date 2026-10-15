@@ -262,7 +262,8 @@ struct DeckBackgroundView: View {
     private var outputStatus: some View {
         PlaybackOutputStatusView(
             controller: playbackController,
-            rendererBrowser: rendererBrowser
+            rendererBrowser: rendererBrowser,
+            navidromeConnection: navidromeConnection
         )
     }
 
@@ -425,6 +426,7 @@ struct DeckBackgroundView: View {
 private struct PlaybackOutputStatusView: View {
     @ObservedObject var controller: PlaybackController
     @ObservedObject var rendererBrowser: UPnPRendererBrowser
+    @ObservedObject var navidromeConnection: NavidromeConnectionStore
     @Environment(\.colorScheme) private var colorScheme
     @State private var isShowingRendererLab = false
 
@@ -437,7 +439,10 @@ private struct PlaybackOutputStatusView: View {
         }
         .buttonStyle(.plain)
         .sheet(isPresented: $isShowingRendererLab) {
-            RendererDiscoveryView(browser: rendererBrowser)
+            RendererDiscoveryView(
+                browser: rendererBrowser,
+                navidromeConnection: navidromeConnection
+            )
         }
         #else
         statusContent
@@ -464,7 +469,7 @@ private struct PlaybackOutputStatusView: View {
                         )
                 }
 
-            Text(controller.outputRoute.displayName)
+            Text(outputDisplayName)
                 .font(.system(.footnote, design: .monospaced))
                 .tracking(2)
                 .foregroundStyle(.primary)
@@ -474,8 +479,13 @@ private struct PlaybackOutputStatusView: View {
         .padding(.top, 12)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(
-            "Current output: \(controller.outputRoute.displayName)"
+            "Current output: \(outputDisplayName)"
         )
+    }
+
+    private var outputDisplayName: String {
+        rendererBrowser.selectedRendererDisplayName
+            ?? controller.outputRoute.displayName
     }
 
     private var pillHeight: CGFloat {

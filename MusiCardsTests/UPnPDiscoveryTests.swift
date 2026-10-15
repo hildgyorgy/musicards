@@ -3,6 +3,47 @@ import XCTest
 @testable import MusiCards
 
 final class UPnPDiscoveryTests: XCTestCase {
+    @MainActor
+    func testRendererSelectionIsExclusiveAndOnlyCommitsOnConfirmation() {
+        let suiteName = "UPnPDiscoveryTests.rendererSelection"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let browser = UPnPRendererBrowser(userDefaults: defaults)
+        let first = makeRenderer(id: "uuid:first", host: "192.168.1.50")
+        let second = makeRenderer(id: "uuid:second", host: "192.168.1.60")
+
+        browser.beginRendererSelection()
+        browser.toggleDraftSelection(of: first)
+        XCTAssertTrue(browser.isDraftSelected(first))
+        XCTAssertFalse(browser.isDraftSelected(second))
+        XCTAssertNil(browser.selectedRenderer)
+
+        browser.toggleDraftSelection(of: second)
+        XCTAssertFalse(browser.isDraftSelected(first))
+        XCTAssertTrue(browser.isDraftSelected(second))
+
+        browser.commitRendererSelection()
+        XCTAssertEqual(browser.selectedRenderer?.id, second.id)
+        XCTAssertEqual(browser.selectedRendererDisplayName, second.friendlyName)
+        XCTAssertEqual(
+            defaults.string(forKey: "UPnPSelectedRendererID"),
+            second.id
+        )
+
+        let restoredBrowser = UPnPRendererBrowser(userDefaults: defaults)
+        XCTAssertEqual(
+            restoredBrowser.selectedRendererDisplayName,
+            second.friendlyName
+        )
+
+        restoredBrowser.beginRendererSelection()
+        restoredBrowser.toggleDraftSelection(of: second)
+        restoredBrowser.commitRendererSelection()
+        XCTAssertNil(restoredBrowser.selectedRendererDisplayName)
+        XCTAssertNil(defaults.string(forKey: "UPnPSelectedRendererID"))
+    }
+
     func testSSDPResponseParserUsesCaseInsensitiveHeaders() throws {
         let data = Data(
             """
@@ -24,6 +65,75 @@ final class UPnPDiscoveryTests: XCTestCase {
         )
         XCTAssertEqual(response.searchTarget, "urn:schemas-upnp-org:device:MediaRenderer:2")
         XCTAssertEqual(response.server, "Test/1.0 UPnP/1.1 Renderer/2.0")
+    }
+
+    func testSSDPAdvertisementParserAcceptsAliveNotification() throws {
+        let data = Data(
+            """
+            NOTIFY * HTTP/1.1\r
+            HOST: 239.255.255.250:1900\r
+            NT: urn:schemas-upnp-org:device:MediaRenderer:1\r
+            NTS: ssdp:alive\r
+            LOCATION: http://192.168.1.60:49152/device.xml\r
+            USN: uuid:renderer::urn:schemas-upnp-org:device:MediaRenderer:1\r
+            \r
+            """.utf8
+        )
+
+        let response = try SSDPAdvertisementParser.parseAlive(data)
+
+        XCTAssertEqual(
+            response.location,
+            URL(string: "http://192.168.1.60:49152/device.xml")
+        )
+        XCTAssertEqual(response.searchTarget, "urn:schemas-upnp-org:device:MediaRenderer:1")
+    }
+
+    func testSSDPAdvertisementParserRejectsByebyeNotification() {
+        let data = Data(
+            """
+            NOTIFY * HTTP/1.1\r
+            NT: upnp:rootdevice\r
+            NTS: ssdp:byebye\r
+            LOCATION: http://192.168.1.60/device.xml\r
+            \r
+            """.utf8
+        )
+
+        XCTAssertThrowsError(try SSDPAdvertisementParser.parseAlive(data))
+    }
+
+    func testSubnetCandidatesCoverLocalSlash24ButExcludeReservedAndSelf() {
+        let hosts = LocalIPv4Subnet.candidateHosts(
+            address: "192.168.0.184",
+            netmask: "255.255.255.0"
+        )
+
+        XCTAssertEqual(hosts.count, 253)
+        XCTAssertTrue(hosts.contains("192.168.0.186"))
+        XCTAssertFalse(hosts.contains("192.168.0.0"))
+        XCTAssertFalse(hosts.contains("192.168.0.184"))
+        XCTAssertFalse(hosts.contains("192.168.0.255"))
+    }
+
+    func testSubnetCandidatesBoundBroadPrivateNetworkToLocalSlash24() {
+        let hosts = LocalIPv4Subnet.candidateHosts(
+            address: "10.42.17.8",
+            netmask: "255.255.0.0"
+        )
+
+        XCTAssertEqual(hosts.count, 253)
+        XCTAssertTrue(hosts.contains("10.42.17.200"))
+        XCTAssertFalse(hosts.contains("10.42.18.1"))
+    }
+
+    func testSubnetCandidatesRejectPublicNetwork() {
+        XCTAssertTrue(
+            LocalIPv4Subnet.candidateHosts(
+                address: "203.0.113.5",
+                netmask: "255.255.255.0"
+            ).isEmpty
+        )
     }
 
     func testDeviceDescriptionChoosesHighestAVTransportVersionAndResolvesURLs() throws {
@@ -139,5 +249,30 @@ final class UPnPDiscoveryTests: XCTestCase {
         ) { error in
             XCTAssertEqual(error as? UPnPDiscoveryError, .missingAVTransport)
         }
+    }
+
+    private func makeRenderer(
+        id: String,
+        host: String
+    ) -> UPnPRendererDescriptor {
+        let baseURL = URL(string: "http://\(host)")!
+        let avTransport = UPnPServiceDescriptor(
+            serviceType: "urn:schemas-upnp-org:service:AVTransport:1",
+            serviceID: nil,
+            controlURL: baseURL.appending(path: "control"),
+            eventSubscriptionURL: nil,
+            serviceDescriptionURL: nil
+        )
+        return UPnPRendererDescriptor(
+            friendlyName: id,
+            uniqueDeviceName: id,
+            manufacturer: nil,
+            modelName: nil,
+            descriptionURL: baseURL.appending(path: "device.xml"),
+            avTransport: avTransport,
+            renderingControl: nil,
+            connectionManager: nil,
+            capabilities: .unknown
+        )
     }
 }

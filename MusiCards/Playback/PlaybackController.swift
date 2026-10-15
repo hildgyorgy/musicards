@@ -25,11 +25,15 @@ final class PlaybackController: ObservableObject {
     @Published private(set) var preparedDuration: TimeInterval?
     @Published private(set) var preparedAudioFormat: PlaybackAudioFormat?
     @Published private(set) var outputRoute = AudioOutputRouteInspector.current()
+    @Published private(set) var externalOutputDisplayName: String?
+    @Published private(set) var outputVolumeState: PlaybackVolumeState?
+    @Published private(set) var outputVolumeErrorMessage: String?
 
     private let engine: PlaybackEngine
     private let assetResolver: (any PlaybackAssetResolving)?
     private var preparedItemID: PlaybackQueueItem.ID?
     private var playbackGeneration: UInt64 = 0
+    private var outputVolumeGeneration: UInt64 = 0
     private var outputRouteObservation: AnyCancellable?
     #if os(macOS)
     private var macOutputRouteObserver: MacOutputRouteObserver?
@@ -76,6 +80,18 @@ final class PlaybackController: ObservableObject {
             return nil
         }
         return queue[currentIndex]
+    }
+
+    var outputDisplayName: String {
+        externalOutputDisplayName ?? outputRoute.displayName
+    }
+
+    var outputSampleRateText: String? {
+        externalOutputDisplayName == nil ? outputRoute.sampleRateText : nil
+    }
+
+    var canControlOutputVolume: Bool {
+        (engine as? any PlaybackVolumeControlling)?.canControlVolume == true
     }
 
     var hasPrevious: Bool {
@@ -230,6 +246,89 @@ final class PlaybackController: ObservableObject {
         engine.restoreOutputConfiguration()
     }
 
+    func setExternalOutputDisplayName(_ name: String?) {
+        externalOutputDisplayName = name
+        if name == nil {
+            outputVolumeState = nil
+            outputVolumeErrorMessage = nil
+        }
+    }
+
+    func refreshOutputVolume() async {
+        guard let controller = engine as? any PlaybackVolumeControlling,
+              controller.canControlVolume else {
+            outputVolumeState = nil
+            outputVolumeErrorMessage = nil
+            return
+        }
+        do {
+            outputVolumeState = try await controller.outputVolumeState()
+            outputVolumeErrorMessage = nil
+        } catch {
+            outputVolumeErrorMessage = error.localizedDescription
+        }
+    }
+
+    func setOutputVolume(_ level: Double) async {
+        guard let controller = engine as? any PlaybackVolumeControlling else {
+            return
+        }
+        outputVolumeGeneration &+= 1
+        let generation = outputVolumeGeneration
+        let clampedLevel = min(max(level, 0), 1)
+        outputVolumeState = PlaybackVolumeState(
+            level: clampedLevel,
+            isMuted: outputVolumeState?.isMuted ?? false
+        )
+        do {
+            let confirmedState = try await controller.setOutputVolume(
+                clampedLevel
+            )
+            guard generation == outputVolumeGeneration else { return }
+            if let confirmedState {
+                outputVolumeState = confirmedState
+            }
+            outputVolumeErrorMessage = nil
+        } catch {
+            guard generation == outputVolumeGeneration,
+                  !(error is CancellationError) else { return }
+            outputVolumeErrorMessage = error.localizedDescription
+        }
+    }
+
+    func setOutputMuted(_ isMuted: Bool) async {
+        guard let controller = engine as? any PlaybackVolumeControlling else {
+            return
+        }
+        do {
+            outputVolumeState = try await controller.setOutputMuted(isMuted)
+            outputVolumeErrorMessage = nil
+        } catch {
+            outputVolumeErrorMessage = error.localizedDescription
+        }
+    }
+
+    /// Stops the previous route and prepares the current item again on the
+    /// newly committed output. A playing queue continues automatically;
+    /// paused and stopped queues wait for the next explicit Play command.
+    func outputSelectionDidChange() async {
+        let shouldResume = status.isPlaying
+        let generation = advancePlaybackGeneration()
+        await engine.stop()
+        guard generation == playbackGeneration else { return }
+
+        preparedItemID = nil
+        position = 0
+        preparedAudioFormat = nil
+        status = queue.isEmpty ? .idle : .stopped
+
+        await refreshOutputVolume()
+
+        if shouldResume {
+            await play()
+        }
+    }
+
     func seek(to requestedPosition: TimeInterval) async {
         guard currentItem != nil else { return }
         guard canSeek else {
@@ -297,6 +396,9 @@ final class PlaybackController: ObservableObject {
             status = .paused
         case .positionChanged(let position):
             self.position = max(position, 0)
+        case .volumeChanged(let state):
+            outputVolumeState = state
+            outputVolumeErrorMessage = nil
         case .outputConfigurationChanged:
             refreshOutputRoute()
         case .finished:

@@ -14,13 +14,15 @@ actor OpenSubsonicClient {
 
     func identifyNavidrome(
         profile: NavidromeServerProfile,
-        password: String
+        password: String,
+        allowsInsecureLocalHTTP: Bool = false
     ) async throws -> NavidromeServerIdentity {
         let salt = try OpenSubsonicAuthentication.makeSalt()
         let request = try requestBuilder.pingRequest(
             profile: profile,
             password: password,
-            salt: salt
+            salt: salt,
+            allowsInsecureLocalHTTP: allowsInsecureLocalHTTP
         )
         let envelope: OpenSubsonicPingEnvelope = try await response(
             for: request

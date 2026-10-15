@@ -95,14 +95,14 @@ struct CollapsedPlayerBar: View {
                 }
 
                 if !isPlaceholder && showsOutputStatus {
-                    Text("→ \(controller.outputRoute.displayName)")
+                    Text("→ \(controller.outputDisplayName)")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .frame(height: metadataRowHeight)
                         .accessibilityLabel(
-                            "Output: \(controller.outputRoute.displayName)"
+                            "Output: \(controller.outputDisplayName)"
                         )
                 } else {
                     Color.clear

@@ -2,13 +2,45 @@ import Foundation
 
 nonisolated enum SSDPResponseParser {
     static func parse(_ data: Data) throws -> SSDPDiscoveryResponse {
+        let message = try SSDPMessageParser.parse(data)
+        guard message.startLine.uppercased().hasPrefix("HTTP/1.1 200") else {
+            throw UPnPDiscoveryError.invalidHTTPResponse
+        }
+        return try SSDPMessageParser.response(
+            headers: message.headers,
+            targetHeader: "st"
+        )
+    }
+}
+
+nonisolated enum SSDPAdvertisementParser {
+    static func parseAlive(_ data: Data) throws -> SSDPDiscoveryResponse {
+        let message = try SSDPMessageParser.parse(data)
+        guard message.startLine.uppercased().hasPrefix("NOTIFY * HTTP/1.1"),
+              message.headers["nts"]?.lowercased() == "ssdp:alive" else {
+            throw UPnPDiscoveryError.invalidHTTPResponse
+        }
+        return try SSDPMessageParser.response(
+            headers: message.headers,
+            targetHeader: "nt"
+        )
+    }
+}
+
+private nonisolated enum SSDPMessageParser {
+    struct Message {
+        let startLine: String
+        let headers: [String: String]
+    }
+
+    static func parse(_ data: Data) throws -> Message {
         guard let text = String(data: data, encoding: .utf8) else {
             throw UPnPDiscoveryError.invalidHTTPResponse
         }
-
         let lines = text.components(separatedBy: .newlines)
-        guard let statusLine = lines.first?.trimmingCharacters(in: .whitespaces),
-              statusLine.uppercased().hasPrefix("HTTP/1.1 200") else {
+        guard let startLine = lines.first?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+              !startLine.isEmpty else {
             throw UPnPDiscoveryError.invalidHTTPResponse
         }
 
@@ -23,7 +55,13 @@ nonisolated enum SSDPResponseParser {
             guard !name.isEmpty, !value.isEmpty else { continue }
             headers[name] = value
         }
+        return Message(startLine: startLine, headers: headers)
+    }
 
+    static func response(
+        headers: [String: String],
+        targetHeader: String
+    ) throws -> SSDPDiscoveryResponse {
         guard let locationText = headers["location"],
               let location = URL(string: locationText) else {
             throw UPnPDiscoveryError.invalidHTTPResponse
@@ -31,7 +69,7 @@ nonisolated enum SSDPResponseParser {
 
         return SSDPDiscoveryResponse(
             location: location,
-            searchTarget: headers["st"],
+            searchTarget: headers[targetHeader],
             uniqueServiceName: headers["usn"],
             server: headers["server"]
         )

@@ -39,6 +39,15 @@ nonisolated struct AVTransportSnapshot: Equatable, Sendable {
     let position: AVTransportPosition
 }
 
+nonisolated protocol AVTransportControlling: Sendable {
+    func snapshot() async throws -> AVTransportSnapshot
+    func setTransportURI(_ uri: URL, metadata: String) async throws
+    func play() async throws
+    func pause() async throws
+    func stop() async throws
+    func seek(to position: TimeInterval) async throws
+}
+
 nonisolated enum AVTransportClientError: LocalizedError, Equatable, Sendable {
     case invalidResponse
     case httpStatus(Int)
@@ -101,7 +110,42 @@ nonisolated struct AVTransportClient: Sendable {
         )
     }
 
-    private func call(action: String) async throws -> [String: String] {
+    func setTransportURI(_ uri: URL, metadata: String) async throws {
+        _ = try await call(
+            action: "SetAVTransportURI",
+            arguments: [
+                ("CurrentURI", uri.absoluteString),
+                ("CurrentURIMetaData", metadata)
+            ]
+        )
+    }
+
+    func play() async throws {
+        _ = try await call(action: "Play", arguments: [("Speed", "1")])
+    }
+
+    func pause() async throws {
+        _ = try await call(action: "Pause")
+    }
+
+    func stop() async throws {
+        _ = try await call(action: "Stop")
+    }
+
+    func seek(to position: TimeInterval) async throws {
+        _ = try await call(
+            action: "Seek",
+            arguments: [
+                ("Unit", "REL_TIME"),
+                ("Target", Self.timeString(position))
+            ]
+        )
+    }
+
+    private func call(
+        action: String,
+        arguments: [(String, String)] = []
+    ) async throws -> [String: String] {
         var request = URLRequest(url: service.controlURL)
         request.httpMethod = "POST"
         request.timeoutInterval = 8
@@ -116,7 +160,7 @@ nonisolated struct AVTransportClient: Sendable {
         request.httpBody = Self.envelope(
             serviceType: service.serviceType,
             action: action,
-            arguments: ["InstanceID": "0"]
+            arguments: [("InstanceID", "0")] + arguments
         )
 
         let (data, response) = try await transport.data(for: request)
@@ -136,10 +180,10 @@ nonisolated struct AVTransportClient: Sendable {
     private static func envelope(
         serviceType: String,
         action: String,
-        arguments: [String: String]
+        arguments: [(String, String)]
     ) -> Data {
-        let argumentXML = arguments.keys.sorted().map {
-            "<\($0)>\(xmlEscaped(arguments[$0] ?? ""))</\($0)>"
+        let argumentXML = arguments.map { name, value in
+            "<\(name)>\(xmlEscaped(value))</\(name)>"
         }.joined()
         return Data(
             """
@@ -168,7 +212,19 @@ nonisolated struct AVTransportClient: Sendable {
         guard parts.count == 3 else { return nil }
         return parts[0] * 3_600 + parts[1] * 60 + parts[2]
     }
+
+    private static func timeString(_ interval: TimeInterval) -> String {
+        let seconds = max(Int(interval.rounded()), 0)
+        return String(
+            format: "%d:%02d:%02d",
+            seconds / 3_600,
+            (seconds % 3_600) / 60,
+            seconds % 60
+        )
+    }
 }
+
+extension AVTransportClient: AVTransportControlling {}
 
 nonisolated enum UPnPSOAPResponseParser {
     static func parse(_ data: Data) throws -> [String: String] {

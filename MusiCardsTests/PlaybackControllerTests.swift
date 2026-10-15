@@ -4,6 +4,33 @@ import XCTest
 
 final class PlaybackControllerTests: XCTestCase {
     @MainActor
+    func testRendererVolumeStateAndCommandsStaySeparateFromPlaybackStatus() async {
+        let engine = PlaybackEngineSpy()
+        engine.canControlVolume = true
+        engine.stubbedVolumeState = PlaybackVolumeState(
+            level: 0.42,
+            isMuted: false
+        )
+        let controller = PlaybackController(engine: engine)
+
+        await controller.refreshOutputVolume()
+        XCTAssertEqual(controller.outputVolumeState?.level, 0.42)
+
+        await controller.setOutputVolume(0.61)
+        await controller.setOutputMuted(true)
+
+        XCTAssertEqual(engine.volumeLevels, [0.61])
+        XCTAssertEqual(engine.muteStates, [true])
+        XCTAssertEqual(controller.status, .idle)
+
+        engine.emit(.volumeChanged(.init(level: 0.25, isMuted: true)))
+        XCTAssertEqual(
+            controller.outputVolumeState,
+            PlaybackVolumeState(level: 0.25, isMuted: true)
+        )
+    }
+
+    @MainActor
     func testQueueReplacementClampsIndexAndNavigationStopsAtEdges() async {
         let engine = PlaybackEngineSpy()
         let controller = PlaybackController(engine: engine)
@@ -56,6 +83,36 @@ final class PlaybackControllerTests: XCTestCase {
         XCTAssertEqual(engine.preparedIDs, ["item-1", "item-1"])
         XCTAssertEqual(engine.playCount, 2)
         XCTAssertEqual(controller.status, .playing)
+    }
+
+    @MainActor
+    func testChangingOutputWhilePlayingRepreparesAndResumesCurrentItem() async {
+        let engine = PlaybackEngineSpy()
+        let controller = PlaybackController(engine: engine)
+        await controller.replaceQueue(with: [item(1)])
+        await controller.play()
+
+        await controller.outputSelectionDidChange()
+
+        XCTAssertEqual(engine.preparedIDs, ["item-1", "item-1"])
+        XCTAssertEqual(engine.playCount, 2)
+        XCTAssertEqual(controller.currentItem?.id, "item-1")
+        XCTAssertEqual(controller.status, .playing)
+    }
+
+    @MainActor
+    func testChangingOutputWhilePausedWaitsForExplicitPlay() async {
+        let engine = PlaybackEngineSpy()
+        let controller = PlaybackController(engine: engine)
+        await controller.replaceQueue(with: [item(1)])
+        await controller.play()
+        await controller.pause()
+
+        await controller.outputSelectionDidChange()
+
+        XCTAssertEqual(engine.preparedIDs, ["item-1"])
+        XCTAssertEqual(engine.playCount, 1)
+        XCTAssertEqual(controller.status, .stopped)
     }
 
     @MainActor
@@ -392,7 +449,7 @@ final class PlaybackControllerTests: XCTestCase {
 }
 
 @MainActor
-private final class PlaybackEngineSpy: PlaybackEngine {
+private final class PlaybackEngineSpy: PlaybackEngine, PlaybackVolumeControlling {
     var eventHandler: ((PlaybackEngineEvent) -> Void)?
     var canSeek = false
     var preparedIDs: [String] = []
@@ -403,6 +460,10 @@ private final class PlaybackEngineSpy: PlaybackEngine {
     var restoreCount = 0
     var seekPositions: [TimeInterval] = []
     var seekError: Error?
+    var canControlVolume = false
+    var stubbedVolumeState: PlaybackVolumeState?
+    var volumeLevels: [Double] = []
+    var muteStates: [Bool] = []
 
     func prepare(_ item: PlaybackQueueItem) async throws {
         preparedIDs.append(item.id)
@@ -435,6 +496,20 @@ private final class PlaybackEngineSpy: PlaybackEngine {
 
     func restoreOutputConfiguration() {
         restoreCount += 1
+    }
+
+    func outputVolumeState() async throws -> PlaybackVolumeState? {
+        stubbedVolumeState
+    }
+
+    func setOutputVolume(_ level: Double) async throws -> PlaybackVolumeState? {
+        volumeLevels.append(level)
+        return stubbedVolumeState
+    }
+
+    func setOutputMuted(_ isMuted: Bool) async throws -> PlaybackVolumeState? {
+        muteStates.append(isMuted)
+        return stubbedVolumeState
     }
 
     func emit(_ event: PlaybackEngineEvent) {

@@ -52,6 +52,43 @@ final class AVTransportClientTests: XCTestCase {
         }
     }
 
+    func testTransportCommandsUseOrderedEscapedSOAPArguments() async throws {
+        let transport = AVTransportTransportStub()
+        let client = AVTransportClient(service: service, transport: transport)
+        let streamURL = URL(
+            string: "https://music.example/rest/stream?id=one&format=raw"
+        )!
+
+        try await client.setTransportURI(
+            streamURL,
+            metadata: "<DIDL-Lite><dc:title>A & B</dc:title></DIDL-Lite>"
+        )
+        try await client.play()
+        try await client.pause()
+        try await client.seek(to: 83)
+        try await client.stop()
+
+        let requests = await transport.requests()
+        XCTAssertEqual(requests.count, 5)
+        let bodies = try requests.map { request in
+            try XCTUnwrap(
+                request.httpBody.flatMap { String(data: $0, encoding: .utf8) }
+            )
+        }
+        XCTAssertTrue(
+            bodies[0].contains(
+                "<InstanceID>0</InstanceID><CurrentURI>https://music.example/rest/stream?id=one&amp;format=raw</CurrentURI>"
+            )
+        )
+        XCTAssertTrue(
+            bodies[0].contains(
+                "&lt;DIDL-Lite&gt;&lt;dc:title&gt;A &amp; B&lt;/dc:title&gt;&lt;/DIDL-Lite&gt;"
+            )
+        )
+        XCTAssertTrue(bodies[1].contains("<Speed>1</Speed>"))
+        XCTAssertTrue(bodies[3].contains("<Unit>REL_TIME</Unit><Target>0:01:23</Target>"))
+    }
+
     private var service: UPnPServiceDescriptor {
         UPnPServiceDescriptor(
             serviceType: "urn:schemas-upnp-org:service:AVTransport:2",
