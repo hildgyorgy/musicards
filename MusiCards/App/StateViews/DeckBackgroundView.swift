@@ -14,6 +14,7 @@ struct DeckBackgroundView: View {
     @ObservedObject var libraryManager: LibraryManager
     @ObservedObject var navidromeConnection: NavidromeConnectionStore
     let playbackController: PlaybackController
+    @ObservedObject var rendererBrowser: UPnPRendererBrowser
     @Binding var activeLibrarySource: LibrarySource?
     let onSelectMusicFolder: ((URL) -> Void)?
     let onCreateOrUpdateLibraryIndex: ((URL) -> Void)?
@@ -33,6 +34,7 @@ struct DeckBackgroundView: View {
         libraryManager: LibraryManager,
         navidromeConnection: NavidromeConnectionStore,
         playbackController: PlaybackController,
+        rendererBrowser: UPnPRendererBrowser,
         activeLibrarySource: Binding<LibrarySource?>,
         onSelectMusicFolder: ((URL) -> Void)? = nil,
         onCreateOrUpdateLibraryIndex: ((URL) -> Void)? = nil,
@@ -44,6 +46,7 @@ struct DeckBackgroundView: View {
         self.libraryManager = libraryManager
         self.navidromeConnection = navidromeConnection
         self.playbackController = playbackController
+        self.rendererBrowser = rendererBrowser
         self._activeLibrarySource = activeLibrarySource
         self.onSelectMusicFolder = onSelectMusicFolder
         self.onCreateOrUpdateLibraryIndex = onCreateOrUpdateLibraryIndex
@@ -257,7 +260,10 @@ struct DeckBackgroundView: View {
     }
 
     private var outputStatus: some View {
-        PlaybackOutputStatusView(controller: playbackController)
+        PlaybackOutputStatusView(
+            controller: playbackController,
+            rendererBrowser: rendererBrowser
+        )
     }
 
     private var connectionButton: some View {
@@ -418,9 +424,27 @@ struct DeckBackgroundView: View {
 
 private struct PlaybackOutputStatusView: View {
     @ObservedObject var controller: PlaybackController
+    @ObservedObject var rendererBrowser: UPnPRendererBrowser
     @Environment(\.colorScheme) private var colorScheme
+    @State private var isShowingRendererLab = false
 
     var body: some View {
+        #if DEBUG
+        Button {
+            isShowingRendererLab = true
+        } label: {
+            statusContent
+        }
+        .buttonStyle(.plain)
+        .sheet(isPresented: $isShowingRendererLab) {
+            RendererDiscoveryView(browser: rendererBrowser)
+        }
+        #else
+        statusContent
+        #endif
+    }
+
+    private var statusContent: some View {
         VStack(spacing: 10) {
             Text("OUTPUT")
                 .font(.footnote.weight(.semibold))

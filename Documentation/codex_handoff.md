@@ -13,10 +13,13 @@
 - **Repository:** `musicards`
 - **Branch:** `main`
 - **Last completed application checkpoint before this documentation update:**
-  `769941f` — `sacd hires layer playing`.
+  `f1381f2` — `upnp`.
 - **Remote state before this documentation edit:** `main` matched
-  `origin/main` at `769941f`.
-- **Working tree at documentation review:** clean.
+  `origin/main` at `f1381f2`.
+- **Working tree:** contains the in-progress debug renderer lab described
+  below: app composition/UI and both Info plists are modified, while
+  `AVTransportClient.swift`, `UPnPRendererBrowser.swift`,
+  `RendererDiscoveryView.swift`, and `AVTransportClientTests.swift` are new.
 
 The checkpoint above deliberately identifies the last completed application
 change rather than claiming that this tracked document can contain the hash of
@@ -54,13 +57,28 @@ AVM before routing the main app's playback through it.
 - **The first production UPnP foundation now exists.** Active SSDP discovery,
   MediaRenderer/device-description parsing, service URL resolution and
   AVTransport action inspection live under `MusiCards/Playback/UPnP/` with
-  unit tests. It is intentionally not wired to the output UI or playback
-  controller yet. The next slice should validate discovery against the real
-  AVM, then add isolated SOAP transport control before changing playback
-  routing.
-- **Hardware checks still needed:** the new macOS Core Audio route observer
-  builds and passes automated tests, but actual AVM discovery/casting and live
-  output changes on the Mac Studio have not been verified in this session.
+  unit tests.
+- **A debug-only renderer lab is now implemented in the working tree.** In a
+  Debug build, tapping the home-screen `OUTPUT` area opens discovery results.
+  Each renderer can be asked for `GetTransportInfo` and `GetPositionInfo` via
+  real SOAP calls; state and position are shown in the sheet. The normal
+  playback route is deliberately unchanged, and Release builds still render
+  the `OUTPUT` area as a noninteractive status label.
+- **macOS UDP permissions:** the first real launch showed that the sandbox
+  could send SSDP but could not receive its UDP replies. The macOS target now
+  has both `com.apple.security.network.client` and
+  `com.apple.security.network.server`; the latter was explicitly approved by
+  the user and is required for incoming UDP discovery responses.
+- **Hardware check needed next:** run a Debug build on the Mac Studio or iPhone
+  on the AVM's LAN, allow local-network access, open the `OUTPUT` lab, verify
+  that AVM Audio CS 2.3 appears, then use `CHECK TRANSPORT`. Actual casting and
+  output switching have not yet been added.
+- **AVM discovery quirk confirmed on real hardware:** the AVM at its current
+  private address did not answer multicast M-SEARCH, but immediately answered
+  the same request sent directly to its IP. The lab therefore has a renderer-IP
+  fallback. A successfully discovered host is stored only in local
+  `UserDefaults` and is retried automatically; no private address is committed
+  or logged.
 - **Security boundary:** never log or commit authenticated Navidrome stream
   URLs, passwords, salts, tokens, or new private LAN addresses.
 
@@ -333,6 +351,12 @@ Simulator build passed, and `git diff --check` was clean. These were separate
 checks, **not** a fresh complete `./Tools/verify.sh` run; MusiCards Sync tests
 were not rerun for this checkpoint. The user also confirmed automatic Mojo 2
 route display on iPhone and output changes through macOS Control Center.
+
+For the renderer-lab working tree on 2026-10-14, all MusiCards macOS tests
+passed, including four SSDP/description tests and two AVTransport SOAP tests.
+The generic iOS device build also passed with code signing disabled. This was
+not a complete `./Tools/verify.sh` run; MusiCards Sync was unchanged and its
+tests were not rerun.
 
 ## 7. Roadmap and next likely work
 

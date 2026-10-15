@@ -189,6 +189,7 @@ struct ContentView: View {
                     libraryManager: appModel.libraryManager,
                     navidromeConnection: appModel.navidromeConnection,
                     playbackController: appModel.playbackController,
+                    rendererBrowser: appModel.rendererBrowser,
                     activeLibrarySource: $appModel.activeLibrarySource,
                 onSelectMusicFolder: { url in
                     appModel.selectMusicFolder(url)
@@ -415,6 +416,7 @@ struct ContentView: View {
                                     libraryManager: appModel.libraryManager,
                                     navidromeConnection: appModel.navidromeConnection,
                                     playbackController: appModel.playbackController,
+                                    rendererBrowser: appModel.rendererBrowser,
                                     activeLibrarySource: $appModel.activeLibrarySource,
                                     onSelectMusicFolder: { url in
                                         appModel.selectMusicFolder(url)

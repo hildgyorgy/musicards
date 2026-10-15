@@ -5,13 +5,22 @@ nonisolated struct SSDPDiscoveryService: Sendable {
     private let multicastAddress = "239.255.255.250"
     private let multicastPort: UInt16 = 1900
 
-    func discover(timeout: TimeInterval = 2.5) async throws -> [SSDPDiscoveryResponse] {
+    func discover(
+        timeout: TimeInterval = 2.5,
+        unicastHosts: [String] = []
+    ) async throws -> [SSDPDiscoveryResponse] {
         try await Task.detached(priority: .userInitiated) {
-            try discoverBlocking(timeout: timeout)
+            try discoverBlocking(
+                timeout: timeout,
+                unicastHosts: unicastHosts
+            )
         }.value
     }
 
-    private func discoverBlocking(timeout: TimeInterval) throws -> [SSDPDiscoveryResponse] {
+    private func discoverBlocking(
+        timeout: TimeInterval,
+        unicastHosts: [String]
+    ) throws -> [SSDPDiscoveryResponse] {
         let socketDescriptor = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
         guard socketDescriptor >= 0 else {
             throw UPnPDiscoveryError.socketCreationFailed(errno)
@@ -32,11 +41,9 @@ nonisolated struct SSDPDiscoveryService: Sendable {
             throw UPnPDiscoveryError.socketConfigurationFailed(errno)
         }
 
-        var destination = sockaddr_in()
-        destination.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
-        destination.sin_family = sa_family_t(AF_INET)
-        destination.sin_port = multicastPort.bigEndian
-        guard inet_pton(AF_INET, multicastAddress, &destination.sin_addr) == 1 else {
+        let destinationAddresses = [multicastAddress] + unicastHosts
+        let destinations = destinationAddresses.compactMap(makeDestination)
+        guard !destinations.isEmpty else {
             throw UPnPDiscoveryError.socketConfigurationFailed(errno)
         }
 
@@ -45,30 +52,39 @@ nonisolated struct SSDPDiscoveryService: Sendable {
             "urn:schemas-upnp-org:device:MediaRenderer:1",
             "upnp:rootdevice"
         ]
+        var sentRequest = false
+        var lastSendError: Int32 = 0
         for round in 0..<2 {
             for target in targets {
                 let payload = mSearchPayload(target: target)
-                let sent = payload.withUnsafeBytes { bytes in
-                    withUnsafePointer(to: &destination) { pointer in
-                        pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-                            sendto(
-                                socketDescriptor,
-                                bytes.baseAddress,
-                                bytes.count,
-                                0,
-                                $0,
-                                socklen_t(MemoryLayout<sockaddr_in>.size)
-                            )
+                for var destination in destinations {
+                    let sent = payload.withUnsafeBytes { bytes in
+                        withUnsafePointer(to: &destination) { pointer in
+                            pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                                sendto(
+                                    socketDescriptor,
+                                    bytes.baseAddress,
+                                    bytes.count,
+                                    0,
+                                    $0,
+                                    socklen_t(MemoryLayout<sockaddr_in>.size)
+                                )
+                            }
                         }
                     }
-                }
-                guard sent == payload.count else {
-                    throw UPnPDiscoveryError.sendFailed(errno)
+                    if sent == payload.count {
+                        sentRequest = true
+                    } else {
+                        lastSendError = errno
+                    }
                 }
             }
             if round == 0 {
                 usleep(100_000)
             }
+        }
+        guard sentRequest else {
+            throw UPnPDiscoveryError.sendFailed(lastSendError)
         }
 
         let deadline = Date().addingTimeInterval(max(0.25, timeout))
@@ -103,6 +119,17 @@ nonisolated struct SSDPDiscoveryService: Sendable {
         return responsesByLocation.values.sorted {
             $0.location.absoluteString < $1.location.absoluteString
         }
+    }
+
+    private func makeDestination(address: String) -> sockaddr_in? {
+        var destination = sockaddr_in()
+        destination.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+        destination.sin_family = sa_family_t(AF_INET)
+        destination.sin_port = multicastPort.bigEndian
+        guard inet_pton(AF_INET, address, &destination.sin_addr) == 1 else {
+            return nil
+        }
+        return destination
     }
 
     private func mSearchPayload(target: String) -> Data {
@@ -175,8 +202,14 @@ nonisolated struct UPnPRendererDiscoveryService: Sendable {
         self.inspector = inspector
     }
 
-    func discover(timeout: TimeInterval = 2.5) async throws -> [UPnPRendererDescriptor] {
-        let responses = try await ssdp.discover(timeout: timeout)
+    func discover(
+        timeout: TimeInterval = 2.5,
+        unicastHosts: [String] = []
+    ) async throws -> [UPnPRendererDescriptor] {
+        let responses = try await ssdp.discover(
+            timeout: timeout,
+            unicastHosts: unicastHosts
+        )
         var renderersByID: [String: UPnPRendererDescriptor] = [:]
 
         await withTaskGroup(of: UPnPRendererDescriptor?.self) { group in

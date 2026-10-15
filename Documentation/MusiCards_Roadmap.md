@@ -50,11 +50,21 @@ Az első, még lejátszást nem módosító alapréteg elkészült:
 - a legmagasabb hirdetett AVTransport-verzió kiválasztása;
 - Play/Pause/Stop/Seek/SetNext akciók felismerése az SCPD-ből;
 - iOS/macOS helyi hálózati használati leírás;
-- automatizált parser- és capability-tesztek.
+- macOS sandboxban a UDP SSDP küldéséhez és válaszfogadásához szükséges kimenő
+  és bejövő hálózati entitlement;
+- automatizált parser- és capability-tesztek;
+- izolált AVTransport SOAP-kliens `GetTransportInfo` és `GetPositionInfo`
+  lekérdezéssel, válasz- és hibafeldolgozással;
+- Debug buildben az `OUTPUT` területről megnyitható renderer-labor, amely
+  megmutatja a hálózaton talált eszközöket és lekéri az állapotukat;
+- kézzel megadható renderer-IP tartalék az olyan eszközökhöz, amelyek nem
+  válaszolnak multicast M-SEARCH-re; a sikeres cím csak helyben tárolódik és a
+  további keresések automatikusan újrapróbálják.
 
-Még nincs bekötve a fő alkalmazás outputválasztásába, és SOAP transportvezérlés
-sincs benne. A következő lépés a valós AVM-felderítés ellenőrzése, majd az
-izolált AVTransport SOAP-kliens.
+Még nincs bekötve a fő alkalmazás outputválasztásába, és nem ad lejátszási
+parancsot. A következő lépés a felderítés és az állapotlekérdezés ellenőrzése a
+valós AVM-en; ezután jöhet az egyetlen Navidrome-szám közvetlen átadása és a
+Play/Pause/Seek vezérlés.
 
 ### A döntő egyszerűsítés
 

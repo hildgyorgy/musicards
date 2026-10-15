@@ -74,6 +74,7 @@ final class MusiCardsAppModel: ObservableObject {
     let localLibrary: LocalLibraryStore
     let libraryManager: LibraryManager
     let navidromeConnection: NavidromeConnectionStore
+    let rendererBrowser: UPnPRendererBrowser
     private let releasePlaybackQueueBuilder: ReleasePlaybackQueueBuilder
 
     private var localPlaybackNowPlayingCoordinator:
@@ -144,11 +145,13 @@ final class MusiCardsAppModel: ObservableObject {
             engine: playbackEngine,
             assetResolver: libraryManager
         )
+        let rendererBrowser = UPnPRendererBrowser()
         let releasePlaybackQueueBuilder = ReleasePlaybackQueueBuilder(
             libraryManager: libraryManager
         )
 
         self.navidromeConnection = navidromeConnection
+        self.rendererBrowser = rendererBrowser
         self.localLibrary = localLibrary
         self.libraryManager = libraryManager
         self.releasePlaybackQueueBuilder = releasePlaybackQueueBuilder
