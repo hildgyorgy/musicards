@@ -91,9 +91,14 @@ struct RendererDiscoveryView: View {
                     browser.commitRendererSelection()
                     dismiss()
                 }
+                #if os(iOS)
+                .buttonStyle(.borderless)
+                .tint(.accentColor)
+                #else
                 .font(.system(.footnote, design: .monospaced).weight(.bold))
                 .buttonStyle(.borderedProminent)
                 .clipShape(Capsule())
+                #endif
                 .disabled(
                     selectedOutputKind == .upnpRenderer
                         && browser.draftRendererID == nil
@@ -132,7 +137,8 @@ struct RendererDiscoveryView: View {
         .font(.caption)
         .tracking(1.5)
         .frame(maxWidth: .infinity)
-        .padding(.top, 2)
+        .padding(.top, 8)
+        .padding(.bottom, 16)
     }
 
     private var systemAudioContent: some View {
@@ -156,6 +162,7 @@ struct RendererDiscoveryView: View {
         Text("FIND AND SELECT UPNP RENDERER")
             .font(.system(.caption, design: .monospaced).weight(.semibold))
             .tracking(1.5)
+            .foregroundStyle(.blue)
 
         LazyVStack(spacing: 0) {
             ForEach(
@@ -164,15 +171,10 @@ struct RendererDiscoveryView: View {
             ) { index, method in
                 discoverySection(method)
                 if index < UPnPRendererBrowser.DiscoveryMethod.allCases.count - 1 {
-                    Divider()
+                    PopupSectionDivider()
                 }
             }
         }
-        .padding(.horizontal, 14)
-        .background(
-            .primary.opacity(0.045),
-            in: RoundedRectangle(cornerRadius: 18)
-        )
     }
 
     private func setUsesUPnPRenderer(_ usesUPnPRenderer: Bool) {
@@ -195,13 +197,14 @@ struct RendererDiscoveryView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Text("- \(method.title)")
+                Text(method.title)
                     .font(.system(.caption, design: .monospaced).weight(.bold))
                     .tracking(1.2)
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
 
-                if horizontalSizeClass != .compact {
+                if horizontalSizeClass != .compact,
+                   method != .manualAddress {
                     Text(method.explanation)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -346,7 +349,7 @@ struct RendererDiscoveryView: View {
                 #endif
 
             monochromePillButton(
-                "FIND",
+                "RUN",
                 isDisabled: browser.isSearching
                     || rendererAddress.trimmingCharacters(
                         in: .whitespacesAndNewlines
@@ -362,7 +365,7 @@ struct RendererDiscoveryView: View {
         HStack(alignment: .center, spacing: 12) {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
                 Text(renderer.friendlyName)
-                    .font(.headline)
+                    .font(.system(.subheadline, design: .monospaced))
                     .lineLimit(1)
 
                 Spacer(minLength: 8)

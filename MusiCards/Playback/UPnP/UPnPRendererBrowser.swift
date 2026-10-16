@@ -25,9 +25,9 @@ final class UPnPRendererBrowser: ObservableObject {
             case .multicast:
                 "to 239.255.255.250"
             case .rememberedAddress:
-                "saved renderer IP"
+                "previous address"
             case .subnetSweep:
-                "local /24 subnet"
+                "the local /24 subnet"
             case .manualAddress:
                 "renderer IP"
             }

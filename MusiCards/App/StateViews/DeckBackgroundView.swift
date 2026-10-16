@@ -27,6 +27,7 @@ struct DeckBackgroundView: View {
     @State private var isHoveringLogo = false
     @State private var isFolderImporterPresented = false
     @State private var isLibraryActionsPresented = false
+    @State private var librarySourceDraft: LibrarySource?
     @State private var folderImportAction: FolderImportAction?
 
     init(
@@ -240,7 +241,11 @@ struct DeckBackgroundView: View {
         .sheet(isPresented: $isShowingAbout) {
             AboutView()
         }
-        .sheet(isPresented: $isLibraryActionsPresented) {
+        .sheet(isPresented: $isLibraryActionsPresented, onDismiss: {
+            if folderImportAction == nil {
+                librarySourceDraft = nil
+            }
+        }) {
             libraryConnectionView
         }
         .fileImporter(
@@ -368,6 +373,7 @@ struct DeckBackgroundView: View {
         defer { folderImportAction = nil }
         guard case .success(let urls) = result,
               let url = urls.first else {
+            librarySourceDraft = nil
             return
         }
         switch folderImportAction {
@@ -408,7 +414,13 @@ struct DeckBackgroundView: View {
             onCreateOrUpdateIndex: nil,
             onDisconnect: {
                 onDisconnectLibrary?()
-            }
+            },
+            onClose: {
+                isLibraryActionsPresented = false
+                librarySourceDraft = nil
+            },
+            initialDraftSource: librarySourceDraft,
+            onDraftSourceChange: { librarySourceDraft = $0 }
         )
     }
 

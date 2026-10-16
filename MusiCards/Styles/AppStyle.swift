@@ -92,3 +92,24 @@ enum AppStyle {
     
     #endif
 }
+
+struct PopupSectionDivider: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        GeometryReader { geometry in
+            Path { path in
+                path.move(to: CGPoint(x: 0, y: 1))
+                path.addLine(to: CGPoint(x: geometry.size.width, y: 1))
+            }
+            .stroke(
+                colorScheme == .dark
+                    ? Color.white.opacity(0.7)
+                    : Color.black.opacity(0.7),
+                style: StrokeStyle(lineWidth: 1.5, dash: [3, 4])
+            )
+        }
+        .frame(height: 2)
+        .accessibilityHidden(true)
+    }
+}

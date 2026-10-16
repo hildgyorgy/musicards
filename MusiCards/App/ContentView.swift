@@ -378,7 +378,12 @@ struct ContentView: View {
                         },
                         onDisconnect: {
                             appModel.disconnectMusicLibrary()
-                        }
+                        },
+                        onClose: {
+                            isShowingLibraryConnection = false
+                        },
+                        initialDraftSource: nil,
+                        onDraftSourceChange: nil
                     )
                 }
                 .padding(.horizontal, DeckStyle.aboutOverlayHorizontalInset)

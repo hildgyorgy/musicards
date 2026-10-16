@@ -12,6 +12,9 @@ struct LibraryConnectionView: View {
     let onConnectExisting: () -> Void
     let onCreateOrUpdateIndex: (() -> Void)?
     let onDisconnect: () -> Void
+    let onClose: () -> Void
+    let initialDraftSource: LibrarySource?
+    let onDraftSourceChange: ((LibrarySource) -> Void)?
 
     @State private var selectedSource: LibrarySource = .local
 
@@ -26,8 +29,10 @@ struct LibraryConnectionView: View {
         navidromeConnection.isConfigured
     }
 
-    private func syncSelectedSource() {
-        if let activeLibrarySource {
+    private func syncSelectedSource(restoreDraft: Bool = true) {
+        if restoreDraft, let initialDraftSource {
+            selectedSource = initialDraftSource
+        } else if let activeLibrarySource {
             selectedSource = activeLibrarySource
         } else if navidromeIsConnected && !localIsConnected {
             selectedSource = .navidrome
@@ -39,7 +44,7 @@ struct LibraryConnectionView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
-                sheetTitle
+                header
 
                 HStack(spacing: 8) {
                     Text("LOCAL")
@@ -54,12 +59,8 @@ struct LibraryConnectionView: View {
                                 selectedSource == .navidrome
                             },
                             set: { isNavidrome in
-                                let newSource: LibrarySource = isNavidrome ? .navidrome : .local
-                                selectedSource = newSource
-
-                                if localIsConnected && navidromeIsConnected {
-                                    activeLibrarySource = newSource
-                                }
+                                selectedSource = isNavidrome ? .navidrome : .local
+                                onDraftSourceChange?(selectedSource)
                             }
                         )
                     )
@@ -75,7 +76,8 @@ struct LibraryConnectionView: View {
                 .font(.caption)
                 .tracking(1.5)
                 .frame(maxWidth: .infinity)
-                .padding(.top, 2)
+                .padding(.top, 8)
+                .padding(.bottom, 16)
 
                 if selectedSource == .local {
                     localContent
@@ -90,7 +92,7 @@ struct LibraryConnectionView: View {
             .onChange(of: navidromeIsConnected) { oldValue, newValue in
                 if !oldValue && newValue {
                     selectedSource = .navidrome
-                    activeLibrarySource = .navidrome
+                    onDraftSourceChange?(selectedSource)
                 } else if oldValue && !newValue {
                     activeLibrarySource = LibrarySourceSelectionPolicy
                         .sourceAfterDisconnect(
@@ -99,13 +101,14 @@ struct LibraryConnectionView: View {
                             localIsConnected: localIsConnected,
                             navidromeIsConnected: false
                         )
-                    syncSelectedSource()
+                    syncSelectedSource(restoreDraft: false)
+                    onDraftSourceChange?(selectedSource)
                 }
             }
             .onChange(of: localIsConnected) { oldValue, newValue in
                 if !oldValue && newValue {
                     selectedSource = .local
-                    activeLibrarySource = .local
+                    onDraftSourceChange?(selectedSource)
                 } else if oldValue && !newValue {
                     activeLibrarySource = LibrarySourceSelectionPolicy
                         .sourceAfterDisconnect(
@@ -114,7 +117,8 @@ struct LibraryConnectionView: View {
                             localIsConnected: false,
                             navidromeIsConnected: navidromeIsConnected
                         )
-                    syncSelectedSource()
+                    syncSelectedSource(restoreDraft: false)
+                    onDraftSourceChange?(selectedSource)
                 }
             }
         }
@@ -261,70 +265,75 @@ struct LibraryConnectionView: View {
     }
 
     private var navidromeSetupContent: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            sectionTitle("HOME ADDRESS")
+        VStack(alignment: .leading, spacing: 16) {
+            Text("CONNECT TO YOUR NAVIDROME SERVER")
+                .font(.system(.caption, design: .monospaced).weight(.semibold))
+                .tracking(1.5)
+                .foregroundStyle(.blue)
+                .padding(.bottom, 12)
+
+            sectionTitle("LOCAL ADDRESS")
 
             TextField(
-                "http://navidrome.local:4533",
+                "http://server.local:4533",
                 text: $navidromeConnection.homeServerURL
             )
-                .textFieldStyle(.roundedBorder)
-                #if os(iOS)
-                .textInputAutocapitalization(.never)
-                .keyboardType(.URL)
-                #endif
+            .popupAddressFieldStyle()
 
-            Text("Used on your home network and by UPnP renderers. Optional if Remote Address is set.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+            PopupSectionDivider()
+                .padding(.vertical, 10)
 
             sectionTitle("REMOTE ADDRESS")
-                .padding(.top, 8)
 
             TextField(
-                "https://music.example.com",
+                "https://",
                 text: $navidromeConnection.remoteServerURL
             )
-                .textFieldStyle(.roundedBorder)
-                #if os(iOS)
-                .textInputAutocapitalization(.never)
-                .keyboardType(.URL)
-                #endif
+            .popupAddressFieldStyle()
 
-            Text("Secure address used away from home. Optional if Home Address is set.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+            PopupSectionDivider()
+                .padding(.vertical, 10)
 
             sectionTitle("ACCOUNT")
-                .padding(.top, 8)
 
             TextField("Username", text: $navidromeConnection.username)
-                .textFieldStyle(.roundedBorder)
+                .popupOutlinedFieldStyle()
 
             SecureField("Password", text: $navidromeConnection.password)
-                .textFieldStyle(.roundedBorder)
+                .popupOutlinedFieldStyle()
 
-            Button {
-                Task {
-                    await navidromeConnection.verifyAndSave()
-                }
-            } label: {
-                Text(navidromeConnection.isConnecting ? "CONNECTING..." : "CONNECT")
-                    .font(.system(.footnote, design: .monospaced).weight(.semibold))
-                    .tracking(1.5)
-                    .foregroundStyle(connectionButtonForeground)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 38)
-                    .background {
-                        Capsule(style: .continuous)
-                            .fill(connectionButtonBackground)
+            HStack(alignment: .top, spacing: 12) {
+                Text("For playback on \(Text("THIS DEVICE").bold()), enter at least one address.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Spacer(minLength: 0)
+
+                Button {
+                    Task {
+                        await navidromeConnection.verifyAndSave()
                     }
+                } label: {
+                    Text(navidromeConnection.isConnecting ? "CONNECTING..." : "CONNECT")
+                        .font(.system(.footnote, design: .monospaced).weight(.semibold))
+                        .tracking(1.5)
+                        .foregroundStyle(connectionButtonForeground)
+                        .padding(.horizontal, 18)
+                        .frame(height: 36)
+                        .background(connectionButtonBackground, in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .disabled(
+                    navidromeConnection.isConnecting
+                        || !hasEnteredNavidromeAddress
+                )
             }
-            .buttonStyle(.plain)
-            .disabled(
-                navidromeConnection.isConnecting
-                    || !hasEnteredNavidromeAddress
-            )
+
+            Text("For controlling playback on a \(Text("UPNP RENDERER").bold()), the renderer must be able to reach the Navidrome address. \(Text("LOCAL").bold()) address is recommended.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
 
             if let errorMessage = navidromeConnection.errorMessage {
                 Text(errorMessage)
@@ -371,10 +380,44 @@ struct LibraryConnectionView: View {
         }
     }
 
-    @ViewBuilder
-    private var sheetTitle: some View {
-        sectionTitle("MUSIC LIBRARY")
-            .frame(maxWidth: .infinity, alignment: .center)
+    private var header: some View {
+        ZStack {
+            Text("MUSIC SOURCE")
+                .font(.system(.headline, design: .monospaced))
+                .tracking(2)
+
+            HStack {
+                Button {
+                    onClose()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.title3.weight(.medium))
+                        .frame(width: 36, height: 36)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Cancel")
+
+                Spacer()
+
+                Button("OK") {
+                    activeLibrarySource = selectedSource
+                    onClose()
+                }
+                #if os(iOS)
+                .buttonStyle(.borderless)
+                .tint(.accentColor)
+                #else
+                .font(.system(.footnote, design: .monospaced).weight(.bold))
+                .buttonStyle(.borderedProminent)
+                .clipShape(Capsule())
+                #endif
+                .disabled(
+                    selectedSource == .local
+                        ? !localIsConnected
+                        : !navidromeIsConnected
+                )
+            }
+        }
     }
 
     private var localConnectionActionTitle: String {
@@ -448,19 +491,11 @@ struct LibraryConnectionView: View {
     }
 
     private var connectionButtonForeground: Color {
-        #if os(iOS)
-        .black
-        #else
         colorScheme == .dark ? .black : .white
-        #endif
     }
 
     private var connectionButtonBackground: Color {
-        #if os(iOS)
-        .white
-        #else
-        .primary
-        #endif
+        colorScheme == .dark ? .white : .black
     }
 
     private func actionForeground(primary: Bool) -> Color {
@@ -498,5 +533,25 @@ struct LibraryConnectionView: View {
         localLibrary.connectionErrorMessage ?? (
             localLibrary.isScanning ? localLibrary.statusMessage : nil
         )
+    }
+}
+
+private extension View {
+    func popupOutlinedFieldStyle() -> some View {
+        textFieldStyle(.plain)
+            .padding(.horizontal, 12)
+            .frame(height: 38)
+            .overlay(Capsule().stroke(Color.primary, lineWidth: 1))
+    }
+
+    @ViewBuilder
+    func popupAddressFieldStyle() -> some View {
+        #if os(iOS)
+        popupOutlinedFieldStyle()
+            .textInputAutocapitalization(.never)
+            .keyboardType(.URL)
+        #else
+        popupOutlinedFieldStyle()
+        #endif
     }
 }
