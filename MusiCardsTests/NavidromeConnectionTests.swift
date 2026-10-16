@@ -3,6 +3,43 @@ import XCTest
 @testable import MusiCards
 
 final class NavidromeConnectionTests: XCTestCase {
+    @MainActor
+    func testConnectionCanBeSavedWhenOnlyRemoteAddressIsReachable() async throws {
+        let suiteName = "NavidromeConnectionTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let identity = NavidromeServerIdentity(
+            serverVersion: "0.58.0",
+            protocolVersion: "1.16.1"
+        )
+        let identifier = NavidromeIdentifierStub(
+            resultsByHost: [
+                "umbrel.local": .failure(NavidromeConnectionError.invalidResponse),
+                "music.example.com": .success(identity)
+            ]
+        )
+        let credentials = NavidromeCredentialStoreStub()
+        let store = NavidromeConnectionStore(
+            defaults: defaults,
+            credentialStore: credentials,
+            client: identifier,
+            reachabilityClient: identifier
+        )
+        store.homeServerURL = "http://umbrel.local:4533"
+        store.remoteServerURL = "https://music.example.com"
+        store.username = "listener"
+        store.password = "password"
+
+        await store.verifyAndSave()
+
+        XCTAssertNil(store.errorMessage)
+        XCTAssertEqual(store.savedProfile?.baseURL.host, "music.example.com")
+        XCTAssertEqual(store.homeBaseURL?.host, "umbrel.local")
+        XCTAssertEqual(store.remoteBaseURL?.host, "music.example.com")
+        XCTAssertEqual(store.identity, identity)
+        XCTAssertTrue(store.statusMessage?.contains("other address") == true)
+    }
+
     private func pingRequest(
         baseURL: URL,
         username: String = "listener",
@@ -526,5 +563,42 @@ final class NavidromeConnectionTests: XCTestCase {
         let json = try XCTUnwrap(String(data: data, encoding: .utf8))
 
         XCTAssertFalse(json.localizedCaseInsensitiveContains("password"))
+    }
+}
+
+private actor NavidromeIdentifierStub: NavidromeIdentifying {
+    let resultsByHost: [String: Result<NavidromeServerIdentity, Error>]
+
+    init(resultsByHost: [String: Result<NavidromeServerIdentity, Error>]) {
+        self.resultsByHost = resultsByHost
+    }
+
+    func identifyNavidrome(
+        profile: NavidromeServerProfile,
+        password: String,
+        allowsInsecureLocalHTTP: Bool
+    ) async throws -> NavidromeServerIdentity {
+        guard let result = resultsByHost[profile.baseURL.host ?? ""] else {
+            throw NavidromeConnectionError.invalidResponse
+        }
+        return try result.get()
+    }
+}
+
+private final class NavidromeCredentialStoreStub:
+    NavidromeCredentialStoring, @unchecked Sendable {
+    private let lock = NSLock()
+    private var passwords: [UUID: String] = [:]
+
+    func save(password: String, for profileID: UUID) throws {
+        lock.withLock { passwords[profileID] = password }
+    }
+
+    func password(for profileID: UUID) throws -> String? {
+        lock.withLock { passwords[profileID] }
+    }
+
+    func deletePassword(for profileID: UUID) throws {
+        lock.withLock { _ = passwords.removeValue(forKey: profileID) }
     }
 }

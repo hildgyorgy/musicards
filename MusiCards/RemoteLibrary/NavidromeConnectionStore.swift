@@ -1,8 +1,14 @@
 import Combine
 import Foundation
+import OSLog
 
 @MainActor
 final class NavidromeConnectionStore: ObservableObject {
+    nonisolated private static let logger = Logger(
+        subsystem: "com.hildgyorgy.MusiCards",
+        category: "NavidromeConnection"
+    )
+
     @Published var serverName = ""
     @Published var homeServerURL = ""
     @Published var remoteServerURL = ""
@@ -71,16 +77,17 @@ final class NavidromeConnectionStore: ObservableObject {
     }
 
     private let defaults: UserDefaults
-    private let credentialStore: NavidromeCredentialStore
-    private let client: OpenSubsonicClient
-    private let reachabilityClient: OpenSubsonicClient
+    private let credentialStore: any NavidromeCredentialStoring
+    private let client: any NavidromeIdentifying
+    private let reachabilityClient: any NavidromeIdentifying
     private let storageKey = "NavidromeServerConnection.v1"
     private let rendererStorageKey = "NavidromeRendererConnection.v1"
 
     init(
         defaults: UserDefaults = .standard,
-        credentialStore: NavidromeCredentialStore = .init(),
-        client: OpenSubsonicClient = .init()
+        credentialStore: any NavidromeCredentialStoring = NavidromeCredentialStore(),
+        client: any NavidromeIdentifying = OpenSubsonicClient(),
+        reachabilityClient: (any NavidromeIdentifying)? = nil
     ) {
         self.defaults = defaults
         self.credentialStore = credentialStore
@@ -89,7 +96,7 @@ final class NavidromeConnectionStore: ObservableObject {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = 2.5
         configuration.timeoutIntervalForResource = 4
-        self.reachabilityClient = OpenSubsonicClient(
+        self.reachabilityClient = reachabilityClient ?? OpenSubsonicClient(
             session: URLSession(configuration: configuration)
         )
         loadSavedConnection()
@@ -135,31 +142,46 @@ final class NavidromeConnectionStore: ObservableObject {
                 throw NavidromeConnectionStoreError.passwordRequired
             }
 
-            var verifiedIdentity: NavidromeServerIdentity?
-            for address in [verifiedHomeURL, verifiedRemoteURL].compactMap({ $0 }) {
+            let configuredAddresses = [verifiedHomeURL, verifiedRemoteURL]
+                .compactMap { $0 }
+            var verifiedEndpoints: [(URL, NavidromeServerIdentity)] = []
+            var firstVerificationError: Error?
+            for address in configuredAddresses {
                 let profile = makeProfile(
                     id: profileID,
                     name: name,
                     baseURL: address,
                     username: trimmedUsername
                 )
-                let endpointIdentity = try await client.identifyNavidrome(
-                    profile: profile,
-                    password: connectionPassword,
-                    allowsInsecureLocalHTTP: address.scheme?.lowercased() == "http"
-                )
-                if let verifiedIdentity,
-                   verifiedIdentity != endpointIdentity {
-                    throw NavidromeConnectionStoreError.addressesDoNotMatch
+                do {
+                    let endpointIdentity = try await client.identifyNavidrome(
+                        profile: profile,
+                        password: connectionPassword,
+                        allowsInsecureLocalHTTP: address.scheme?.lowercased() == "http"
+                    )
+                    verifiedEndpoints.append((address, endpointIdentity))
+                } catch {
+                    if firstVerificationError == nil {
+                        firstVerificationError = error
+                    }
+                    Self.logger.notice(
+                        "Navidrome endpoint verification failed host=\(address.host ?? "unknown", privacy: .private) error=\(error.localizedDescription, privacy: .private)"
+                    )
                 }
-                verifiedIdentity = endpointIdentity
             }
 
-            guard let verifiedIdentity else {
-                throw NavidromeConnectionStoreError.addressRequired
+            guard let firstVerifiedEndpoint = verifiedEndpoints.first else {
+                throw firstVerificationError
+                    ?? NavidromeConnectionStoreError.addressRequired
+            }
+            guard verifiedEndpoints.dropFirst().allSatisfy({
+                $0.1 == firstVerifiedEndpoint.1
+            }) else {
+                throw NavidromeConnectionStoreError.addressesDoNotMatch
             }
 
-            let activeURL = verifiedHomeURL ?? verifiedRemoteURL!
+            let activeURL = firstVerifiedEndpoint.0
+            let verifiedIdentity = firstVerifiedEndpoint.1
             let profile = makeProfile(
                 id: profileID,
                 name: name,
@@ -192,8 +214,13 @@ final class NavidromeConnectionStore: ObservableObject {
             username = profile.username
             password = ""
             hasStoredPassword = true
-            statusMessage = "Navidrome connection verified and saved."
+            statusMessage = verifiedEndpoints.count == configuredAddresses.count
+                ? "Navidrome connection verified and saved."
+                : "Navidrome connection saved. The other address could not be verified from this network."
         } catch {
+            Self.logger.error(
+                "Navidrome connection could not be saved error=\(error.localizedDescription, privacy: .private)"
+            )
             errorMessage = error.localizedDescription
         }
     }
@@ -271,8 +298,14 @@ final class NavidromeConnectionStore: ObservableObject {
                     remoteBaseURL: remoteBaseURL
                 )
                 savedProfile = candidate
+                Self.logger.info(
+                    "Selected reachable Navidrome endpoint host=\(address.host ?? "unknown", privacy: .private)"
+                )
                 return
             } catch {
+                Self.logger.debug(
+                    "Navidrome endpoint is not reachable host=\(address.host ?? "unknown", privacy: .private) error=\(error.localizedDescription, privacy: .private)"
+                )
                 continue
             }
         }

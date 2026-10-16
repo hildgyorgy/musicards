@@ -82,6 +82,17 @@ final class PlaybackController: ObservableObject {
         return queue[currentIndex]
     }
 
+    var canAdoptRendererPlayback: Bool {
+        switch status {
+        case .idle:
+            queue.isEmpty
+        case .stopped, .failed:
+            true
+        case .loading, .ready, .playing, .paused:
+            false
+        }
+    }
+
     var outputDisplayName: String {
         externalOutputDisplayName ?? outputRoute.displayName
     }

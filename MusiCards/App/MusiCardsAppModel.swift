@@ -25,6 +25,10 @@ final class MusiCardsAppModel: ObservableObject {
         subsystem: "com.hildgyorgy.MusiCards",
         category: "Shazam"
     )
+    nonisolated private static let rendererAdoptionLogger = Logger(
+        subsystem: "com.hildgyorgy.MusiCards",
+        category: "RendererAdoption"
+    )
 
     @Published var deckSelection = DeckSelection<MusiCardID>(
         activeID: .home,
@@ -282,7 +286,7 @@ final class MusiCardsAppModel: ObservableObject {
     private func adoptRendererPlaybackIfAvailable(
         provider: NavidromeLibraryProvider
     ) async {
-        guard playbackController.currentItem == nil else { return }
+        guard playbackController.canAdoptRendererPlayback else { return }
         do {
             guard let snapshot = try await playbackController.rendererSnapshot(),
                   ["PLAYING", "PAUSED_PLAYBACK", "TRANSITIONING"].contains(
@@ -294,7 +298,7 @@ final class MusiCardsAppModel: ObservableObject {
             let queue = try await provider.playbackQueue(
                 containingNavidromeSongID: songID
             )
-            guard playbackController.currentItem == nil else { return }
+            guard playbackController.canAdoptRendererPlayback else { return }
             try await playbackController.adoptRendererPlayback(
                 queue: queue,
                 snapshot: snapshot
@@ -303,6 +307,9 @@ final class MusiCardsAppModel: ObservableObject {
         } catch {
             // Discovery and ordinary local playback remain usable when an
             // external renderer session cannot be identified as Navidrome.
+            Self.rendererAdoptionLogger.notice(
+                "Renderer playback could not be adopted errorType=\(String(reflecting: type(of: error)), privacy: .public) detail=\(error.localizedDescription, privacy: .private)"
+            )
         }
     }
 

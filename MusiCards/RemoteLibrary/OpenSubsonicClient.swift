@@ -1,6 +1,14 @@
 import Foundation
 
-actor OpenSubsonicClient {
+nonisolated protocol NavidromeIdentifying: Sendable {
+    func identifyNavidrome(
+        profile: NavidromeServerProfile,
+        password: String,
+        allowsInsecureLocalHTTP: Bool
+    ) async throws -> NavidromeServerIdentity
+}
+
+actor OpenSubsonicClient: NavidromeIdentifying {
     private let session: URLSession
     private let requestBuilder: OpenSubsonicRequestBuilder
 

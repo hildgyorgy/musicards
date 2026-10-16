@@ -1,7 +1,13 @@
 import Foundation
 import Security
 
-struct NavidromeCredentialStore: Sendable {
+nonisolated protocol NavidromeCredentialStoring: Sendable {
+    func save(password: String, for profileID: UUID) throws
+    func password(for profileID: UUID) throws -> String?
+    func deletePassword(for profileID: UUID) throws
+}
+
+struct NavidromeCredentialStore: NavidromeCredentialStoring, Sendable {
     private let service: String
 
     init(service: String = "hu.hildgyorgy.MusiCards.navidrome") {

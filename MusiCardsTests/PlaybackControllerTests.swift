@@ -86,6 +86,34 @@ final class PlaybackControllerTests: XCTestCase {
     }
 
     @MainActor
+    func testStoppedQueueAllowsRendererPlaybackAdoption() async {
+        let engine = PlaybackEngineSpy()
+        let controller = PlaybackController(engine: engine)
+        await controller.replaceQueue(with: [item(1)])
+
+        XCTAssertFalse(controller.canAdoptRendererPlayback)
+
+        await controller.stop()
+
+        XCTAssertNotNil(controller.currentItem)
+        XCTAssertTrue(controller.canAdoptRendererPlayback)
+    }
+
+    @MainActor
+    func testActivePlaybackDoesNotAllowRendererPlaybackAdoption() async {
+        let engine = PlaybackEngineSpy()
+        let controller = PlaybackController(engine: engine)
+        await controller.replaceQueue(with: [item(1)])
+        await controller.play()
+
+        XCTAssertFalse(controller.canAdoptRendererPlayback)
+
+        await controller.pause()
+
+        XCTAssertFalse(controller.canAdoptRendererPlayback)
+    }
+
+    @MainActor
     func testChangingOutputWhilePlayingRepreparesAndResumesCurrentItem() async {
         let engine = PlaybackEngineSpy()
         let controller = PlaybackController(engine: engine)
