@@ -428,22 +428,18 @@ private struct PlaybackOutputStatusView: View {
     @ObservedObject var rendererBrowser: UPnPRendererBrowser
     @ObservedObject var navidromeConnection: NavidromeConnectionStore
     @Environment(\.colorScheme) private var colorScheme
-    @State private var isShowingRendererLab = false
+    @State private var isShowingOutputPicker = false
 
     var body: some View {
-        #if DEBUG
         Button {
-            isShowingRendererLab = true
+            isShowingOutputPicker = true
         } label: {
             statusContent
         }
         .buttonStyle(.plain)
-        .sheet(isPresented: $isShowingRendererLab) {
+        .sheet(isPresented: $isShowingOutputPicker) {
             RendererDiscoveryView(browser: rendererBrowser)
         }
-        #else
-        statusContent
-        #endif
     }
 
     private var statusContent: some View {

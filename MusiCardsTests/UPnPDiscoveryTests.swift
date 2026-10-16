@@ -10,6 +10,8 @@ final class UPnPDiscoveryTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let browser = UPnPRendererBrowser(userDefaults: defaults)
+        var selectionChangeCount = 0
+        browser.selectionCommitHandler = { selectionChangeCount += 1 }
         let first = makeRenderer(id: "uuid:first", host: "192.168.1.50")
         let second = makeRenderer(id: "uuid:second", host: "192.168.1.60")
 
@@ -24,6 +26,7 @@ final class UPnPDiscoveryTests: XCTestCase {
         XCTAssertTrue(browser.isDraftSelected(second))
 
         browser.commitRendererSelection()
+        XCTAssertEqual(selectionChangeCount, 1)
         XCTAssertEqual(browser.selectedRenderer?.id, second.id)
         XCTAssertEqual(browser.selectedRendererDisplayName, second.friendlyName)
         XCTAssertEqual(
@@ -32,12 +35,17 @@ final class UPnPDiscoveryTests: XCTestCase {
         )
 
         browser.beginRendererSelection()
+        browser.commitRendererSelection()
+        XCTAssertEqual(selectionChangeCount, 1)
+
+        browser.beginRendererSelection()
         browser.clearDraftRendererSelection()
         browser.cancelRendererSelection()
         XCTAssertTrue(browser.isDraftSelected(second))
 
         browser.clearDraftRendererSelection()
         browser.commitRendererSelection()
+        XCTAssertEqual(selectionChangeCount, 2)
         XCTAssertNil(browser.selectedRenderer)
         XCTAssertNil(browser.selectedRendererDisplayName)
         XCTAssertNil(defaults.string(forKey: "UPnPSelectedRendererID"))

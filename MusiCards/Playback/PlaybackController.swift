@@ -32,6 +32,7 @@ final class PlaybackController: ObservableObject {
     private let engine: PlaybackEngine
     private let assetResolver: (any PlaybackAssetResolving)?
     private var preparedItemID: PlaybackQueueItem.ID?
+    private var pendingOutputResumePosition: TimeInterval?
     private var playbackGeneration: UInt64 = 0
     private var outputVolumeGeneration: UInt64 = 0
     private var outputRouteObservation: AnyCancellable?
@@ -124,6 +125,7 @@ final class PlaybackController: ObservableObject {
 
     func beginQueueRequest() -> PlaybackQueueRequest {
         let generation = advancePlaybackGeneration()
+        pendingOutputResumePosition = nil
         status = .loading
         return PlaybackQueueRequest(generation: generation)
     }
@@ -166,6 +168,7 @@ final class PlaybackController: ObservableObject {
 
         queue = items
         preparedItemID = nil
+        pendingOutputResumePosition = nil
         position = 0
         preparedDuration = nil
         preparedAudioFormat = nil
@@ -194,7 +197,9 @@ final class PlaybackController: ObservableObject {
         do {
             if preparedItemID != itemID {
                 status = .loading
-                position = 0
+                if pendingOutputResumePosition == nil {
+                    position = 0
+                }
                 preparedDuration = currentItem.track.duration
                 preparedAudioFormat = nil
                 let resolvedItem = try await resolvedItem(currentItem)
@@ -217,6 +222,25 @@ final class PlaybackController: ObservableObject {
                   !Task.isCancelled else {
                 await engine.stop()
                 return
+            }
+            if let resumePosition = pendingOutputResumePosition {
+                pendingOutputResumePosition = nil
+                if engine.canSeek, resumePosition > 0 {
+                    do {
+                        try await engine.seek(to: resumePosition)
+                    } catch {
+                        await engine.stop()
+                        throw error
+                    }
+                    guard isCurrent(generation: generation, itemID: itemID),
+                          !Task.isCancelled else {
+                        await engine.stop()
+                        return
+                    }
+                    position = resumePosition
+                } else {
+                    position = 0
+                }
             }
             status = .playing
         } catch {
@@ -246,6 +270,7 @@ final class PlaybackController: ObservableObject {
     func stop() async {
         _ = advancePlaybackGeneration()
         preparedItemID = nil
+        pendingOutputResumePosition = nil
         position = 0
         preparedAudioFormat = nil
         status = queue.isEmpty ? .idle : .stopped
@@ -324,16 +349,20 @@ final class PlaybackController: ObservableObject {
     /// paused and stopped queues wait for the next explicit Play command.
     func outputSelectionDidChange() async {
         let shouldResume = status.isPlaying
+        let previousPosition = position
         let generation = advancePlaybackGeneration()
         await engine.stop()
         guard generation == playbackGeneration else { return }
 
         preparedItemID = nil
-        position = 0
+        pendingOutputResumePosition = previousPosition > 0
+            ? previousPosition : nil
+        position = previousPosition
         preparedAudioFormat = nil
         status = queue.isEmpty ? .idle : .stopped
 
         await refreshOutputVolume()
+        guard generation == playbackGeneration else { return }
 
         if shouldResume {
             await play()
@@ -355,6 +384,7 @@ final class PlaybackController: ObservableObject {
             return
         }
         _ = advancePlaybackGeneration()
+        pendingOutputResumePosition = nil
         queue = newQueue.items
         currentIndex = newQueue.selectedIndex
         let item = newQueue.items[newQueue.selectedIndex]
@@ -420,6 +450,7 @@ final class PlaybackController: ObservableObject {
         guard generation == playbackGeneration else { return }
         currentIndex = index
         preparedItemID = nil
+        pendingOutputResumePosition = nil
         position = 0
         preparedDuration = queue[index].track.duration
         preparedAudioFormat = nil

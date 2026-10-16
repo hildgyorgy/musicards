@@ -119,12 +119,15 @@ final class PlaybackControllerTests: XCTestCase {
         let controller = PlaybackController(engine: engine)
         await controller.replaceQueue(with: [item(1)])
         await controller.play()
+        engine.emit(.positionChanged(47))
 
         await controller.outputSelectionDidChange()
 
         XCTAssertEqual(engine.preparedIDs, ["item-1", "item-1"])
         XCTAssertEqual(engine.playCount, 2)
         XCTAssertEqual(controller.currentItem?.id, "item-1")
+        XCTAssertEqual(engine.seekPositions, [47])
+        XCTAssertEqual(controller.position, 47)
         XCTAssertEqual(controller.status, .playing)
     }
 
@@ -134,13 +137,21 @@ final class PlaybackControllerTests: XCTestCase {
         let controller = PlaybackController(engine: engine)
         await controller.replaceQueue(with: [item(1)])
         await controller.play()
+        engine.emit(.positionChanged(38))
         await controller.pause()
 
         await controller.outputSelectionDidChange()
 
         XCTAssertEqual(engine.preparedIDs, ["item-1"])
         XCTAssertEqual(engine.playCount, 1)
+        XCTAssertEqual(controller.position, 38)
         XCTAssertEqual(controller.status, .stopped)
+
+        await controller.play()
+
+        XCTAssertEqual(engine.seekPositions, [38])
+        XCTAssertEqual(controller.position, 38)
+        XCTAssertEqual(controller.status, .playing)
     }
 
     @MainActor
