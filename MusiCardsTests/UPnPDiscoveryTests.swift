@@ -31,6 +31,21 @@ final class UPnPDiscoveryTests: XCTestCase {
             second.id
         )
 
+        browser.beginRendererSelection()
+        browser.clearDraftRendererSelection()
+        browser.cancelRendererSelection()
+        XCTAssertTrue(browser.isDraftSelected(second))
+
+        browser.clearDraftRendererSelection()
+        browser.commitRendererSelection()
+        XCTAssertNil(browser.selectedRenderer)
+        XCTAssertNil(browser.selectedRendererDisplayName)
+        XCTAssertNil(defaults.string(forKey: "UPnPSelectedRendererID"))
+
+        browser.beginRendererSelection()
+        browser.toggleDraftSelection(of: second)
+        browser.commitRendererSelection()
+
         let restoredBrowser = UPnPRendererBrowser(userDefaults: defaults)
         XCTAssertEqual(
             restoredBrowser.selectedRendererDisplayName,

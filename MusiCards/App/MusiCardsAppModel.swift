@@ -111,6 +111,7 @@ final class MusiCardsAppModel: ObservableObject {
     private var currentArtistIDForGroups: String?
     private var releaseSelectionGeneration: UInt64 = 0
     private var releaseLoadTask: Task<Void, Never>?
+    private var isBackgroundReleaseLoad = false
     private var artistSelectionGeneration: UInt64 = 0
     private var artistLoadTask: Task<Void, Never>?
     private var artistWikipediaTask: Task<Void, Never>?
@@ -143,17 +144,20 @@ final class MusiCardsAppModel: ObservableObject {
             navidromeProvider: navidromeLibraryProvider
         )
         let effectivePlaybackEngine: PlaybackEngine
+        let rendererEngine: UPnPPlaybackEngine?
         if let playbackEngine {
             effectivePlaybackEngine = playbackEngine
+            rendererEngine = nil
         } else {
-            let rendererEngine = UPnPPlaybackEngine(
+            let upnpRendererEngine = UPnPPlaybackEngine(
                 streamURLProvider: NavidromeRendererStreamURLProvider(
                     connection: navidromeConnection
                 )
             )
+            rendererEngine = upnpRendererEngine
             effectivePlaybackEngine = OutputRoutingPlaybackEngine(
                 systemEngine: PlaybackEngineFactory.makeDefault(),
-                rendererEngine: rendererEngine
+                rendererEngine: upnpRendererEngine
             ) {
                 if let renderer = rendererBrowser.selectedRenderer {
                     return .renderer(renderer)
@@ -171,10 +175,8 @@ final class MusiCardsAppModel: ObservableObject {
             engine: effectivePlaybackEngine,
             assetResolver: libraryManager
         )
-        rendererBrowser.selectionCommitHandler = { [weak playbackController] in
-            Task { @MainActor in
-                await playbackController?.outputSelectionDidChange()
-            }
+        rendererEngine?.nextItemProvider = { [weak playbackController] in
+            try await playbackController?.resolvedNextItemForRenderer()
         }
         let releasePlaybackQueueBuilder = ReleasePlaybackQueueBuilder(
             libraryManager: libraryManager
@@ -238,6 +240,25 @@ final class MusiCardsAppModel: ObservableObject {
                 self?.hasCurrentPlaybackItem = hasCurrentItem
             }
 
+        rendererBrowser.selectionCommitHandler = { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                await self.playbackController.outputSelectionDidChange()
+                await self.adoptRendererPlaybackIfAvailable(
+                    provider: navidromeLibraryProvider
+                )
+            }
+        }
+        rendererBrowser.selectedRendererResolvedHandler = { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                await self.playbackController.refreshOutputVolume()
+                await self.adoptRendererPlaybackIfAvailable(
+                    provider: navidromeLibraryProvider
+                )
+            }
+        }
+
         let restoredLibrarySource = LibrarySourcePreference.restoredSource(
             navidromeIsConfigured: navidromeConnection.isConfigured
         )
@@ -256,6 +277,85 @@ final class MusiCardsAppModel: ObservableObject {
         startNowPlayingUpdates()
         #endif
         localLibrary.startAutomaticRefresh()
+    }
+
+    private func adoptRendererPlaybackIfAvailable(
+        provider: NavidromeLibraryProvider
+    ) async {
+        guard playbackController.currentItem == nil else { return }
+        do {
+            guard let snapshot = try await playbackController.rendererSnapshot(),
+                  ["PLAYING", "PAUSED_PLAYBACK", "TRANSITIONING"].contains(
+                    snapshot.transport.state.uppercased()
+                  ),
+                  let songID = UPnPPlaybackEngine.navidromeSongID(
+                    in: snapshot.position.trackURI
+                  ) else { return }
+            let queue = try await provider.playbackQueue(
+                containingNavidromeSongID: songID
+            )
+            guard playbackController.currentItem == nil else { return }
+            try await playbackController.adoptRendererPlayback(
+                queue: queue,
+                snapshot: snapshot
+            )
+            await preloadPlaybackContext(from: queue)
+        } catch {
+            // Discovery and ordinary local playback remain usable when an
+            // external renderer session cannot be identified as Navidrome.
+        }
+    }
+
+    func preloadPlaybackContext(
+        from queue: ReleasePlaybackQueue
+    ) async {
+        guard queue.items.indices.contains(queue.selectedIndex),
+              let releaseID = queue.items[queue.selectedIndex].track.releaseID?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+              !releaseID.isEmpty,
+              selectedReleaseID == nil || selectedReleaseID == releaseID else {
+            return
+        }
+
+        if selectedRelease?.id != releaseID {
+            releaseLoadTask?.cancel()
+            releaseSelectionGeneration &+= 1
+            let generation = releaseSelectionGeneration
+
+            selectedReleaseID = releaseID
+            isBackgroundReleaseLoad = true
+            isLoadingRelease = true
+            releaseError = nil
+            selectedRelease = nil
+            selectedReleaseCover = nil
+
+            let task = Task(priority: .utility) { [weak self] in
+                guard let self else { return }
+                await self.loadReleaseAndCover(
+                    id: releaseID,
+                    generation: generation,
+                    activateWhenLoaded: false
+                )
+            }
+            releaseLoadTask = task
+            await task.value
+
+            guard generation == releaseSelectionGeneration,
+                  selectedReleaseID == releaseID else { return }
+            isBackgroundReleaseLoad = false
+        }
+
+        guard let release = selectedRelease,
+              release.id == releaseID,
+              selectedArtistID == nil,
+              let artist = Self.unambiguousArtist(in: release) else { return }
+        selectArtist(
+            id: artist.id,
+            name: artist.name,
+            lifeSpan: nil,
+            activateImmediately: false,
+            priority: .utility
+        )
     }
 
     func selectMusicFolder(_ url: URL) {
@@ -278,7 +378,13 @@ final class MusiCardsAppModel: ObservableObject {
 
     func refreshActiveLibraryIfNeeded() {
         Task {
-            await libraryManager.refreshActiveCatalogIfNeeded()
+            if activeLibrarySource == .navidrome {
+                await navidromeConnection.refreshReachableEndpoint()
+                await libraryManager.refreshActiveCatalogIfNeeded()
+            } else {
+                await libraryManager.refreshActiveCatalogIfNeeded()
+                await navidromeConnection.refreshReachableEndpoint()
+            }
         }
     }
 
@@ -362,7 +468,8 @@ final class MusiCardsAppModel: ObservableObject {
     }
 
     var isBlockingNavigationLoad: Bool {
-        isLoadingRelease || isLoadingArtistHeader
+        (isLoadingRelease && !isBackgroundReleaseLoad)
+            || isLoadingArtistHeader
     }
 
     // MARK: - Release
@@ -375,6 +482,7 @@ final class MusiCardsAppModel: ObservableObject {
         releaseSelectionGeneration &+= 1
         let generation = releaseSelectionGeneration
 
+        isBackgroundReleaseLoad = false
         selectedReleaseID = row.id
         isLoadingRelease = true
         releaseError = nil
@@ -391,7 +499,11 @@ final class MusiCardsAppModel: ObservableObject {
         }
 
         releaseLoadTask = Task {
-            await loadReleaseAndCover(id: row.id, generation: generation)
+            await loadReleaseAndCover(
+                id: row.id,
+                generation: generation,
+                activateWhenLoaded: true
+            )
         }
     }
 
@@ -409,6 +521,7 @@ final class MusiCardsAppModel: ObservableObject {
         releaseSelectionGeneration &+= 1
         let generation = releaseSelectionGeneration
 
+        isBackgroundReleaseLoad = false
         isLoadingRelease = true
         releaseError = nil
         selectedRelease = nil
@@ -417,14 +530,16 @@ final class MusiCardsAppModel: ObservableObject {
         releaseLoadTask = Task {
             await loadReleaseAndCover(
                 id: selectedReleaseID,
-                generation: generation
+                generation: generation,
+                activateWhenLoaded: true
             )
         }
     }
 
     private func loadReleaseAndCover(
         id: String,
-        generation: UInt64
+        generation: UInt64,
+        activateWhenLoaded: Bool
     ) async {
         if let cached = await recentContentCache.release(for: id) {
             guard generation == releaseSelectionGeneration,
@@ -436,7 +551,9 @@ final class MusiCardsAppModel: ObservableObject {
             isLoadingRelease = false
             releaseError = nil
             updateRecentReleaseMetadata(from: cached.release)
-            activateReleaseCardIfNeeded()
+            if activateWhenLoaded {
+                activateReleaseCardIfNeeded()
+            }
         }
 
         do {
@@ -457,7 +574,9 @@ final class MusiCardsAppModel: ObservableObject {
             releaseError = nil
             updateRecentReleaseMetadata(from: release)
 
-            activateReleaseCardIfNeeded()
+            if activateWhenLoaded {
+                activateReleaseCardIfNeeded()
+            }
 
             if recentReleases.contains(where: { $0.id == id }) {
                 await recentContentCache.save(
@@ -536,7 +655,11 @@ final class MusiCardsAppModel: ObservableObject {
             }
             return
         }
-        selectArtist(id: row.id, name: row.name, lifeSpan: row.lifeSpan.nilIfEmpty)
+        selectArtist(
+            id: row.id,
+            name: row.name,
+            lifeSpan: row.lifeSpan.nilIfEmpty
+        )
     }
 
     nonisolated static func exactArtistMatch(
@@ -566,7 +689,13 @@ final class MusiCardsAppModel: ObservableObject {
         selectArtist(id: id, name: nil, lifeSpan: nil)
     }
 
-    private func selectArtist(id: String, name: String?, lifeSpan: String?) {
+    private func selectArtist(
+        id: String,
+        name: String?,
+        lifeSpan: String?,
+        activateImmediately: Bool = true,
+        priority: TaskPriority? = nil
+    ) {
         artistLoadTask?.cancel()
         artistWikipediaTask?.cancel()
         artistDiscographyTask?.cancel()
@@ -595,13 +724,40 @@ final class MusiCardsAppModel: ObservableObject {
         isLoadingArtistWikipedia = true
         isLoadingArtistDiscography = true
 
-        withAnimation(AppStyle.animation) {
-            deckSelection = DeckSelection<MusiCardID>(
-                activeID: .artist,
-                activeSlotIndex: MusiCardID.artist.slotIndex
-            )
+        if activateImmediately {
+            withAnimation(AppStyle.animation) {
+                deckSelection = DeckSelection<MusiCardID>(
+                    activeID: .artist,
+                    activeSlotIndex: MusiCardID.artist.slotIndex
+                )
+            }
         }
-        artistLoadTask = Task { await loadArtist(id: id, generation: generation) }
+        artistLoadTask = Task(priority: priority) {
+            await loadArtist(id: id, generation: generation)
+        }
+    }
+
+    nonisolated static func unambiguousArtist(
+        in release: MBRelease
+    ) -> MBArtist? {
+        guard let credits = release.artistCredit, !credits.isEmpty else {
+            return nil
+        }
+        let artists = credits.compactMap(\.artist).filter {
+            !$0.id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        guard artists.count == credits.count else { return nil }
+        let artistsByID = Dictionary(
+            artists.map { ($0.id.lowercased(), $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
+        guard artistsByID.count == 1,
+              let artist = artistsByID.values.first,
+              artist.id.lowercased()
+                != "89ad4ac3-39f7-470e-963a-56509c546377" else {
+            return nil
+        }
+        return artist
     }
 
     func retryArtist() {

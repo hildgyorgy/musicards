@@ -129,6 +129,29 @@ final class PlaybackControllerTests: XCTestCase {
     }
 
     @MainActor
+    func testRendererAdvanceMovesQueueWithoutReplacingItsTransportURI() async {
+        let engine = PlaybackEngineSpy()
+        let controller = PlaybackController(engine: engine)
+        await controller.replaceQueue(with: [item(1), item(2), item(3)])
+        await controller.play()
+
+        engine.emit(
+            .advancedToNext(
+                itemID: "item-2",
+                duration: 202,
+                audioFormat: nil,
+                position: 1.5
+            )
+        )
+
+        XCTAssertEqual(controller.currentIndex, 1)
+        XCTAssertEqual(controller.currentItem?.id, "item-2")
+        XCTAssertEqual(controller.position, 1.5)
+        XCTAssertEqual(controller.status, .playing)
+        XCTAssertEqual(engine.preparedIDs, ["item-1"])
+    }
+
+    @MainActor
     func testFinishedEventStopsAtEndAndRestoresOutput() async {
         let engine = PlaybackEngineSpy()
         let controller = PlaybackController(engine: engine)

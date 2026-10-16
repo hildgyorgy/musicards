@@ -275,7 +275,7 @@ final class NavidromeConnectionTests: XCTestCase {
         }
     }
 
-    func testRendererRequestsCanExplicitlyUseVerifiedLocalHTTP() throws {
+    func testRequestsAllowPrivateLocalHTTP() throws {
         let profile = NavidromeServerProfile(
             name: "Home LAN",
             baseURL: URL(string: "http://umbrel.local:4533")!,
@@ -291,7 +291,7 @@ final class NavidromeConnectionTests: XCTestCase {
                 allowsInsecureLocalHTTP: true
             )
         )
-        XCTAssertThrowsError(
+        XCTAssertNoThrow(
             try builder.pingRequest(
                 profile: profile,
                 password: "password",

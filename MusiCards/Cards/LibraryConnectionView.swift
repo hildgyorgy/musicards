@@ -217,9 +217,13 @@ struct LibraryConnectionView: View {
                             .font(.headline)
                     }
 
-                    Text(profile.baseURL.absoluteString)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
+                    if let homeURL = navidromeConnection.homeBaseURL {
+                        endpointRow("HOME", url: homeURL)
+                    }
+
+                    if let remoteURL = navidromeConnection.remoteBaseURL {
+                        endpointRow("REMOTE", url: remoteURL)
+                    }
 
                     Text(profile.username)
                         .font(.callout)
@@ -258,14 +262,41 @@ struct LibraryConnectionView: View {
 
     private var navidromeSetupContent: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionTitle("SERVER")
+            sectionTitle("HOME ADDRESS")
 
-            TextField("https://example.com", text: $navidromeConnection.serverURL)
+            TextField(
+                "http://navidrome.local:4533",
+                text: $navidromeConnection.homeServerURL
+            )
                 .textFieldStyle(.roundedBorder)
+                #if os(iOS)
+                .textInputAutocapitalization(.never)
+                .keyboardType(.URL)
+                #endif
 
-            Text("Enter the address of your Navidrome server.")
+            Text("Used on your home network and by UPnP renderers. Optional if Remote Address is set.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
+
+            sectionTitle("REMOTE ADDRESS")
+                .padding(.top, 8)
+
+            TextField(
+                "https://music.example.com",
+                text: $navidromeConnection.remoteServerURL
+            )
+                .textFieldStyle(.roundedBorder)
+                #if os(iOS)
+                .textInputAutocapitalization(.never)
+                .keyboardType(.URL)
+                #endif
+
+            Text("Secure address used away from home. Optional if Home Address is set.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
+            sectionTitle("ACCOUNT")
+                .padding(.top, 8)
 
             TextField("Username", text: $navidromeConnection.username)
                 .textFieldStyle(.roundedBorder)
@@ -290,7 +321,10 @@ struct LibraryConnectionView: View {
                     }
             }
             .buttonStyle(.plain)
-            .disabled(navidromeConnection.isConnecting)
+            .disabled(
+                navidromeConnection.isConnecting
+                    || !hasEnteredNavidromeAddress
+            )
 
             if let errorMessage = navidromeConnection.errorMessage {
                 Text(errorMessage)
@@ -308,6 +342,27 @@ struct LibraryConnectionView: View {
             }
             #endif
         }
+    }
+
+    private func endpointRow(_ label: String, url: URL) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(label)
+                .font(.system(.caption, design: .monospaced).weight(.semibold))
+                .foregroundStyle(.secondary)
+            Text(url.absoluteString)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+        }
+    }
+
+    private var hasEnteredNavidromeAddress: Bool {
+        !navidromeConnection.homeServerURL.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        ).isEmpty
+            || !navidromeConnection.remoteServerURL.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            ).isEmpty
     }
 
     private var connectedSummary: some View {

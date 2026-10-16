@@ -59,6 +59,21 @@ nonisolated struct OpenSubsonicRequestBuilder: Sendable {
         )
     }
 
+    func songRequest(
+        profile: NavidromeServerProfile,
+        password: String,
+        salt: String,
+        songID: String
+    ) throws -> URLRequest {
+        try authenticatedRequest(
+            endpoint: "getSong",
+            profile: profile,
+            password: password,
+            salt: salt,
+            additionalParameters: ["id": songID]
+        )
+    }
+
     func streamRequest(
         profile: NavidromeServerProfile,
         password: String,
@@ -148,11 +163,14 @@ nonisolated struct OpenSubsonicRequestBuilder: Sendable {
             resolvingAgainstBaseURL: false
         ),
         let scheme = components.scheme?.lowercased(),
-        scheme == "https" || (allowsInsecureLocalHTTP && scheme == "http") else {
+        let host = components.host,
+        scheme == "https"
+            || (scheme == "http"
+                && (allowsInsecureLocalHTTP
+                    || NavidromeRendererServerURL.isLocalHost(host))) else {
             throw NavidromeConnectionError.secureConnectionRequired
         }
-        guard components.host != nil,
-              components.user == nil,
+        guard components.user == nil,
               components.password == nil,
               components.query == nil,
               components.fragment == nil else {

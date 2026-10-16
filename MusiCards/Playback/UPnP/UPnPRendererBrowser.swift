@@ -5,35 +5,31 @@ import Combine
 final class UPnPRendererBrowser: ObservableObject {
     enum DiscoveryMethod: String, CaseIterable, Identifiable {
         case multicast
-        case rememberedAddress
-        case passiveAlive
         case subnetSweep
+        case rememberedAddress
         case manualAddress
 
         var id: String { rawValue }
 
         var title: String {
             switch self {
-            case .multicast: "1  MULTICAST SSDP"
-            case .rememberedAddress: "2  REMEMBERED ADDRESS"
-            case .passiveAlive: "3  SSDP:ALIVE LISTENER"
-            case .subnetSweep: "4  DEEP SEARCH"
-            case .manualAddress: "5  MANUAL ADDRESS"
+            case .multicast: "MULTICAST SSDP"
+            case .subnetSweep: "DEEP SEARCH"
+            case .rememberedAddress: "STORED ADDRESS"
+            case .manualAddress: "MANUAL ADDRESS"
             }
         }
 
         var explanation: String {
             switch self {
             case .multicast:
-                "Standard M-SEARCH to 239.255.255.250."
+                "to 239.255.255.250"
             case .rememberedAddress:
-                "Directly retries renderers found successfully before."
-            case .passiveAlive:
-                "Listens for 3 seconds; silence is normal between announcements."
+                "saved renderer IP"
             case .subnetSweep:
-                "Direct M-SEARCH across the local /24 subnet."
+                "local /24 subnet"
             case .manualAddress:
-                "Final fallback using an address entered below."
+                "renderer IP"
             }
         }
     }
@@ -70,10 +66,12 @@ final class UPnPRendererBrowser: ObservableObject {
     }
 
     var selectionCommitHandler: (() -> Void)?
+    var selectedRendererResolvedHandler: (() -> Void)?
 
     private let discoveryService: UPnPRendererDiscoveryService
     private let userDefaults: UserDefaults
     private var searchTask: Task<Void, Never>?
+    private var passiveListeningTask: Task<Void, Never>?
     private var searchGeneration: UInt64 = 0
     private let knownRendererHostsKey = "UPnPKnownRendererHosts"
     private let selectedRendererIDKey = "UPnPSelectedRendererID"
@@ -100,6 +98,7 @@ final class UPnPRendererBrowser: ObservableObject {
 
     deinit {
         searchTask?.cancel()
+        passiveListeningTask?.cancel()
     }
 
     func state(for method: DiscoveryMethod) -> DiscoveryStageState {
@@ -123,6 +122,11 @@ final class UPnPRendererBrowser: ObservableObject {
             draftRendererID = renderer.id
             draftRenderer = renderer
         }
+    }
+
+    func clearDraftRendererSelection() {
+        draftRendererID = nil
+        draftRenderer = nil
     }
 
     func commitRendererSelection() {
@@ -161,8 +165,7 @@ final class UPnPRendererBrowser: ObservableObject {
         statusErrors = [:]
         for method in [
             DiscoveryMethod.multicast,
-            .rememberedAddress,
-            .passiveAlive
+            .rememberedAddress
         ] {
             setState(.waiting, for: method)
         }
@@ -197,14 +200,72 @@ final class UPnPRendererBrowser: ObservableObject {
                 ) else { return }
             }
 
+        }
+    }
+
+    func searchMulticast() {
+        beginNewSearch()
+        let generation = searchGeneration
+        searchTask = Task { [weak self, discoveryService] in
+            guard let self else { return }
             _ = await self.runStage(
-                .passiveAlive,
-                mode: .passive,
-                timeout: 3.0,
+                .multicast,
+                mode: .multicast,
+                timeout: 2.5,
                 generation: generation,
                 discoveryService: discoveryService
             )
         }
+    }
+
+    func searchRememberedAddresses() {
+        beginNewSearch()
+        let generation = searchGeneration
+        let knownHosts = userDefaults.stringArray(
+            forKey: knownRendererHostsKey
+        ) ?? []
+        guard !knownHosts.isEmpty else {
+            setState(
+                .unavailable("No successful renderer address is saved yet."),
+                for: .rememberedAddress
+            )
+            return
+        }
+        searchTask = Task { [weak self, discoveryService] in
+            guard let self else { return }
+            _ = await self.runStage(
+                .rememberedAddress,
+                mode: .unicast(hosts: knownHosts),
+                timeout: 2.5,
+                generation: generation,
+                discoveryService: discoveryService
+            )
+        }
+    }
+
+    func startPassiveListening() {
+        guard passiveListeningTask == nil else { return }
+        passiveListeningTask = Task { [weak self, discoveryService] in
+            while !Task.isCancelled {
+                do {
+                    let renderers = try await discoveryService.discover(
+                        timeout: 15,
+                        mode: .passive
+                    )
+                    try Task.checkCancellation()
+                    self?.mergePassiveRenderers(renderers)
+                } catch is CancellationError {
+                    return
+                } catch {
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                }
+            }
+        }
+    }
+
+    func stopPassiveListening() {
+        passiveListeningTask?.cancel()
+        passiveListeningTask = nil
     }
 
     func deepSearch() {
@@ -296,6 +357,31 @@ final class UPnPRendererBrowser: ObservableObject {
         )
     }
 
+    private func mergePassiveRenderers(
+        _ renderers: [UPnPRendererDescriptor]
+    ) {
+        guard !renderers.isEmpty else { return }
+        let existing: [UPnPRendererDescriptor]
+        if case let .found(current) = state(for: .multicast) {
+            existing = current
+        } else {
+            existing = []
+        }
+        var mergedByID = Dictionary(
+            uniqueKeysWithValues: existing.map { ($0.id, $0) }
+        )
+        for renderer in renderers {
+            mergedByID[renderer.id] = renderer
+        }
+        let merged = mergedByID.values.sorted {
+            $0.friendlyName.localizedCaseInsensitiveCompare($1.friendlyName)
+                == .orderedAscending
+        }
+        setState(.found(merged), for: .multicast)
+        rememberHosts(from: renderers)
+        reconcileSelection(with: renderers)
+    }
+
     private func reconcileSelection(
         with renderers: [UPnPRendererDescriptor]
     ) {
@@ -303,12 +389,16 @@ final class UPnPRendererBrowser: ObservableObject {
               let renderer = renderers.first(where: {
                   $0.id == selectedRendererID
               }) else { return }
+        let didResolveRenderer = selectedRenderer != renderer
         selectedRenderer = renderer
         selectedRendererDisplayName = renderer.friendlyName
         if draftRendererID == renderer.id {
             draftRenderer = renderer
         }
         userDefaults.set(renderer.friendlyName, forKey: selectedRendererNameKey)
+        if didResolveRenderer {
+            selectedRendererResolvedHandler?()
+        }
     }
 
     func checkStatus(of renderer: UPnPRendererDescriptor) {

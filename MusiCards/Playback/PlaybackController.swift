@@ -329,6 +329,54 @@ final class PlaybackController: ObservableObject {
         }
     }
 
+    func rendererSnapshot() async throws -> AVTransportSnapshot? {
+        guard let renderer = engine as? any RendererPlaybackSessionControlling
+        else { return nil }
+        return try await renderer.rendererSnapshot()
+    }
+
+    func adoptRendererPlayback(
+        queue newQueue: ReleasePlaybackQueue,
+        snapshot: AVTransportSnapshot
+    ) async throws {
+        guard let renderer = engine as? any RendererPlaybackSessionControlling,
+              newQueue.items.indices.contains(newQueue.selectedIndex) else {
+            return
+        }
+        _ = advancePlaybackGeneration()
+        queue = newQueue.items
+        currentIndex = newQueue.selectedIndex
+        let item = newQueue.items[newQueue.selectedIndex]
+        preparedItemID = item.id
+        position = snapshot.position.relativeTime ?? 0
+        preparedDuration = snapshot.position.duration ?? item.track.duration
+        preparedAudioFormat = item.track.audioFormat
+        status = .ready
+        do {
+            let resolved = try await resolvedItem(item)
+            try await renderer.adoptRendererSession(
+                item: resolved,
+                snapshot: snapshot
+            )
+        } catch {
+            queue = []
+            currentIndex = nil
+            preparedItemID = nil
+            position = 0
+            preparedDuration = nil
+            preparedAudioFormat = nil
+            status = .idle
+            throw error
+        }
+    }
+
+    func resolvedNextItemForRenderer() async throws -> PlaybackQueueItem? {
+        guard let currentIndex else { return nil }
+        let nextIndex = currentIndex + 1
+        guard queue.indices.contains(nextIndex) else { return nil }
+        return try await resolvedItem(queue[nextIndex])
+    }
+
     func seek(to requestedPosition: TimeInterval) async {
         guard currentItem != nil else { return }
         guard canSeek else {
@@ -396,6 +444,17 @@ final class PlaybackController: ObservableObject {
             status = .paused
         case .positionChanged(let position):
             self.position = max(position, 0)
+        case let .advancedToNext(itemID, duration, audioFormat, position):
+            guard let currentIndex else { return }
+            let nextIndex = currentIndex + 1
+            guard queue.indices.contains(nextIndex),
+                  queue[nextIndex].id == itemID else { return }
+            self.currentIndex = nextIndex
+            preparedItemID = itemID
+            preparedDuration = duration ?? queue[nextIndex].track.duration
+            preparedAudioFormat = audioFormat
+            self.position = max(position, 0)
+            status = .playing
         case .volumeChanged(let state):
             outputVolumeState = state
             outputVolumeErrorMessage = nil

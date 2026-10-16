@@ -79,6 +79,31 @@ actor OpenSubsonicClient {
         return album
     }
 
+    func song(
+        profile: NavidromeServerProfile,
+        password: String,
+        id: String
+    ) async throws -> OpenSubsonicSong {
+        let salt = try OpenSubsonicAuthentication.makeSalt()
+        let request = try requestBuilder.songRequest(
+            profile: profile,
+            password: password,
+            salt: salt,
+            songID: id
+        )
+        let envelope: OpenSubsonicSongEnvelope = try await response(
+            for: request
+        )
+        try validate(
+            status: envelope.response.status,
+            error: envelope.response.error
+        )
+        guard let song = envelope.response.song else {
+            throw NavidromeConnectionError.invalidResponse
+        }
+        return song
+    }
+
     private func response<Response: Decodable>(
         for request: URLRequest
     ) async throws -> Response {

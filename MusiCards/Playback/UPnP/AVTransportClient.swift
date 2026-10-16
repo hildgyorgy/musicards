@@ -42,6 +42,7 @@ nonisolated struct AVTransportSnapshot: Equatable, Sendable {
 nonisolated protocol AVTransportControlling: Sendable {
     func snapshot() async throws -> AVTransportSnapshot
     func setTransportURI(_ uri: URL, metadata: String) async throws
+    func setNextTransportURI(_ uri: URL?, metadata: String) async throws
     func play() async throws
     func pause() async throws
     func stop() async throws
@@ -116,6 +117,16 @@ nonisolated struct AVTransportClient: Sendable {
             arguments: [
                 ("CurrentURI", uri.absoluteString),
                 ("CurrentURIMetaData", metadata)
+            ]
+        )
+    }
+
+    func setNextTransportURI(_ uri: URL?, metadata: String) async throws {
+        _ = try await call(
+            action: "SetNextAVTransportURI",
+            arguments: [
+                ("NextURI", uri?.absoluteString ?? ""),
+                ("NextURIMetaData", uri == nil ? "" : metadata)
             ]
         )
     }

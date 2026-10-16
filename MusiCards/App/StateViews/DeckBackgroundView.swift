@@ -439,10 +439,7 @@ private struct PlaybackOutputStatusView: View {
         }
         .buttonStyle(.plain)
         .sheet(isPresented: $isShowingRendererLab) {
-            RendererDiscoveryView(
-                browser: rendererBrowser,
-                navidromeConnection: navidromeConnection
-            )
+            RendererDiscoveryView(browser: rendererBrowser)
         }
         #else
         statusContent

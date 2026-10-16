@@ -26,6 +26,12 @@ nonisolated protocol OpenSubsonicCatalogClientProtocol: Sendable {
         password: String,
         id: String
     ) async throws -> OpenSubsonicAlbum
+
+    func song(
+        profile: NavidromeServerProfile,
+        password: String,
+        id: String
+    ) async throws -> OpenSubsonicSong
 }
 
 extension OpenSubsonicClient: OpenSubsonicCatalogClientProtocol {}
@@ -412,6 +418,76 @@ final class NavidromeLibraryProvider: ObservableObject, LibraryProvider {
         )
     }
 
+    /// Reconstructs the album queue around a song URI reported by a renderer.
+    /// The returned items already own remote assets so adopting playback does
+    /// not depend on which release details happen to be cached in the UI.
+    func playbackQueue(
+        containingNavidromeSongID songID: String
+    ) async throws -> ReleasePlaybackQueue {
+        let credentials = try connection.catalogCredentials()
+        let currentSong = try await client.song(
+            profile: credentials.profile,
+            password: credentials.password,
+            id: songID
+        )
+        guard let albumID = currentSong.albumID?.nilIfBlank else {
+            throw PlaybackAssetResolutionError.assetUnavailable
+        }
+        let album = try await client.album(
+            profile: credentials.profile,
+            password: credentials.password,
+            id: albumID
+        )
+        let fallbackArtist = album.artist?.nilIfBlank
+            ?? album.artists.map(\.name).joined(separator: ", ")
+        let releaseID = Self.releaseID(from: album.musicBrainzID)
+        var selectedIndex: Int?
+        var items = [PlaybackQueueItem]()
+
+        for song in album.songs {
+            guard let mediaSize = song.size, mediaSize > 0 else { continue }
+            if song.id == songID {
+                selectedIndex = items.count
+            }
+            let provider = NavidromeRemoteAudioByteSourceProvider(
+                connection: connection,
+                songID: song.id,
+                mediaSize: mediaSize
+            )
+            let asset = RemotePlaybackAsset(
+                source: source,
+                providerItemID: song.id,
+                displayName: "NAVIDROME",
+                mediaSize: mediaSize,
+                suffix: song.suffix,
+                contentType: song.contentType,
+                byteSourceProvider: provider
+            )
+            let track = PlaybackTrack(
+                id: song.id,
+                releaseTrackID: nil,
+                recordingID: Self.recordingID(from: song.musicBrainzID),
+                releaseID: releaseID,
+                title: song.title?.nilIfBlank ?? "Unknown track",
+                artist: song.artist?.nilIfBlank ?? fallbackArtist,
+                albumTitle: song.album?.nilIfBlank ?? album.name,
+                duration: song.duration.map(TimeInterval.init),
+                artworkData: nil,
+                discNumber: song.discNumber,
+                trackNumber: song.track,
+                audioFormat: Self.playbackAudioFormat(for: song)
+            )
+            items.append(
+                PlaybackQueueItem(track: track, source: .remoteAudio(asset))
+            )
+        }
+
+        guard let selectedIndex, !items.isEmpty else {
+            throw PlaybackAssetResolutionError.assetUnavailable
+        }
+        return ReleasePlaybackQueue(items: items, selectedIndex: selectedIndex)
+    }
+
     private func invalidateCatalog() {
         catalogGeneration += 1
         catalogRefreshTask?.cancel()
@@ -645,5 +721,11 @@ final class NavidromeLibraryProvider: ObservableObject, LibraryProvider {
             bitrate: song.bitRate.map { Double($0) * 1_000 },
             channelCount: channelCount
         )
+    }
+}
+
+private extension String {
+    var nilIfBlank: String? {
+        trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : self
     }
 }

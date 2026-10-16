@@ -142,7 +142,7 @@ struct ContentView: View {
                         appModel.playSelectedRelease()
                     },
                     onSelectArtist: { artistID in
-                        appModel.selectArtist(id: artistID)
+                        selectArtistAfterViewUpdate(id: artistID)
                     }
                 )
             }
@@ -152,7 +152,7 @@ struct ContentView: View {
                     title: release.title,
                     artistCredits: release.artistCredit,
                     onSelectArtist: { artistID in
-                        appModel.selectArtist(id: artistID)
+                        selectArtistAfterViewUpdate(id: artistID)
                     }
                 )
             } else {
@@ -170,7 +170,7 @@ struct ContentView: View {
                     controller: appModel.playbackController,
                     detailStore: appModel.trackDetailStore,
                     onSelectArtist: { artistID in
-                        appModel.selectArtist(id: artistID)
+                        selectArtistAfterViewUpdate(id: artistID)
                     }
                 )
             } else {
@@ -219,12 +219,10 @@ struct ContentView: View {
                     appModel.addRecentRelease(row)
                 },
                 onSelectArtist: { artist in
-                    appModel.selectArtist(artist)
-                    appModel.addRecentArtist(artist)
+                    selectArtistAfterViewUpdate(artist, addToRecents: true)
                 },
                 onSelectRecentArtist: { artist in
-                    appModel.selectArtist(artist)
-                    appModel.addRecentArtist(artist)
+                    selectArtistAfterViewUpdate(artist, addToRecents: true)
                 },
                 onSelectRecentRelease: { release in
                     appModel.selectRecentRelease(release)
@@ -271,7 +269,7 @@ struct ContentView: View {
             TracksCardContentView(
                 release: appModel.selectedRelease,
                 onSelectArtist: { artistID in
-                    appModel.selectArtist(id: artistID)
+                    selectArtistAfterViewUpdate(id: artistID)
                 },
                 libraryManager: appModel.libraryManager,
                 playbackController: appModel.playbackController,
@@ -450,6 +448,9 @@ struct ContentView: View {
             value: appModel.isBlockingNavigationLoad
         )
         .animation(.spring(duration: 0.35), value: isShowingAbout)
+        .onAppear {
+            appModel.refreshActiveLibraryIfNeeded()
+        }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
                 appModel.refreshActiveLibraryIfNeeded()
@@ -479,6 +480,30 @@ struct ContentView: View {
         Task { @MainActor in
             await Task.yield()
             isFolderImporterPresented = true
+        }
+    }
+
+    /// Artist links can be activated by SwiftUI while it is still completing
+    /// the current view update (notably from the player's detail pager). Move
+    /// the model mutation to the next MainActor turn so its published changes
+    /// start a fresh update transaction.
+    private func selectArtistAfterViewUpdate(id: String) {
+        Task { @MainActor in
+            await Task.yield()
+            appModel.selectArtist(id: id)
+        }
+    }
+
+    private func selectArtistAfterViewUpdate(
+        _ artist: SearchArtistRow,
+        addToRecents: Bool
+    ) {
+        Task { @MainActor in
+            await Task.yield()
+            appModel.selectArtist(artist)
+            if addToRecents {
+                appModel.addRecentArtist(artist)
+            }
         }
     }
 

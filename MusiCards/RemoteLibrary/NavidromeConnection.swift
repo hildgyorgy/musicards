@@ -101,7 +101,7 @@ nonisolated enum NavidromeRendererServerURL {
         return url
     }
 
-    private static func isLocalHost(_ host: String) -> Bool {
+    static func isLocalHost(_ host: String) -> Bool {
         let normalized = host.lowercased()
         if normalized.hasSuffix(".local") || !normalized.contains(".") {
             return true

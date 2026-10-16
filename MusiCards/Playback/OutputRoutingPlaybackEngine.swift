@@ -166,3 +166,30 @@ extension OutputRoutingPlaybackEngine: PlaybackVolumeControlling {
         return try await rendererEngine.setOutputMuted(isMuted)
     }
 }
+
+extension OutputRoutingPlaybackEngine: RendererPlaybackSessionControlling {
+    func rendererSnapshot() async throws -> AVTransportSnapshot? {
+        guard case .renderer(let renderer) = selection() else { return nil }
+        rendererEngine.configure(renderer: renderer)
+        return try await rendererEngine.rendererSnapshot()
+    }
+
+    func adoptRendererSession(
+        item: PlaybackQueueItem,
+        snapshot: AVTransportSnapshot
+    ) async throws {
+        guard case .renderer(let renderer) = selection() else {
+            throw UPnPPlaybackError.rendererUnavailable("network renderer")
+        }
+        if activeRoute == .system {
+            await systemEngine.stop()
+        }
+        preparedItem = item
+        rendererEngine.configure(renderer: renderer)
+        activeRoute = .renderer(renderer.id)
+        try await rendererEngine.adoptRendererSession(
+            item: item,
+            snapshot: snapshot
+        )
+    }
+}

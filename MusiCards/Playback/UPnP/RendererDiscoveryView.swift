@@ -1,183 +1,271 @@
 import SwiftUI
 
 struct RendererDiscoveryView: View {
+    private enum OutputKind {
+        case systemAudio
+        case upnpRenderer
+    }
+
     @ObservedObject var browser: UPnPRendererBrowser
-    @ObservedObject var navidromeConnection: NavidromeConnectionStore
     @Environment(\.dismiss) private var dismiss
-    @State private var rendererAddress = ""
-    @State private var rendererServerAddress = ""
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @State private var rendererAddress = "192.168."
+    @State private var selectedOutputKind: OutputKind = .systemAudio
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                header
-
-                Text("Select one renderer, then provide a Navidrome address it can reach.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-
+        Group {
+            #if os(macOS)
+            content
+                .frame(width: MacWindowMetrics.contentSize.width - 4)
+                .fixedSize(horizontal: false, vertical: true)
+            #else
+            ScrollView {
                 content
             }
-            .padding(24)
+            .scrollIndicators(.hidden)
+            .frame(
+                minWidth: 360,
+                idealWidth: 440,
+                minHeight: 360,
+                idealHeight: 520
+            )
+            #endif
         }
-        .scrollIndicators(.hidden)
-        .frame(minWidth: 360, idealWidth: 440, minHeight: 360, idealHeight: 520)
         .onAppear {
             browser.beginRendererSelection()
-            rendererServerAddress = navidromeConnection.rendererServerURL?
-                .absoluteString ?? ""
-            if !browser.hasStartedAutomaticDiscovery {
+            selectedOutputKind = browser.draftRendererID == nil
+                ? .systemAudio
+                : .upnpRenderer
+            if selectedOutputKind == .upnpRenderer,
+               !browser.hasStartedAutomaticDiscovery {
                 browser.refresh()
             }
+            if selectedOutputKind == .upnpRenderer {
+                browser.startPassiveListening()
+            }
         }
+        .onDisappear { browser.stopPassiveListening() }
         #if os(iOS)
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
         #endif
     }
 
+    private var content: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            header
+
+            outputKindPicker
+
+            if selectedOutputKind == .upnpRenderer {
+                upnpContent
+            } else {
+                systemAudioContent
+            }
+        }
+        .padding(24)
+    }
+
     private var header: some View {
-        HStack {
-            Text("NETWORK RENDERER LAB")
+        ZStack {
+            Text("AUDIO OUTPUT")
                 .font(.system(.headline, design: .monospaced))
                 .tracking(2)
 
-            Spacer()
+            HStack {
+                Button {
+                    browser.cancelRendererSelection()
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.title3.weight(.medium))
+                        .frame(width: 36, height: 36)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Cancel")
 
-            Button("CANCEL") {
-                browser.cancelRendererSelection()
-                dismiss()
-            }
-            .font(.system(.footnote, design: .monospaced).weight(.semibold))
-            .buttonStyle(.plain)
+                Spacer()
 
-            Button("OK") {
-                browser.commitRendererSelection()
-                dismiss()
+                Button("OK") {
+                    browser.commitRendererSelection()
+                    dismiss()
+                }
+                .font(.system(.footnote, design: .monospaced).weight(.bold))
+                .buttonStyle(.borderedProminent)
+                .clipShape(Capsule())
+                .disabled(
+                    selectedOutputKind == .upnpRenderer
+                        && browser.draftRendererID == nil
+                )
             }
-            .font(.system(.footnote, design: .monospaced).weight(.bold))
-            .buttonStyle(.borderedProminent)
         }
     }
 
-    @ViewBuilder
-    private var content: some View {
-        rendererServerSection
+    private var outputKindPicker: some View {
+        HStack(spacing: 8) {
+            Text("SYSTEM AUDIO")
+                .foregroundStyle(
+                    selectedOutputKind == .systemAudio
+                        ? .primary
+                        : .secondary
+                )
 
-        LazyVStack(spacing: 14) {
-            ForEach(UPnPRendererBrowser.DiscoveryMethod.allCases) { method in
-                discoverySection(method)
-            }
+            Toggle(
+                "",
+                isOn: Binding(
+                    get: { selectedOutputKind == .upnpRenderer },
+                    set: setUsesUPnPRenderer
+                )
+            )
+            .toggleStyle(.switch)
+            .tint(.blue)
+            .labelsHidden()
+
+            Text("UPNP RENDERER")
+                .foregroundStyle(
+                    selectedOutputKind == .upnpRenderer
+                        ? .primary
+                        : .secondary
+                )
         }
-
-        Button("RUN AUTOMATIC TESTS AGAIN") { browser.refresh() }
-            .font(.system(.footnote, design: .monospaced).weight(.semibold))
-            .buttonStyle(.plain)
-            .disabled(browser.isSearching)
-            .frame(maxWidth: .infinity)
-            .padding(.top, 6)
+        .font(.caption)
+        .tracking(1.5)
+        .frame(maxWidth: .infinity)
+        .padding(.top, 2)
     }
 
-    private var rendererServerSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("NAVIDROME ADDRESS FOR RENDERER")
+    private var systemAudioContent: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("SYSTEM AUDIO")
                 .font(.system(.caption, design: .monospaced).weight(.bold))
                 .tracking(1.2)
 
-            Text(
-                "Use a home-network address the renderer can open, for example http://umbrel.local:4533. The app keeps using the normal HTTPS address and reuses the same saved account."
-            )
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-
-            TextField(
-                "http://umbrel.local:4533",
-                text: $rendererServerAddress
-            )
-            .textFieldStyle(.roundedBorder)
-            #if os(iOS)
-            .textInputAutocapitalization(.never)
-            .keyboardType(.URL)
-            #endif
-
-            HStack(spacing: 10) {
-                Button {
-                    Task {
-                        await navidromeConnection
-                            .verifyAndSaveRendererServerURL(
-                                rendererServerAddress
-                            )
-                    }
-                } label: {
-                    Text(
-                        navidromeConnection.isVerifyingRendererServer
-                            ? "VERIFYING…" : "VERIFY & SAVE"
-                    )
-                }
-                .font(.system(.footnote, design: .monospaced).weight(.semibold))
-                .buttonStyle(.borderedProminent)
-                .disabled(
-                    navidromeConnection.isVerifyingRendererServer
-                        || rendererServerAddress.trimmingCharacters(
-                            in: .whitespacesAndNewlines
-                        ).isEmpty
-                )
-
-                Button("USE NORMAL ADDRESS") {
-                    navidromeConnection.useNormalServerAddressForRenderer()
-                    rendererServerAddress = ""
-                }
-                .font(.system(.caption, design: .monospaced).weight(.semibold))
-                .buttonStyle(.plain)
-            }
-
-            if let message = navidromeConnection.rendererServerStatusMessage {
-                Text(message)
-                    .font(.caption)
-                    .foregroundStyle(.green)
-            }
-            if let message = navidromeConnection.rendererServerErrorMessage {
-                Text(message)
-                    .font(.caption)
-                    .foregroundStyle(.red)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            Text("Sound follows the output selected in the system, such as built-in speakers, headphones, Bluetooth or AirPlay.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
         .background(.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 14))
+    }
+
+    @ViewBuilder
+    private var upnpContent: some View {
+        Text("FIND AND SELECT UPNP RENDERER")
+            .font(.system(.caption, design: .monospaced).weight(.semibold))
+            .tracking(1.5)
+
+        LazyVStack(spacing: 0) {
+            ForEach(
+                Array(UPnPRendererBrowser.DiscoveryMethod.allCases.enumerated()),
+                id: \.element.id
+            ) { index, method in
+                discoverySection(method)
+                if index < UPnPRendererBrowser.DiscoveryMethod.allCases.count - 1 {
+                    Divider()
+                }
+            }
+        }
+        .padding(.horizontal, 14)
+        .background(
+            .primary.opacity(0.045),
+            in: RoundedRectangle(cornerRadius: 18)
+        )
+    }
+
+    private func setUsesUPnPRenderer(_ usesUPnPRenderer: Bool) {
+        if usesUPnPRenderer {
+            selectedOutputKind = .upnpRenderer
+            browser.beginRendererSelection()
+            browser.startPassiveListening()
+            if !browser.hasStartedAutomaticDiscovery {
+                browser.refresh()
+            }
+        } else {
+            selectedOutputKind = .systemAudio
+            browser.stopPassiveListening()
+            browser.clearDraftRendererSelection()
+        }
     }
 
     private func discoverySection(
         _ method: UPnPRendererBrowser.DiscoveryMethod
     ) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(method.title)
-                .font(.system(.caption, design: .monospaced).weight(.bold))
-                .tracking(1.2)
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Text("- \(method.title)")
+                    .font(.system(.caption, design: .monospaced).weight(.bold))
+                    .tracking(1.2)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
 
-            Text(method.explanation)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+                if horizontalSizeClass != .compact {
+                    Text(method.explanation)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
 
-            stageResult(browser.state(for: method))
-
-            if method == .subnetSweep {
-                Button("RUN DEEP SEARCH") { browser.deepSearch() }
-                    .font(.system(.footnote, design: .monospaced).weight(.semibold))
-                    .buttonStyle(.borderedProminent)
-                    .disabled(browser.isSearching)
+                Spacer(minLength: 8)
+                discoveryAction(for: method)
             }
 
             if method == .manualAddress {
                 manualAddressControls
             }
+
+            stageResult(browser.state(for: method))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
-        .background(.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 14))
+        .padding(.vertical, 14)
+    }
+
+    @ViewBuilder
+    private func discoveryAction(
+        for method: UPnPRendererBrowser.DiscoveryMethod
+    ) -> some View {
+        switch method {
+        case .multicast:
+            compactRunButton("RUN", action: browser.searchMulticast)
+        case .rememberedAddress:
+            compactRunButton("RUN", action: browser.searchRememberedAddresses)
+        case .subnetSweep:
+            compactRunButton("RUN", action: browser.deepSearch)
+        case .manualAddress:
+            EmptyView()
+        }
+    }
+
+    private func compactRunButton(
+        _ title: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        monochromePillButton(
+            title,
+            isDisabled: browser.isSearching,
+            action: action
+        )
+    }
+
+    private func monochromePillButton(
+        _ title: String,
+        isDisabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(title, action: action)
+            .font(.system(.caption, design: .monospaced).weight(.bold))
+            .foregroundStyle(colorScheme == .dark ? Color.black : Color.white)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 7)
+            .background(
+                colorScheme == .dark ? Color.white : Color.black,
+                in: Capsule()
+            )
+            .buttonStyle(.plain)
+            .opacity(isDisabled ? 0.45 : 1)
+            .disabled(isDisabled)
     }
 
     @ViewBuilder
@@ -186,24 +274,21 @@ struct RendererDiscoveryView: View {
     ) -> some View {
         switch state {
         case .waiting:
-            resultLabel("WAITING", color: .secondary)
+            placeholderRendererRow()
         case .searching:
-            HStack(spacing: 8) {
-                ProgressView().controlSize(.small)
-                resultLabel("SEARCHING…", color: .secondary)
-            }
+            placeholderRendererRow("SEARCHING…", showsProgress: true)
         case .noResult:
-            resultLabel("NO RENDERER FOUND", color: .orange)
+            placeholderRendererRow("NO RENDERER FOUND", color: .orange)
         case let .unavailable(message):
             VStack(alignment: .leading, spacing: 3) {
-                resultLabel("NOT AVAILABLE", color: .secondary)
+                placeholderRendererRow("NOT AVAILABLE")
                 Text(message)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
         case let .failed(message):
             VStack(alignment: .leading, spacing: 3) {
-                resultLabel("ERROR", color: .red)
+                placeholderRendererRow("ERROR", color: .red)
                 Text(message)
                     .font(.caption)
                     .foregroundStyle(.red)
@@ -218,10 +303,37 @@ struct RendererDiscoveryView: View {
         }
     }
 
-    private func resultLabel(_ text: String, color: Color) -> some View {
-        Text(text)
-            .font(.system(.caption, design: .monospaced).weight(.semibold))
-            .foregroundStyle(color)
+    private func placeholderRendererRow(
+        _ status: String? = nil,
+        color: Color = .secondary,
+        showsProgress: Bool = false
+    ) -> some View {
+        HStack(alignment: .center, spacing: 12) {
+            HStack(spacing: 8) {
+                if showsProgress {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+                if let status {
+                    Text(status)
+                        .font(
+                            .system(
+                                .caption,
+                                design: .monospaced
+                            ).weight(.semibold)
+                        )
+                        .foregroundStyle(color)
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 37, alignment: .center)
+            .background(.primary.opacity(0.055), in: Capsule())
+
+            Image(systemName: "circle")
+                .font(.title2)
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var manualAddressControls: some View {
@@ -233,75 +345,42 @@ struct RendererDiscoveryView: View {
                 .textInputAutocapitalization(.never)
                 #endif
 
-            Button("FIND") {
-                browser.findRenderer(at: rendererAddress)
-            }
-            .font(.system(.footnote, design: .monospaced).weight(.semibold))
-            .buttonStyle(.bordered)
-            .disabled(
-                browser.isSearching
+            monochromePillButton(
+                "FIND",
+                isDisabled: browser.isSearching
                     || rendererAddress.trimmingCharacters(
                         in: .whitespacesAndNewlines
-                    ).isEmpty
+                    ).isEmpty,
+                action: {
+                    browser.findRenderer(at: rendererAddress)
+                }
             )
         }
     }
 
     private func rendererRow(_ renderer: UPnPRendererDescriptor) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline) {
+        HStack(alignment: .center, spacing: 12) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
                 Text(renderer.friendlyName)
                     .font(.headline)
-                Spacer()
-                resultLabel("FOUND", color: .green)
-                selectionButton(for: renderer)
-            }
+                    .lineLimit(1)
 
-            if let modelName = renderer.modelName {
-                Text(modelName)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                Spacer(minLength: 8)
+                if let host = renderer.descriptionURL.host {
+                    Text(host)
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                }
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 9)
+            .background(.primary.opacity(0.055), in: Capsule())
 
-            if let host = renderer.descriptionURL.host {
-                Text(host)
-                    .font(.system(.caption, design: .monospaced))
-                    .foregroundStyle(.secondary)
-            }
-
-            Text(capabilityText(renderer.capabilities))
-                .font(.system(.caption, design: .monospaced))
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-
-            if let snapshot = browser.snapshots[renderer.id] {
-                Text(snapshotText(snapshot))
-                    .font(.system(.caption, design: .monospaced))
-                    .foregroundStyle(.primary)
-            }
-
-            if let error = browser.statusErrors[renderer.id] {
-                Text(error)
-                    .font(.footnote)
-                    .foregroundStyle(.red)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            Button {
-                browser.checkStatus(of: renderer)
-            } label: {
-                Text(
-                    browser.checkingRendererIDs.contains(renderer.id)
-                        ? "CHECKING…" : "CHECK TRANSPORT"
-                )
-                .font(.system(.footnote, design: .monospaced).weight(.semibold))
-            }
-            .buttonStyle(.bordered)
-            .disabled(browser.checkingRendererIDs.contains(renderer.id))
+            selectionButton(for: renderer)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(.primary.opacity(0.055), in: RoundedRectangle(cornerRadius: 10))
     }
 
     private func selectionButton(
@@ -311,8 +390,8 @@ struct RendererDiscoveryView: View {
         return Button {
             browser.toggleDraftSelection(of: renderer)
         } label: {
-            Image(systemName: isSelected ? "checkmark.square.fill" : "square")
-                .font(.title3)
+            Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
+                .font(.title2)
                 .foregroundStyle(isSelected ? Color.accentColor : .secondary)
         }
         .buttonStyle(.plain)
@@ -324,24 +403,4 @@ struct RendererDiscoveryView: View {
         .accessibilityValue(isSelected ? "Selected" : "Not selected")
     }
 
-    private func capabilityText(_ capabilities: UPnPRendererCapabilities) -> String {
-        var values: [String] = []
-        if capabilities.supportsPlay { values.append("PLAY") }
-        if capabilities.supportsPause { values.append("PAUSE") }
-        if capabilities.supportsStop { values.append("STOP") }
-        if capabilities.supportsSeek { values.append("SEEK") }
-        if capabilities.supportsSetNext { values.append("SET NEXT") }
-        return values.isEmpty ? "CAPABILITIES: UNKNOWN" : values.joined(separator: " • ")
-    }
-
-    private func snapshotText(_ snapshot: AVTransportSnapshot) -> String {
-        let position = snapshot.position.relativeTime.map(durationText) ?? "—"
-        let duration = snapshot.position.duration.map(durationText) ?? "—"
-        return "STATE: \(snapshot.transport.state)\nPOSITION: \(position) / \(duration)"
-    }
-
-    private func durationText(_ interval: TimeInterval) -> String {
-        let total = max(0, Int(interval.rounded()))
-        return String(format: "%d:%02d", total / 60, total % 60)
-    }
 }

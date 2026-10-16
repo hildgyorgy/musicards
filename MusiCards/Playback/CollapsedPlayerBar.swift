@@ -253,7 +253,7 @@ struct CollapsedPlayerBar: View {
     private let controlFont: Font = .body
     private let titleFont: Font = .caption.weight(.medium)
     private let timeFont: Font = .caption
-    private let metadataRowHeight: CGFloat = 18
+    private let metadataRowHeight: CGFloat = 15
     private let seekHitHeight: CGFloat = 16
     private let idleSeekHeight: CGFloat = 3
     private let activeSeekHeight: CGFloat = 7
@@ -264,7 +264,7 @@ struct CollapsedPlayerBar: View {
     private let controlFont: Font = .title3
     private let titleFont: Font = .subheadline.weight(.medium)
     private let timeFont: Font = .caption
-    private let metadataRowHeight: CGFloat = 20
+    private let metadataRowHeight: CGFloat = 17
     private let seekHitHeight: CGFloat = 20
     private let idleSeekHeight: CGFloat = 3
     private let activeSeekHeight: CGFloat = 7

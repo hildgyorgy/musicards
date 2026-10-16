@@ -454,6 +454,62 @@ final class NavidromeLibraryProviderTests: XCTestCase {
         XCTAssertEqual(detailRequestsAfterSearch, detailRequestsAfterRefresh)
     }
 
+    @MainActor
+    func testPlaybackQueueReconstructsAlbumAroundRendererSong() async throws {
+        let first = song(
+            id: "song-1",
+            musicBrainzID: uniqueRecordingID,
+            albumID: "album-1",
+            track: 1,
+            title: "First",
+            suffix: "flac",
+            contentType: "audio/flac",
+            size: 1_000,
+            duration: 180
+        )
+        let second = song(
+            id: "song-2",
+            musicBrainzID: duplicateRecordingID,
+            albumID: "album-1",
+            track: 2,
+            title: "Second",
+            suffix: "m4a",
+            contentType: "audio/mp4",
+            size: 2_000,
+            duration: 240
+        )
+        let provider = NavidromeLibraryProvider(
+            connection: CatalogConnectionStub(),
+            client: CatalogClientStub(
+                details: [
+                    "album-1": album(
+                        id: "album-1",
+                        name: "Renderer Album",
+                        musicBrainzID: listReleaseID,
+                        artist: "Album Artist",
+                        songs: [first, second]
+                    )
+                ]
+            )
+        )
+
+        let queue = try await provider.playbackQueue(
+            containingNavidromeSongID: "song-2"
+        )
+
+        XCTAssertEqual(queue.selectedIndex, 1)
+        XCTAssertEqual(queue.items.map(\.id), ["song-1", "song-2"])
+        XCTAssertEqual(queue.items.map(\.track.title), ["First", "Second"])
+        XCTAssertEqual(queue.items.map(\.track.albumTitle), [
+            "Renderer Album", "Renderer Album"
+        ])
+        guard case .remoteAudio(let asset) = queue.items[1].source else {
+            return XCTFail("Expected a resolved Navidrome asset")
+        }
+        XCTAssertEqual(asset.providerItemID, "song-2")
+        XCTAssertEqual(asset.suffix, "m4a")
+    }
+
     private func album(
         id: String,
         name: String? = nil,
@@ -479,6 +535,7 @@ final class NavidromeLibraryProviderTests: XCTestCase {
     private func song(
         id: String,
         musicBrainzID: String?,
+        albumID: String? = nil,
         discNumber: Int? = nil,
         track: Int? = nil,
         title: String? = nil,
@@ -489,6 +546,7 @@ final class NavidromeLibraryProviderTests: XCTestCase {
     ) -> OpenSubsonicSong {
         OpenSubsonicSong(
             id: id,
+            albumID: albumID,
             musicBrainzID: musicBrainzID,
             discNumber: discNumber,
             track: track,
@@ -573,6 +631,20 @@ private actor CatalogClientStub: OpenSubsonicCatalogClientProtocol {
         detailIDs.append(id)
         guard let album = details[id] else { throw CatalogTestError.failed }
         return album
+    }
+
+    func song(
+        profile: NavidromeServerProfile,
+        password: String,
+        id: String
+    ) async throws -> OpenSubsonicSong {
+        guard let song = details.values
+            .lazy
+            .flatMap(\.songs)
+            .first(where: { $0.id == id }) else {
+            throw CatalogTestError.failed
+        }
+        return song
     }
 
     func requestedOffsets() -> [Int] {

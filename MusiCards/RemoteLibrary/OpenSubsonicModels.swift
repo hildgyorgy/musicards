@@ -77,6 +77,20 @@ nonisolated struct OpenSubsonicAlbumResponse: Decodable, Sendable {
     let error: OpenSubsonicServerError?
 }
 
+nonisolated struct OpenSubsonicSongEnvelope: Decodable, Sendable {
+    let response: OpenSubsonicSongResponse
+
+    enum CodingKeys: String, CodingKey {
+        case response = "subsonic-response"
+    }
+}
+
+nonisolated struct OpenSubsonicSongResponse: Decodable, Sendable {
+    let status: OpenSubsonicStatus
+    let song: OpenSubsonicSong?
+    let error: OpenSubsonicServerError?
+}
+
 nonisolated struct OpenSubsonicAlbum: Decodable, Equatable, Sendable {
     let id: String
     let name: String
@@ -137,6 +151,9 @@ nonisolated struct OpenSubsonicArtist: Decodable, Equatable, Sendable {
 
 nonisolated struct OpenSubsonicSong: Decodable, Equatable, Sendable {
     let id: String
+    let albumID: String?
+    let album: String?
+    let artist: String?
     let musicBrainzID: String?
     let discNumber: Int?
     let track: Int?
@@ -152,6 +169,9 @@ nonisolated struct OpenSubsonicSong: Decodable, Equatable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case id
+        case albumID = "albumId"
+        case album
+        case artist
         case musicBrainzID = "musicBrainzId"
         case discNumber
         case track
@@ -168,6 +188,9 @@ nonisolated struct OpenSubsonicSong: Decodable, Equatable, Sendable {
 
     init(
         id: String,
+        albumID: String? = nil,
+        album: String? = nil,
+        artist: String? = nil,
         musicBrainzID: String?,
         discNumber: Int? = nil,
         track: Int? = nil,
@@ -182,6 +205,9 @@ nonisolated struct OpenSubsonicSong: Decodable, Equatable, Sendable {
         channelCount: Int? = nil
     ) {
         self.id = id
+        self.albumID = albumID
+        self.album = album
+        self.artist = artist
         self.musicBrainzID = musicBrainzID
         self.discNumber = discNumber
         self.track = track

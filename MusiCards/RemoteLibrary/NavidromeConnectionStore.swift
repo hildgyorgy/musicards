@@ -4,26 +4,67 @@ import Foundation
 @MainActor
 final class NavidromeConnectionStore: ObservableObject {
     @Published var serverName = ""
-    @Published var serverURL = ""
+    @Published var homeServerURL = ""
+    @Published var remoteServerURL = ""
     @Published var username = ""
     @Published var password = ""
 
     @Published private(set) var savedProfile: NavidromeServerProfile?
     @Published private(set) var identity: NavidromeServerIdentity?
+    @Published private(set) var homeBaseURL: URL?
+    @Published private(set) var remoteBaseURL: URL?
     @Published private(set) var isConnecting = false
     @Published private(set) var statusMessage: String?
     @Published private(set) var errorMessage: String?
     @Published private(set) var hasStoredPassword = false
-    @Published private(set) var rendererServerURL: URL?
-    @Published private(set) var isVerifyingRendererServer = false
-    @Published private(set) var rendererServerStatusMessage: String?
-    @Published private(set) var rendererServerErrorMessage: String?
 
     private struct PersistedConnection: Codable {
         let profile: NavidromeServerProfile
         let identity: NavidromeServerIdentity
+        let homeBaseURL: URL?
+        let remoteBaseURL: URL?
+
+        init(
+            profile: NavidromeServerProfile,
+            identity: NavidromeServerIdentity,
+            homeBaseURL: URL?,
+            remoteBaseURL: URL?
+        ) {
+            self.profile = profile
+            self.identity = identity
+            self.homeBaseURL = homeBaseURL
+            self.remoteBaseURL = remoteBaseURL
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case profile
+            case identity
+            case homeBaseURL
+            case remoteBaseURL
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            profile = try container.decode(
+                NavidromeServerProfile.self,
+                forKey: .profile
+            )
+            identity = try container.decode(
+                NavidromeServerIdentity.self,
+                forKey: .identity
+            )
+            homeBaseURL = try container.decodeIfPresent(
+                URL.self,
+                forKey: .homeBaseURL
+            )
+            remoteBaseURL = try container.decodeIfPresent(
+                URL.self,
+                forKey: .remoteBaseURL
+            )
+        }
     }
 
+    /// Kept only so existing installations can migrate the old OUTPUT setting.
     private struct PersistedRendererConnection: Codable {
         let profileID: UUID
         let baseURL: URL
@@ -32,6 +73,7 @@ final class NavidromeConnectionStore: ObservableObject {
     private let defaults: UserDefaults
     private let credentialStore: NavidromeCredentialStore
     private let client: OpenSubsonicClient
+    private let reachabilityClient: OpenSubsonicClient
     private let storageKey = "NavidromeServerConnection.v1"
     private let rendererStorageKey = "NavidromeRendererConnection.v1"
 
@@ -43,6 +85,13 @@ final class NavidromeConnectionStore: ObservableObject {
         self.defaults = defaults
         self.credentialStore = credentialStore
         self.client = client
+
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = 2.5
+        configuration.timeoutIntervalForResource = 4
+        self.reachabilityClient = OpenSubsonicClient(
+            session: URLSession(configuration: configuration)
+        )
         loadSavedConnection()
     }
 
@@ -59,43 +108,87 @@ final class NavidromeConnectionStore: ObservableObject {
         defer { isConnecting = false }
 
         do {
-            let profile = try NavidromeServerProfile.validated(
-                id: savedProfile?.id ?? UUID(),
-                name: serverName,
-                serverURL: serverURL,
-                username: username
+            let trimmedUsername = username.trimmingCharacters(
+                in: .whitespacesAndNewlines
             )
+            guard !trimmedUsername.isEmpty else {
+                throw NavidromeProfileValidationError.usernameRequired
+            }
+
+            let profileID = savedProfile?.id ?? UUID()
+            let name = serverName.trimmingCharacters(in: .whitespacesAndNewlines)
+            let verifiedHomeURL = try validatedHomeAddress(homeServerURL)
+            let verifiedRemoteURL = try validatedRemoteAddress(remoteServerURL)
+            guard verifiedHomeURL != nil || verifiedRemoteURL != nil else {
+                throw NavidromeConnectionStoreError.addressRequired
+            }
 
             let enteredPassword = password
             let connectionPassword: String
             if !enteredPassword.isEmpty {
                 connectionPassword = enteredPassword
-            } else if let storedPassword = try credentialStore.password(for: profile.id) {
+            } else if let storedPassword = try credentialStore.password(
+                for: profileID
+            ) {
                 connectionPassword = storedPassword
             } else {
                 throw NavidromeConnectionStoreError.passwordRequired
             }
 
-            let verifiedIdentity = try await client.identifyNavidrome(
-                profile: profile,
-                password: connectionPassword
-            )
+            var verifiedIdentity: NavidromeServerIdentity?
+            for address in [verifiedHomeURL, verifiedRemoteURL].compactMap({ $0 }) {
+                let profile = makeProfile(
+                    id: profileID,
+                    name: name,
+                    baseURL: address,
+                    username: trimmedUsername
+                )
+                let endpointIdentity = try await client.identifyNavidrome(
+                    profile: profile,
+                    password: connectionPassword,
+                    allowsInsecureLocalHTTP: address.scheme?.lowercased() == "http"
+                )
+                if let verifiedIdentity,
+                   verifiedIdentity != endpointIdentity {
+                    throw NavidromeConnectionStoreError.addressesDoNotMatch
+                }
+                verifiedIdentity = endpointIdentity
+            }
 
+            guard let verifiedIdentity else {
+                throw NavidromeConnectionStoreError.addressRequired
+            }
+
+            let activeURL = verifiedHomeURL ?? verifiedRemoteURL!
+            let profile = makeProfile(
+                id: profileID,
+                name: name,
+                baseURL: activeURL,
+                username: trimmedUsername
+            )
             let connection = PersistedConnection(
                 profile: profile,
-                identity: verifiedIdentity
+                identity: verifiedIdentity,
+                homeBaseURL: verifiedHomeURL,
+                remoteBaseURL: verifiedRemoteURL
             )
-            let encodedConnection = try JSONEncoder().encode(connection)
 
             if !enteredPassword.isEmpty {
                 try credentialStore.save(password: enteredPassword, for: profile.id)
             }
-            defaults.set(encodedConnection, forKey: storageKey)
+            defaults.set(
+                try JSONEncoder().encode(connection),
+                forKey: storageKey
+            )
+            defaults.removeObject(forKey: rendererStorageKey)
 
             savedProfile = profile
             identity = verifiedIdentity
+            homeBaseURL = verifiedHomeURL
+            remoteBaseURL = verifiedRemoteURL
             serverName = profile.name
-            serverURL = profile.baseURL.absoluteString
+            homeServerURL = verifiedHomeURL?.absoluteString ?? ""
+            remoteServerURL = verifiedRemoteURL?.absoluteString ?? ""
             username = profile.username
             password = ""
             hasStoredPassword = true
@@ -129,59 +222,112 @@ final class NavidromeConnectionStore: ObservableObject {
         return NavidromeCatalogCredentials(profile: profile, password: password)
     }
 
+    /// UPnP renderers must receive an address reachable from the home network.
+    /// If no separate HOME address exists, the normal active address is reused.
     func rendererCredentials() throws -> NavidromeCatalogCredentials {
         let credentials = try catalogCredentials()
-        guard let rendererServerURL else { return credentials }
-        let rendererProfile = NavidromeServerProfile(
-            id: credentials.profile.id,
-            name: credentials.profile.name,
-            baseURL: rendererServerURL,
-            username: credentials.profile.username
-        )
+        guard let homeBaseURL else { return credentials }
         return NavidromeCatalogCredentials(
-            profile: rendererProfile,
+            profile: makeProfile(
+                id: credentials.profile.id,
+                name: credentials.profile.name,
+                baseURL: homeBaseURL,
+                username: credentials.profile.username
+            ),
             password: credentials.password
         )
     }
 
-    func verifyAndSaveRendererServerURL(_ value: String) async {
-        guard !isVerifyingRendererServer else { return }
-        isVerifyingRendererServer = true
-        rendererServerStatusMessage = nil
-        rendererServerErrorMessage = nil
-        defer { isVerifyingRendererServer = false }
+    /// Prefer HOME while it is reachable, otherwise use REMOTE. This is called
+    /// when the app becomes active, so moving between home Wi-Fi and the road
+    /// does not require changing the saved source.
+    func refreshReachableEndpoint() async {
+        guard let currentProfile = savedProfile,
+              let identity,
+              let connectionPassword = try? credentialStore.password(
+                  for: currentProfile.id
+              ) else {
+            return
+        }
 
-        do {
-            let credentials = try catalogCredentials()
-            let baseURL = try NavidromeRendererServerURL.validated(value)
-            let rendererProfile = NavidromeServerProfile(
-                id: credentials.profile.id,
-                name: credentials.profile.name,
-                baseURL: baseURL,
-                username: credentials.profile.username
+        for address in [homeBaseURL, remoteBaseURL].compactMap({ $0 }) {
+            let candidate = makeProfile(
+                id: currentProfile.id,
+                name: currentProfile.name,
+                baseURL: address,
+                username: currentProfile.username
             )
-            _ = try await client.identifyNavidrome(
-                profile: rendererProfile,
-                password: credentials.password,
-                allowsInsecureLocalHTTP: true
-            )
-            let saved = PersistedRendererConnection(
-                profileID: credentials.profile.id,
-                baseURL: baseURL
-            )
-            defaults.set(try JSONEncoder().encode(saved), forKey: rendererStorageKey)
-            rendererServerURL = baseURL
-            rendererServerStatusMessage = "Renderer address verified and saved."
-        } catch {
-            rendererServerErrorMessage = error.localizedDescription
+            do {
+                _ = try await reachabilityClient.identifyNavidrome(
+                    profile: candidate,
+                    password: connectionPassword,
+                    allowsInsecureLocalHTTP: address.scheme?.lowercased() == "http"
+                )
+                guard candidate.baseURL != currentProfile.baseURL else { return }
+                try persist(
+                    profile: candidate,
+                    identity: identity,
+                    homeBaseURL: homeBaseURL,
+                    remoteBaseURL: remoteBaseURL
+                )
+                savedProfile = candidate
+                return
+            } catch {
+                continue
+            }
         }
     }
 
-    func useNormalServerAddressForRenderer() {
-        defaults.removeObject(forKey: rendererStorageKey)
-        rendererServerURL = nil
-        rendererServerErrorMessage = nil
-        rendererServerStatusMessage = "The renderer will use the normal Navidrome address."
+    private func validatedHomeAddress(_ value: String) throws -> URL? {
+        guard !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return nil
+        }
+        return try NavidromeRendererServerURL.validated(value)
+    }
+
+    private func validatedRemoteAddress(_ value: String) throws -> URL? {
+        guard !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return nil
+        }
+        return try NavidromeServerProfile.validated(
+            id: savedProfile?.id ?? UUID(),
+            name: serverName,
+            serverURL: value,
+            username: username.isEmpty ? "placeholder" : username
+        ).baseURL
+    }
+
+    private func makeProfile(
+        id: UUID,
+        name: String,
+        baseURL: URL,
+        username: String
+    ) -> NavidromeServerProfile {
+        NavidromeServerProfile(
+            id: id,
+            name: name.isEmpty ? (baseURL.host ?? "Navidrome") : name,
+            baseURL: baseURL,
+            username: username
+        )
+    }
+
+    private func persist(
+        profile: NavidromeServerProfile,
+        identity: NavidromeServerIdentity,
+        homeBaseURL: URL?,
+        remoteBaseURL: URL?
+    ) throws {
+        defaults.set(
+            try JSONEncoder().encode(
+                PersistedConnection(
+                    profile: profile,
+                    identity: identity,
+                    homeBaseURL: homeBaseURL,
+                    remoteBaseURL: remoteBaseURL
+                )
+            ),
+            forKey: storageKey
+        )
     }
 
     private func loadSavedConnection() {
@@ -189,49 +335,79 @@ final class NavidromeConnectionStore: ObservableObject {
 
         do {
             let connection = try JSONDecoder().decode(PersistedConnection.self, from: data)
-            savedProfile = connection.profile
-            identity = connection.identity
-            serverName = connection.profile.name
-            serverURL = connection.profile.baseURL.absoluteString
-            username = connection.profile.username
-            hasStoredPassword = try credentialStore.password(for: connection.profile.id) != nil
-            loadRendererConnection(for: connection.profile.id)
+            let legacyRendererURL = loadLegacyRendererConnection(
+                for: connection.profile.id
+            )
+            let migratedHomeURL = connection.homeBaseURL
+                ?? legacyRendererURL
+                ?? (connection.profile.baseURL.scheme?.lowercased() == "http"
+                    ? connection.profile.baseURL : nil)
+            let migratedRemoteURL = connection.remoteBaseURL
+                ?? (connection.profile.baseURL.scheme?.lowercased() == "https"
+                    ? connection.profile.baseURL : nil)
 
-            if connection.profile.baseURL.scheme?.lowercased() != "https" {
-                errorMessage = connection.profile.baseURL.scheme?.lowercased() == "http"
-                    ? NavidromeProfileValidationError.secureConnectionRequired.localizedDescription
-                    : NavidromeProfileValidationError.invalidServerURL.localizedDescription
+            let activeURL = migratedHomeURL
+                ?? migratedRemoteURL
+                ?? connection.profile.baseURL
+            let activeProfile = makeProfile(
+                id: connection.profile.id,
+                name: connection.profile.name,
+                baseURL: activeURL,
+                username: connection.profile.username
+            )
+
+            savedProfile = activeProfile
+            identity = connection.identity
+            homeBaseURL = migratedHomeURL
+            remoteBaseURL = migratedRemoteURL
+            serverName = activeProfile.name
+            homeServerURL = migratedHomeURL?.absoluteString ?? ""
+            remoteServerURL = migratedRemoteURL?.absoluteString ?? ""
+            username = activeProfile.username
+            hasStoredPassword = try credentialStore.password(
+                for: activeProfile.id
+            ) != nil
+
+            if connection.homeBaseURL == nil
+                || connection.remoteBaseURL == nil
+                || legacyRendererURL != nil {
+                try persist(
+                    profile: activeProfile,
+                    identity: connection.identity,
+                    homeBaseURL: migratedHomeURL,
+                    remoteBaseURL: migratedRemoteURL
+                )
+                defaults.removeObject(forKey: rendererStorageKey)
             }
         } catch {
             errorMessage = "The saved Navidrome connection could not be read."
         }
     }
 
-    private func loadRendererConnection(for profileID: UUID) {
+    private func loadLegacyRendererConnection(for profileID: UUID) -> URL? {
         guard let data = defaults.data(forKey: rendererStorageKey),
               let connection = try? JSONDecoder().decode(
-                PersistedRendererConnection.self,
-                from: data
+                  PersistedRendererConnection.self,
+                  from: data
               ),
               connection.profileID == profileID else {
-            rendererServerURL = nil
-            return
+            return nil
         }
-        rendererServerURL = connection.baseURL
+        return connection.baseURL
     }
 
     private func resetFields() {
         serverName = ""
-        serverURL = ""
+        homeServerURL = ""
+        remoteServerURL = ""
         username = ""
         password = ""
         savedProfile = nil
         identity = nil
+        homeBaseURL = nil
+        remoteBaseURL = nil
+        isConnecting = false
         hasStoredPassword = false
-        rendererServerURL = nil
-        isVerifyingRendererServer = false
-        rendererServerStatusMessage = nil
-        rendererServerErrorMessage = nil
         errorMessage = nil
     }
 }
@@ -241,6 +417,8 @@ extension NavidromeConnectionStore: NavidromeCatalogConnectionProviding {}
 nonisolated enum NavidromeConnectionStoreError: LocalizedError, Equatable, Sendable {
     case passwordRequired
     case serverNotConfigured
+    case addressRequired
+    case addressesDoNotMatch
 
     var errorDescription: String? {
         switch self {
@@ -248,6 +426,10 @@ nonisolated enum NavidromeConnectionStoreError: LocalizedError, Equatable, Senda
             "Enter your Navidrome password."
         case .serverNotConfigured:
             "Connect a Navidrome server before loading its library."
+        case .addressRequired:
+            "Enter at least one Navidrome address."
+        case .addressesDoNotMatch:
+            "The Home and Remote addresses do not identify the same Navidrome server."
         }
     }
 }

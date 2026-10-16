@@ -9,17 +9,17 @@
 
 ## 1. Snapshot
 
-- **Last updated:** 2026-10-14 (Europe/Budapest)
+- **Last updated:** 2026-10-16 (Europe/Budapest)
 - **Repository:** `musicards`
 - **Branch:** `main`
 - **Last completed application checkpoint before this documentation update:**
-  `f1381f2` — `upnp`.
+  `cba71f1` — `1`.
 - **Remote state before this documentation edit:** `main` matched
-  `origin/main` at `f1381f2`.
-- **Working tree:** contains the in-progress debug renderer lab described
-  below: app composition/UI and both Info plists are modified, while
-  `AVTransportClient.swift`, `UPnPRendererBrowser.swift`,
-  `RendererDiscoveryView.swift`, and `AVTransportClientTests.swift` are new.
+  `origin/main` at `cba71f1`.
+- **Working tree:** contains the in-progress UPnP renderer integration,
+  cross-device renderer-session adoption, lazy MusicBrainz context loading,
+  output-volume work, and the HOME/REMOTE Navidrome routing described below.
+  Use `git status --short` for the exact file list; preserve all of it.
 
 The checkpoint above deliberately identifies the last completed application
 change rather than claiming that this tracked document can contain the hash of
@@ -80,12 +80,14 @@ AVM before routing the main app's playback through it.
   has both `com.apple.security.network.client` and
   `com.apple.security.network.server`; the latter was explicitly approved by
   the user and is required for incoming UDP discovery responses.
-- **Renderer-accessible Navidrome address is now implemented.** The renderer
-  lab accepts one optional local address such as
-  `http://navidrome.local:4533`, verifies it against Navidrome using the already
-  stored account, and persists it separately from the normal HTTPS/Tailscale
-  app connection. Plain HTTP is accepted only for local/private hosts. Only
-  authenticated renderer stream URLs use this address.
+- **One Navidrome profile now has two optional routes in SOURCE.** `HOME
+  ADDRESS` is the LAN-reachable endpoint (plain HTTP is allowed only for
+  local/private hosts); `REMOTE ADDRESS` is the HTTPS endpoint used away from
+  home. At least one is required. Both reuse the same account and library.
+  HOME is preferred while reachable, REMOTE is the automatic fallback, and a
+  UPnP renderer always receives the HOME route when available. The former
+  renderer-only address is migrated to HOME and the former primary HTTPS
+  address to REMOTE. OUTPUT no longer contains Navidrome connection settings.
 - **Real AVM playback succeeded on macOS.** With the separate, verified local
   Navidrome address the AVM produced sound through the real output route. Next,
   validate the new volume/mute controls, metadata, pause, seek, next-track
@@ -376,20 +378,15 @@ The generic iOS device build also passed with code signing disabled. This was
 not a complete `./Tools/verify.sh` run; MusiCards Sync was unchanged and its
 tests were not rerun.
 
-On 2026-10-15 the renderer discovery gained a layered fallback path: multicast
-M-SEARCH, cached successful hosts, passive `ssdp:alive` reception, and a
-user-triggered bounded `/24` unicast `DEEP SEARCH`; manual IP entry remains the
-final fallback. Deep Search deliberately ignores cached hosts so a real-device
-test cannot pass merely because the renderer was found manually before. The
-renderer lab presents these as five isolated diagnostic sections, so a result
-from one mechanism cannot be mistaken for a result from another. The first
-three checks run sequentially; Deep Search and manual address lookup remain
-explicit actions. The full MusiCards macOS XCTest suite and the unsigned
-generic iOS device build passed after the discovery foundation change; the
-five-section diagnostic refactor subsequently passed the full MusiCards macOS
-XCTest suite and unsigned iOS build again. The pre-existing MusiCards Sync
-project/scheme and MusiCards scheme working-tree edits were not changed or
-verified as part of this work.
+On 2026-10-16 renderer discovery exposes four user-facing methods: multicast
+M-SEARCH, bounded `/24` unicast `DEEP SEARCH`, stored successful addresses and
+manual IP lookup. Passive `ssdp:alive` reception remains an invisible helper,
+not a separate choice. The OUTPUT sheet has a SYSTEM AUDIO / UPNP RENDERER
+switch and one compact, divided discovery panel; only one renderer can be
+selected. Navidrome HOME/REMOTE routing moved entirely to SOURCE. The complete
+MusiCards macOS XCTest suite passed, both macOS and generic iOS Simulator builds
+passed, and `git diff --check` was clean. This was not a complete
+`./Tools/verify.sh` run; MusiCards Sync was unchanged and not retested.
 
 ## 7. Roadmap and next likely work
 
@@ -456,17 +453,12 @@ UPnP/DLNA MediaRenderer and Navidrome server without understanding Tailscale,
 SOAP or authenticated stream URLs.
 
 - Discover renderers automatically and present their friendly names.
-- Keep the existing HTTPS-only Navidrome address as the normal app connection.
-- The app can use that existing address for renderer playback, or the user can
-  enter one optional **home-network Navidrome address for players** when the
-  renderer cannot reach it (for example because it is Tailscale-only). The
-  implementation reuses the saved Navidrome account and does not create a
-  second library profile.
-- Explain the optional address in user language, with examples such as
-  `http://navidrome.local:4533` and `http://192.168.1.20:4533`. Keep it hidden
-  until external-renderer setup actually needs it.
-- The renderer address is verified before it is saved; retain clear,
-  actionable playback errors as the hardware path is refined.
+- Keep one Navidrome account/library profile with two routes configured in
+  SOURCE: optional local/private HOME and optional HTTPS REMOTE, with at least
+  one required. Do not reintroduce Navidrome address setup in OUTPUT.
+- Verify configured routes before saving. Prefer HOME automatically while it
+  is reachable, fall back to REMOTE, and give UPnP renderers the HOME route
+  whenever it exists. Retain clear, actionable playback errors.
 - Build against standard AVTransport. Detect optional capabilities such as
   `SetNextAVTransportURI`; use them when available and degrade gracefully when
   a renderer does not support them. Do not add AVM-only logic to the core path.

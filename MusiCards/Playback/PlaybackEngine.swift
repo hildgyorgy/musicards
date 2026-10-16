@@ -391,6 +391,12 @@ enum PlaybackEngineEvent: Equatable {
     case started
     case paused
     case positionChanged(TimeInterval)
+    case advancedToNext(
+        itemID: String,
+        duration: TimeInterval?,
+        audioFormat: PlaybackAudioFormat?,
+        position: TimeInterval
+    )
     case volumeChanged(PlaybackVolumeState)
     case outputConfigurationChanged
     case finished

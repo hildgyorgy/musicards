@@ -63,13 +63,17 @@ final class AVTransportClientTests: XCTestCase {
             streamURL,
             metadata: "<DIDL-Lite><dc:title>A & B</dc:title></DIDL-Lite>"
         )
+        try await client.setNextTransportURI(
+            URL(string: "https://music.example/rest/stream?id=two")!,
+            metadata: "<DIDL-Lite><dc:title>Next</dc:title></DIDL-Lite>"
+        )
         try await client.play()
         try await client.pause()
         try await client.seek(to: 83)
         try await client.stop()
 
         let requests = await transport.requests()
-        XCTAssertEqual(requests.count, 5)
+        XCTAssertEqual(requests.count, 6)
         let bodies = try requests.map { request in
             try XCTUnwrap(
                 request.httpBody.flatMap { String(data: $0, encoding: .utf8) }
@@ -85,8 +89,13 @@ final class AVTransportClientTests: XCTestCase {
                 "&lt;DIDL-Lite&gt;&lt;dc:title&gt;A &amp; B&lt;/dc:title&gt;&lt;/DIDL-Lite&gt;"
             )
         )
-        XCTAssertTrue(bodies[1].contains("<Speed>1</Speed>"))
-        XCTAssertTrue(bodies[3].contains("<Unit>REL_TIME</Unit><Target>0:01:23</Target>"))
+        XCTAssertTrue(
+            bodies[1].contains(
+                "<NextURI>https://music.example/rest/stream?id=two</NextURI>"
+            )
+        )
+        XCTAssertTrue(bodies[2].contains("<Speed>1</Speed>"))
+        XCTAssertTrue(bodies[4].contains("<Unit>REL_TIME</Unit><Target>0:01:23</Target>"))
     }
 
     private var service: UPnPServiceDescriptor {

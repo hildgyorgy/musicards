@@ -1,9 +1,19 @@
 import Foundation
 
+@MainActor
+protocol RendererPlaybackSessionControlling: AnyObject {
+    func rendererSnapshot() async throws -> AVTransportSnapshot?
+    func adoptRendererSession(
+        item: PlaybackQueueItem,
+        snapshot: AVTransportSnapshot
+    ) async throws
+}
+
 enum UPnPPlaybackError: LocalizedError {
     case rendererUnavailable(String)
     case navidromeOnly
     case missingNavidromeConnection
+    case rendererSessionMismatch
 
     var errorDescription: String? {
         switch self {
@@ -13,6 +23,8 @@ enum UPnPPlaybackError: LocalizedError {
             "Network renderer playback currently supports Navidrome tracks only."
         case .missingNavidromeConnection:
             "Connect the Navidrome library before using a network renderer."
+        case .rendererSessionMismatch:
+            "The renderer changed tracks before MusiCards could adopt its session."
         }
     }
 }
@@ -66,6 +78,11 @@ final class UPnPPlaybackEngine: PlaybackEngine {
     private var hasObservedPlaying = false
     private var consecutivePollFailures = 0
     private var volumePollCounter = 0
+    private var currentStreamURL: URL?
+    private var stagedNextItem: PlaybackQueueItem?
+    private var stagedNextStreamURL: URL?
+
+    var nextItemProvider: (() async throws -> PlaybackQueueItem?)?
 
     init(
         streamURLProvider: NavidromeRendererStreamURLProvider,
@@ -95,6 +112,9 @@ final class UPnPPlaybackEngine: PlaybackEngine {
         preparedItem = nil
         hasObservedPlaying = false
         volumePollCounter = 0
+        currentStreamURL = nil
+        stagedNextItem = nil
+        stagedNextStreamURL = nil
     }
 
     func prepare(_ item: PlaybackQueueItem) async throws {
@@ -114,6 +134,8 @@ final class UPnPPlaybackEngine: PlaybackEngine {
         let metadata = Self.metadata(for: item, streamURL: streamURL, asset: asset)
         try await client.setTransportURI(streamURL, metadata: metadata)
         preparedItem = item
+        currentStreamURL = streamURL
+        await stageNextItemIfAvailable()
         await publishVolumeStateIfAvailable()
         eventHandler?(
             .prepared(
@@ -183,6 +205,24 @@ final class UPnPPlaybackEngine: PlaybackEngine {
             let snapshot = try await client.snapshot()
             consecutivePollFailures = 0
             let state = snapshot.transport.state.uppercased()
+            if let stagedNextItem,
+               let stagedNextStreamURL,
+               Self.sameStream(snapshot.position.trackURI, stagedNextStreamURL),
+               !Self.sameStream(currentStreamURL, stagedNextStreamURL) {
+                preparedItem = stagedNextItem
+                currentStreamURL = stagedNextStreamURL
+                self.stagedNextItem = nil
+                self.stagedNextStreamURL = nil
+                eventHandler?(
+                    .advancedToNext(
+                        itemID: stagedNextItem.id,
+                        duration: stagedNextItem.track.duration,
+                        audioFormat: stagedNextItem.track.audioFormat,
+                        position: snapshot.position.relativeTime ?? 0
+                    )
+                )
+                await stageNextItemIfAvailable()
+            }
             if state == "PLAYING" || state == "TRANSITIONING" {
                 hasObservedPlaying = true
             }
@@ -218,6 +258,61 @@ final class UPnPPlaybackEngine: PlaybackEngine {
         if let state = try? await volumeClient.volumeState() {
             eventHandler?(.volumeChanged(state))
         }
+    }
+
+    private func stageNextItemIfAvailable() async {
+        guard renderer?.capabilities.supportsSetNext == true,
+              let client else {
+            stagedNextItem = nil
+            stagedNextStreamURL = nil
+            return
+        }
+        do {
+            guard let item = try await nextItemProvider?() else {
+                try? await client.setNextTransportURI(nil, metadata: "")
+                stagedNextItem = nil
+                stagedNextStreamURL = nil
+                return
+            }
+            guard case .remoteAudio(let asset) = item.source,
+                  asset.source == .navidrome else {
+                stagedNextItem = nil
+                stagedNextStreamURL = nil
+                return
+            }
+            let streamURL = try streamURLProvider.streamURL(for: asset)
+            let itemMetadata = Self.metadata(
+                for: item,
+                streamURL: streamURL,
+                asset: asset
+            )
+            try await client.setNextTransportURI(
+                streamURL,
+                metadata: itemMetadata
+            )
+            stagedNextItem = item
+            stagedNextStreamURL = streamURL
+        } catch {
+            stagedNextItem = nil
+            stagedNextStreamURL = nil
+        }
+    }
+
+    private static func sameStream(_ lhs: URL?, _ rhs: URL?) -> Bool {
+        guard let lhs, let rhs else { return false }
+        if lhs == rhs { return true }
+        return navidromeSongID(in: lhs) == navidromeSongID(in: rhs)
+    }
+
+    static func navidromeSongID(in url: URL?) -> String? {
+        guard let url,
+              let components = URLComponents(
+                url: url,
+                resolvingAgainstBaseURL: false
+              ) else { return nil }
+        return components.queryItems?.first(where: {
+            $0.name.caseInsensitiveCompare("id") == .orderedSame
+        })?.value?.nilIfBlank
     }
 
     private static func metadata(
@@ -300,6 +395,50 @@ extension UPnPPlaybackEngine: PlaybackVolumeControlling {
         guard let volumeClient else { return nil }
         try await volumeClient.setMuted(isMuted)
         return try await volumeClient.volumeState()
+    }
+}
+
+extension UPnPPlaybackEngine: RendererPlaybackSessionControlling {
+    func rendererSnapshot() async throws -> AVTransportSnapshot? {
+        try await client?.snapshot()
+    }
+
+    func adoptRendererSession(
+        item: PlaybackQueueItem,
+        snapshot: AVTransportSnapshot
+    ) async throws {
+        guard case .remoteAudio(let asset) = item.source,
+              asset.source == .navidrome else {
+            throw UPnPPlaybackError.navidromeOnly
+        }
+        let streamURL = try streamURLProvider.streamURL(for: asset)
+        guard Self.sameStream(snapshot.position.trackURI, streamURL) else {
+            throw UPnPPlaybackError.rendererSessionMismatch
+        }
+
+        preparedItem = item
+        currentStreamURL = snapshot.position.trackURI ?? streamURL
+        hasObservedPlaying = snapshot.transport.state.uppercased() == "PLAYING"
+        consecutivePollFailures = 0
+        volumePollCounter = 0
+        eventHandler?(
+            .prepared(
+                duration: snapshot.position.duration ?? item.track.duration,
+                audioFormat: item.track.audioFormat
+            )
+        )
+        eventHandler?(.positionChanged(snapshot.position.relativeTime ?? 0))
+        switch snapshot.transport.state.uppercased() {
+        case "PLAYING", "TRANSITIONING":
+            eventHandler?(.started)
+        case "PAUSED_PLAYBACK":
+            eventHandler?(.paused)
+        default:
+            break
+        }
+        await stageNextItemIfAvailable()
+        await publishVolumeStateIfAvailable()
+        startPolling()
     }
 }
 
