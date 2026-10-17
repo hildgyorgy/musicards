@@ -443,7 +443,10 @@ private struct PlaybackOutputStatusView: View {
         }
         .buttonStyle(.plain)
         .sheet(isPresented: $isShowingOutputPicker) {
-            RendererDiscoveryView(browser: rendererBrowser)
+            RendererDiscoveryView(
+                browser: rendererBrowser,
+                controller: controller
+            )
         }
     }
 

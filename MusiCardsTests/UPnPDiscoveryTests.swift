@@ -4,6 +4,32 @@ import XCTest
 
 final class UPnPDiscoveryTests: XCTestCase {
     @MainActor
+    func testImmediateOutputSelectionPersistsAndCanReturnToSystemAudio() {
+        let suiteName = "UPnPDiscoveryTests.immediateSelection"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let browser = UPnPRendererBrowser(userDefaults: defaults)
+        let renderer = makeRenderer(id: "uuid:immediate", host: "192.168.1.50")
+        var selectionChangeCount = 0
+        browser.selectionCommitHandler = { selectionChangeCount += 1 }
+
+        browser.selectImmediately(renderer)
+        XCTAssertTrue(browser.isSelected(renderer))
+        XCTAssertEqual(browser.selectedRendererDisplayName, renderer.friendlyName)
+        XCTAssertEqual(selectionChangeCount, 1)
+
+        browser.selectImmediately(renderer)
+        XCTAssertEqual(selectionChangeCount, 1)
+
+        browser.selectSystemAudioImmediately()
+        XCTAssertFalse(browser.isSelected(renderer))
+        XCTAssertNil(browser.selectedRendererDisplayName)
+        XCTAssertNil(defaults.string(forKey: "UPnPSelectedRendererID"))
+        XCTAssertEqual(selectionChangeCount, 2)
+    }
+
+    @MainActor
     func testRendererSelectionIsExclusiveAndOnlyCommitsOnConfirmation() {
         let suiteName = "UPnPDiscoveryTests.rendererSelection"
         let defaults = UserDefaults(suiteName: suiteName)!

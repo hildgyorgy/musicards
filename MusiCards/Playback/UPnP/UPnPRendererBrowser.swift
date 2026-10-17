@@ -129,6 +129,22 @@ final class UPnPRendererBrowser: ObservableObject {
         draftRenderer = nil
     }
 
+    func isSelected(_ renderer: UPnPRendererDescriptor) -> Bool {
+        selectedRendererID == renderer.id
+    }
+
+    /// iOS changes the output when a row is tapped; macOS keeps its draft/OK flow.
+    func selectImmediately(_ renderer: UPnPRendererDescriptor) {
+        draftRendererID = renderer.id
+        draftRenderer = renderer
+        commitRendererSelection()
+    }
+
+    func selectSystemAudioImmediately() {
+        clearDraftRendererSelection()
+        commitRendererSelection()
+    }
+
     func commitRendererSelection() {
         let didChangeSelection = selectedRendererID != draftRendererID
         selectedRendererID = draftRendererID

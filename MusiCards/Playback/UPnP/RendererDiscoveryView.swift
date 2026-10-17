@@ -7,36 +7,34 @@ struct RendererDiscoveryView: View {
     }
 
     @ObservedObject var browser: UPnPRendererBrowser
+    @ObservedObject var controller: PlaybackController
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    @State private var rendererAddress = "192.168."
+    @State private var rendererAddress = ""
     @State private var selectedOutputKind: OutputKind = .systemAudio
 
     var body: some View {
         Group {
-            #if os(macOS)
+            #if os(iOS)
+            iosOutputSheet
+            #else
             content
                 .frame(width: MacWindowMetrics.contentSize.width - 4)
                 .fixedSize(horizontal: false, vertical: true)
-            #else
-            ScrollView {
-                content
-            }
-            .scrollIndicators(.hidden)
-            .frame(
-                minWidth: 360,
-                idealWidth: 440,
-                minHeight: 360,
-                idealHeight: 520
-            )
             #endif
         }
         .onAppear {
+            #if os(macOS)
             browser.beginRendererSelection()
             selectedOutputKind = browser.draftRendererID == nil
                 ? .systemAudio
                 : .upnpRenderer
+            #else
+            selectedOutputKind = browser.hasSelectedRendererPreference
+                ? .upnpRenderer
+                : .systemAudio
+            #endif
             if selectedOutputKind == .upnpRenderer,
                !browser.hasStartedAutomaticDiscovery {
                 browser.refresh()
@@ -47,10 +45,233 @@ struct RendererDiscoveryView: View {
         }
         .onDisappear { browser.stopPassiveListening() }
         #if os(iOS)
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         #endif
     }
+
+    #if os(iOS)
+    private var iosOutputSheet: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    HStack(spacing: 12) {
+                        iosOutputButton(.systemAudio, title: "System audio")
+                        iosOutputButton(.upnpRenderer, title: "UPnP renderer")
+                    }
+                    .listRowBackground(Color.clear)
+                }
+
+                if selectedOutputKind == .systemAudio {
+                    iosSystemAudioContent
+                } else {
+                    iosUPnPContent
+                }
+            }
+            .navigationTitle("Audio output")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+    }
+
+    @ViewBuilder
+    private func iosOutputButton(
+        _ kind: OutputKind,
+        title: String
+    ) -> some View {
+        if selectedOutputKind == kind {
+            Button {
+                selectOutputKind(kind)
+            } label: {
+                Text(title)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.regular)
+        } else {
+            Button {
+                selectOutputKind(kind)
+            } label: {
+                Text(title)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.regular)
+        }
+    }
+
+    private func selectOutputKind(_ kind: OutputKind) {
+        guard selectedOutputKind != kind else { return }
+        selectedOutputKind = kind
+        switch kind {
+        case .systemAudio:
+            browser.stopPassiveListening()
+            browser.selectSystemAudioImmediately()
+        case .upnpRenderer:
+            browser.startPassiveListening()
+            if !browser.hasStartedAutomaticDiscovery {
+                browser.refresh()
+            }
+        }
+    }
+
+    private var iosSystemAudioContent: some View {
+        Section {
+            Text("Active system audio output")
+            Text(controller.outputRoute.displayName)
+                .font(.system(.body, design: .monospaced))
+        } header: {
+            Text("System audio")
+        } footer: {
+            Text("Sound follows the output selected in the system, such as built-in speakers, headphones, Bluetooth, AirPlay, or a connected DAC.")
+                .font(.subheadline)
+        }
+    }
+
+    @ViewBuilder
+    private var iosUPnPContent: some View {
+        Section("Find and select UPnP renderer") {
+            iosSearchHeader(for: .multicast)
+            iosDiscoveryResult(for: .multicast)
+        }
+
+        Section {
+            iosSearchHeader(for: .subnetSweep)
+            iosDiscoveryResult(for: .subnetSweep)
+        }
+
+        Section {
+            iosSearchHeader(for: .rememberedAddress)
+            iosDiscoveryResult(for: .rememberedAddress)
+        }
+
+        Section {
+            iosSearchHeader(for: .manualAddress)
+            TextField("e.g. 192.168.1.50", text: $rendererAddress)
+                .font(.system(.body, design: .monospaced))
+                .keyboardType(.numbersAndPunctuation)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .submitLabel(.search)
+                .onSubmit(searchManualAddress)
+            iosDiscoveryResult(for: .manualAddress)
+        }
+    }
+
+    private func iosSearchHeader(
+        for method: UPnPRendererBrowser.DiscoveryMethod
+    ) -> some View {
+        HStack(spacing: 12) {
+            Text(iosTitle(for: method))
+                .font(.body.weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+            Spacer(minLength: 4)
+            if browser.state(for: method).isSearching {
+                ProgressView()
+                    .controlSize(.small)
+                    .accessibilityLabel("Searching for renderers")
+            } else {
+                Button(method == .manualAddress ? "Find" : "Search") {
+                    search(for: method)
+                }
+                .buttonStyle(.borderless)
+                .tint(.blue)
+                .disabled(
+                    method == .manualAddress
+                        && rendererAddress.trimmingCharacters(
+                            in: .whitespacesAndNewlines
+                        ).isEmpty
+                )
+            }
+        }
+    }
+
+    private func iosTitle(
+        for method: UPnPRendererBrowser.DiscoveryMethod
+    ) -> String {
+        switch method {
+        case .multicast: "Multicast SSDP"
+        case .subnetSweep: "Deep search"
+        case .rememberedAddress: "Saved addresses"
+        case .manualAddress: "Manual address"
+        }
+    }
+
+    private func search(for method: UPnPRendererBrowser.DiscoveryMethod) {
+        switch method {
+        case .multicast: browser.searchMulticast()
+        case .subnetSweep: browser.deepSearch()
+        case .rememberedAddress: browser.searchRememberedAddresses()
+        case .manualAddress: searchManualAddress()
+        }
+    }
+
+    private func searchManualAddress() {
+        let address = rendererAddress.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !address.isEmpty else { return }
+        browser.findRenderer(at: address)
+    }
+
+    @ViewBuilder
+    private func iosDiscoveryResult(
+        for method: UPnPRendererBrowser.DiscoveryMethod
+    ) -> some View {
+        switch browser.state(for: method) {
+        case .waiting:
+            EmptyView()
+        case .searching:
+            Text("Searching…")
+                .foregroundStyle(.secondary)
+        case .noResult:
+            Text("No renderer found")
+                .foregroundStyle(.secondary)
+        case let .unavailable(message):
+            Text(method == .rememberedAddress ? "No saved addresses" : message)
+                .foregroundStyle(.secondary)
+        case let .failed(message):
+            Text(message)
+                .foregroundStyle(.red)
+        case let .found(renderers):
+            ForEach(renderers) { renderer in
+                iosRendererRow(renderer)
+            }
+        }
+    }
+
+    private func iosRendererRow(
+        _ renderer: UPnPRendererDescriptor
+    ) -> some View {
+        let isSelected = browser.isSelected(renderer)
+        return Button {
+            browser.selectImmediately(renderer)
+        } label: {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(renderer.friendlyName)
+                        .foregroundStyle(.primary)
+                    if let host = renderer.descriptionURL.host {
+                        Text(host)
+                            .font(.system(.footnote, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Spacer(minLength: 8)
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(.blue)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(renderer.friendlyName)
+        .accessibilityValue(isSelected ? "Selected output" : "Not selected")
+    }
+    #endif
 
     private var content: some View {
         VStack(alignment: .leading, spacing: 20) {
