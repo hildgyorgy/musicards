@@ -113,6 +113,29 @@ struct DeckBackgroundView: View {
                     activeLibraryPrompt
                     outputStatus
 
+                    if onCreateOrUpdateLibraryIndex != nil {
+                        Button {
+                            beginFolderImport(.createOrUpdateIndex)
+                        } label: {
+                            Text("Create / update library index")
+                                .font(.callout)
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.blue)
+                        .disabled(localLibrary.isScanning)
+                        .accessibilityHint("Select a music folder to create or update library.json")
+                        .padding(.top, 4)
+
+                        if localLibrary.isScanning,
+                           libraryManager.source != .local {
+                            ProgressView(
+                                localLibrary.statusMessage
+                                    ?? "Preparing music library…"
+                            )
+                            .font(.caption)
+                        }
+                    }
+
                     if let report = compatibilityReport {
                         homePrompt(report)
                             .multilineTextAlignment(.center)
@@ -405,15 +428,9 @@ struct DeckBackgroundView: View {
             onConnectExisting: {
                 beginFolderImport(.connectExisting)
             },
-            onCreateOrUpdateIndex: nil,
             onDisconnect: {
                 onDisconnectLibrary?()
-            },
-            onClose: {
-                isLibraryActionsPresented = false
-            },
-            initialDraftSource: nil,
-            onDraftSourceChange: nil
+            }
         )
     }
 

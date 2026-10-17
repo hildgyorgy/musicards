@@ -12,11 +12,6 @@ import UniformTypeIdentifiers
 import AppKit
 #endif
 
-private enum FolderImportAction {
-    case connectExisting
-    case createOrUpdateIndex
-}
-
 struct ContentView: View {
 
     private var cards: [DeckCard<MusiCardID>] {
@@ -90,7 +85,7 @@ struct ContentView: View {
     @State private var isShowingAbout = false
     @State private var isShowingLibraryConnection = false
     @State private var isFolderImporterPresented = false
-    @State private var folderImportAction: FolderImportAction?
+    @State private var openFolderImporterAfterSourceDismissal = false
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.scenePhase) private var scenePhase
@@ -349,6 +344,20 @@ struct ContentView: View {
                     allowsMultipleSelection: false,
                     onCompletion: handleFolderImport
                 )
+                .sheet(
+                    isPresented: $isShowingLibraryConnection,
+                    onDismiss: handleSourceSheetDismissal
+                ) {
+                    LibraryConnectionView(
+                        localLibrary: appModel.localLibrary,
+                        navidromeConnection: appModel.navidromeConnection,
+                        activeLibrarySource: $appModel.activeLibrarySource,
+                        onConnectExisting: beginFolderImport,
+                        onDisconnect: {
+                            appModel.disconnectMusicLibrary()
+                        }
+                    )
+                }
 
                 if isShowingAbout {
                     AboutSheetView {
@@ -359,38 +368,6 @@ struct ContentView: View {
                     .zIndex(1_000)
                     .transition(.scale.combined(with: .opacity))
                 }
-
-            if isShowingLibraryConnection {
-                MusiCardsPanelShell(
-                    onDismiss: {
-                        isShowingLibraryConnection = false
-                    }
-                ) {
-                    LibraryConnectionView(
-                        localLibrary: appModel.localLibrary,
-                        navidromeConnection: appModel.navidromeConnection,
-                        activeLibrarySource: $appModel.activeLibrarySource,
-                        onConnectExisting: {
-                            beginFolderImport(.connectExisting)
-                        },
-                        onCreateOrUpdateIndex: {
-                            beginFolderImport(.createOrUpdateIndex)
-                        },
-                        onDisconnect: {
-                            appModel.disconnectMusicLibrary()
-                        },
-                        onClose: {
-                            isShowingLibraryConnection = false
-                        },
-                        initialDraftSource: nil,
-                        onDraftSourceChange: nil
-                    )
-                }
-                .padding(.horizontal, DeckStyle.aboutOverlayHorizontalInset)
-                .padding(.bottom, DeckStyle.aboutOverlayHorizontalInset)
-                .zIndex(1_000)
-                .transition(.scale.combined(with: .opacity))
-            }
 
             #else
                 GeometryReader { viewportProxy in
@@ -479,9 +456,14 @@ struct ContentView: View {
         #endif
     }
 
-    private func beginFolderImport(_ action: FolderImportAction) {
-        folderImportAction = action
+    private func beginFolderImport() {
+        openFolderImporterAfterSourceDismissal = true
+        isShowingLibraryConnection = false
+    }
 
+    private func handleSourceSheetDismissal() {
+        guard openFolderImporterAfterSourceDismissal else { return }
+        openFolderImporterAfterSourceDismissal = false
         Task { @MainActor in
             await Task.yield()
             isFolderImporterPresented = true
@@ -515,22 +497,13 @@ struct ContentView: View {
     private func handleFolderImport(
         _ result: Result<[URL], Error>
     ) {
-        defer { folderImportAction = nil }
-
-        guard case .success(let urls) = result,
-              let url = urls.first else {
-            return
-        }
-
-        switch folderImportAction {
-        case .connectExisting:
+        if case .success(let urls) = result,
+           let url = urls.first {
             appModel.selectMusicFolder(url)
-
-        case .createOrUpdateIndex:
-            appModel.createOrUpdateLibraryIndex(url)
-
-        case nil:
-            break
+        }
+        Task { @MainActor in
+            await Task.yield()
+            isShowingLibraryConnection = true
         }
     }
 }

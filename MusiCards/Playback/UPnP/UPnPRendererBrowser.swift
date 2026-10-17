@@ -133,7 +133,7 @@ final class UPnPRendererBrowser: ObservableObject {
         selectedRendererID == renderer.id
     }
 
-    /// iOS changes the output when a row is tapped; macOS keeps its draft/OK flow.
+    /// Both platforms commit a tapped renderer immediately; the draft state is an internal staging step.
     func selectImmediately(_ renderer: UPnPRendererDescriptor) {
         draftRendererID = renderer.id
         draftRenderer = renderer
