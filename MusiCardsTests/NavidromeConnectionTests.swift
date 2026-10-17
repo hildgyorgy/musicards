@@ -4,6 +4,40 @@ import XCTest
 
 final class NavidromeConnectionTests: XCTestCase {
     @MainActor
+    func testCancelledVerificationCannotSaveLateResponse() async throws {
+        let suiteName = "NavidromeConnectionCancellationTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let identifier = PausedNavidromeIdentifier()
+        let store = NavidromeConnectionStore(
+            defaults: defaults,
+            credentialStore: NavidromeCredentialStoreStub(),
+            client: identifier,
+            reachabilityClient: identifier
+        )
+        store.remoteServerURL = "https://music.example.com"
+        store.username = "listener"
+        store.password = "password"
+
+        let task = try XCTUnwrap(store.beginVerification())
+        await identifier.waitForRequest()
+        XCTAssertTrue(store.isConnecting)
+
+        store.cancelPendingVerification()
+        XCTAssertFalse(store.isConnecting)
+
+        await identifier.complete(with: NavidromeServerIdentity(
+            serverVersion: "0.58.0",
+            protocolVersion: "1.16.1"
+        ))
+        await task.value
+
+        XCTAssertNil(store.savedProfile)
+        XCTAssertNil(store.identity)
+        XCTAssertNil(store.errorMessage)
+    }
+
+    @MainActor
     func testConnectionCanBeSavedWhenOnlyRemoteAddressIsReachable() async throws {
         let suiteName = "NavidromeConnectionTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
@@ -563,6 +597,35 @@ final class NavidromeConnectionTests: XCTestCase {
         let json = try XCTUnwrap(String(data: data, encoding: .utf8))
 
         XCTAssertFalse(json.localizedCaseInsensitiveContains("password"))
+    }
+}
+
+private actor PausedNavidromeIdentifier: NavidromeIdentifying {
+    private var pendingRequest: CheckedContinuation<NavidromeServerIdentity, Error>?
+    private var requestWaiters: [CheckedContinuation<Void, Never>] = []
+
+    func identifyNavidrome(
+        profile: NavidromeServerProfile,
+        password: String,
+        allowsInsecureLocalHTTP: Bool
+    ) async throws -> NavidromeServerIdentity {
+        try await withCheckedThrowingContinuation { continuation in
+            pendingRequest = continuation
+            requestWaiters.forEach { $0.resume() }
+            requestWaiters.removeAll()
+        }
+    }
+
+    func waitForRequest() async {
+        guard pendingRequest == nil else { return }
+        await withCheckedContinuation { continuation in
+            requestWaiters.append(continuation)
+        }
+    }
+
+    func complete(with identity: NavidromeServerIdentity) {
+        pendingRequest?.resume(returning: identity)
+        pendingRequest = nil
     }
 }
 

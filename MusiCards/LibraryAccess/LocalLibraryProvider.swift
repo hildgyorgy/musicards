@@ -29,7 +29,9 @@ final class LocalLibraryProvider: LibraryProvider {
     }
 
     func refreshCatalogIfNeeded() async {
+        #if os(macOS)
         store.refreshIfNeeded()
+        #endif
     }
 
     func searchCatalog(

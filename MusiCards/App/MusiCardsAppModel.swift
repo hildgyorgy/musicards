@@ -280,7 +280,9 @@ final class MusiCardsAppModel: ObservableObject {
 #if os(iOS)
         startNowPlayingUpdates()
         #endif
+        #if os(macOS)
         localLibrary.startAutomaticRefresh()
+        #endif
     }
 
     private func adoptRendererPlaybackIfAvailable(

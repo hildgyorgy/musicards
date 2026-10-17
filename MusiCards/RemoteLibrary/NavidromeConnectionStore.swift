@@ -82,6 +82,8 @@ final class NavidromeConnectionStore: ObservableObject {
     private let reachabilityClient: any NavidromeIdentifying
     private let storageKey = "NavidromeServerConnection.v1"
     private let rendererStorageKey = "NavidromeRendererConnection.v1"
+    private var pendingVerificationID: UUID?
+    private var pendingVerificationTask: Task<Void, Never>?
 
     init(
         defaults: UserDefaults = .standard,
@@ -106,13 +108,39 @@ final class NavidromeConnectionStore: ObservableObject {
         savedProfile != nil && identity != nil && errorMessage == nil
     }
 
-    func verifyAndSave() async {
-        guard !isConnecting else { return }
+    @discardableResult
+    func beginVerification() -> Task<Void, Never>? {
+        guard pendingVerificationTask == nil, !isConnecting else { return nil }
+        let task = Task { await verifyAndSave() }
+        pendingVerificationTask = task
+        return task
+    }
 
+    func cancelPendingVerification() {
+        guard pendingVerificationID != nil || pendingVerificationTask != nil else { return }
+        pendingVerificationID = nil
+        pendingVerificationTask?.cancel()
+        pendingVerificationTask = nil
+        isConnecting = false
+        statusMessage = nil
+        errorMessage = nil
+    }
+
+    func verifyAndSave() async {
+        guard !isConnecting, !Task.isCancelled else { return }
+
+        let verificationID = UUID()
+        pendingVerificationID = verificationID
         isConnecting = true
         statusMessage = nil
         errorMessage = nil
-        defer { isConnecting = false }
+        defer {
+            if pendingVerificationID == verificationID {
+                pendingVerificationID = nil
+                pendingVerificationTask = nil
+                isConnecting = false
+            }
+        }
 
         do {
             let trimmedUsername = username.trimmingCharacters(
@@ -159,8 +187,12 @@ final class NavidromeConnectionStore: ObservableObject {
                         password: connectionPassword,
                         allowsInsecureLocalHTTP: address.scheme?.lowercased() == "http"
                     )
+                    try Task.checkCancellation()
+                    guard pendingVerificationID == verificationID else { return }
                     verifiedEndpoints.append((address, endpointIdentity))
                 } catch {
+                    guard pendingVerificationID == verificationID,
+                          !Task.isCancelled else { return }
                     if firstVerificationError == nil {
                         firstVerificationError = error
                     }
@@ -170,6 +202,8 @@ final class NavidromeConnectionStore: ObservableObject {
                 }
             }
 
+            try Task.checkCancellation()
+            guard pendingVerificationID == verificationID else { return }
             guard let firstVerifiedEndpoint = verifiedEndpoints.first else {
                 throw firstVerificationError
                     ?? NavidromeConnectionStoreError.addressRequired
@@ -218,6 +252,8 @@ final class NavidromeConnectionStore: ObservableObject {
                 ? "Navidrome connection verified and saved."
                 : "Navidrome connection saved. The other address could not be verified from this network."
         } catch {
+            guard pendingVerificationID == verificationID,
+                  !Task.isCancelled else { return }
             Self.logger.error(
                 "Navidrome connection could not be saved error=\(error.localizedDescription, privacy: .private)"
             )
@@ -226,6 +262,7 @@ final class NavidromeConnectionStore: ObservableObject {
     }
 
     func removeServer() {
+        cancelPendingVerification()
         do {
             if let profileID = savedProfile?.id {
                 try credentialStore.deletePassword(for: profileID)

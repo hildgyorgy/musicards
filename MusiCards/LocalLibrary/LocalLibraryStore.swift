@@ -20,12 +20,16 @@ final class LocalLibraryStore: ObservableObject {
     @Published private(set) var isScanning = false
     @Published private(set) var statusMessage: String?
     @Published private(set) var connectionErrorMessage: String?
+    /// A readable label only; file access continues to use the original URL and bookmark.
+    @Published private(set) var selectedFolderDisplayPath: String?
 
     private let container: ModelContainer
     private let context: ModelContext
     private var rootURLs: [String: URL] = [:]
     private var accessedRootIDs = Set<String>()
     private var lookup = LocalLibraryLookup()
+    private var pendingFolderConnectionID: UUID?
+    private var pendingFolderConnectionTask: Task<Void, Never>?
 
     init() {
         do {
@@ -93,14 +97,17 @@ final class LocalLibraryStore: ObservableObject {
 
         do {
             let bookmark = try makeBookmark(for: url)
+            let connectionID = UUID()
+            pendingFolderConnectionID = connectionID
             isScanning = true
             connectionErrorMessage = nil
             statusMessage = "Connecting music folder…"
-            Task {
+            pendingFolderConnectionTask = Task {
                 await connectMusicFolder(
                     url,
                     bookmark: bookmark,
-                    didAccess: didAccess
+                    didAccess: didAccess,
+                    connectionID: connectionID
                 )
             }
         } catch {
@@ -109,6 +116,17 @@ final class LocalLibraryStore: ObservableObject {
             }
             connectionErrorMessage = error.localizedDescription
         }
+    }
+
+    /// Leaves an in-flight file-provider read alone, but prevents its result from connecting.
+    func cancelPendingFolderConnection() {
+        guard pendingFolderConnectionID != nil else { return }
+        pendingFolderConnectionID = nil
+        pendingFolderConnectionTask?.cancel()
+        pendingFolderConnectionTask = nil
+        isScanning = false
+        statusMessage = nil
+        connectionErrorMessage = nil
     }
 
     #if os(macOS)
@@ -286,14 +304,36 @@ final class LocalLibraryStore: ObservableObject {
         _ url: URL,
         bookmark: Data,
         didAccess: Bool,
-        successMessage: String = "Library index connected"
+        successMessage: String = "Library index connected",
+        connectionID: UUID? = nil
     ) async {
-        defer { isScanning = false }
+        defer {
+            if let connectionID {
+                if pendingFolderConnectionID == connectionID {
+                    pendingFolderConnectionID = nil
+                    pendingFolderConnectionTask = nil
+                    isScanning = false
+                }
+            } else {
+                isScanning = false
+            }
+        }
+
+        if let connectionID,
+           pendingFolderConnectionID != connectionID || Task.isCancelled {
+            if didAccess { url.stopAccessingSecurityScopedResource() }
+            return
+        }
 
         do {
             let manifest = try await LocalLibraryManifestLoader.load(
                 from: url
             )
+            if let connectionID,
+               pendingFolderConnectionID != connectionID || Task.isCancelled {
+                if didAccess { url.stopAccessingSecurityScopedResource() }
+                return
+            }
             let existingRoots = try context.fetch(
                 FetchDescriptor<LocalLibraryRootRecord>()
             )
@@ -302,7 +342,9 @@ final class LocalLibraryStore: ObservableObject {
             )
 
             if let existing = existingRoots.first(where: {
-                rootURLs[$0.id]?.standardizedFileURL == url.standardizedFileURL
+                // Comparing paths is enough here; standardizing a File Provider
+                // URL can synchronously wait for Dropbox on the main actor.
+                rootURLs[$0.id]?.path == url.path
             }) {
                 guard didAccess || accessedRootIDs.contains(existing.id) else {
                     throw NativePlaybackEngineError(
@@ -358,8 +400,12 @@ final class LocalLibraryStore: ObservableObject {
             rebuildLookup()
             statusMessage = successMessage
         } catch {
-            context.rollback()
             if didAccess { url.stopAccessingSecurityScopedResource() }
+            if let connectionID,
+               pendingFolderConnectionID != connectionID || Task.isCancelled {
+                return
+            }
+            context.rollback()
             connectionErrorMessage = manifestErrorMessage(error)
         }
     }
@@ -466,6 +512,7 @@ final class LocalLibraryStore: ObservableObject {
     private func retain(url: URL, for rootID: String, didAccess: Bool) {
         rootURLs[rootID] = url
         if didAccess { accessedRootIDs.insert(rootID) }
+        updateDisplayPath(for: url, rootID: rootID)
     }
 
     private func releaseAccess(for roots: [LocalLibraryRootRecord]) {
@@ -474,6 +521,30 @@ final class LocalLibraryStore: ObservableObject {
                 rootURLs[root.id]?.stopAccessingSecurityScopedResource()
             }
             rootURLs.removeValue(forKey: root.id)
+        }
+        if let (rootID, url) = rootURLs.first {
+            updateDisplayPath(for: url, rootID: rootID)
+        } else {
+            selectedFolderDisplayPath = nil
+        }
+    }
+
+    private func updateDisplayPath(for url: URL, rootID: String) {
+        // The file provider may block while answering volume metadata requests.
+        // Show a path-only label immediately and resolve the fuller label off-main.
+        selectedFolderDisplayPath = MusicFolderDisplayPath.label(
+            for: url,
+            volumeURL: nil,
+            volumeName: nil,
+            isExternalVolume: false
+        )
+        let labelTask = Task.detached(priority: .utility) {
+            MusicFolderDisplayPath.label(for: url)
+        }
+        Task { [weak self] in
+            let label = await labelTask.value
+            guard let self, self.rootURLs[rootID] == url else { return }
+            self.selectedFolderDisplayPath = label
         }
     }
 
@@ -485,18 +556,12 @@ final class LocalLibraryStore: ObservableObject {
             let records = try context.fetch(
                 FetchDescriptor<LocalAudioFileRecord>()
             )
-            var snapshotsByFileURL: [String: LocalAudioFileSnapshot] = [:]
-            for record in records {
-                guard let rootURL = rootURLs[record.rootID] else { continue }
-                let fileURL = rootURL
-                    .appendingPathComponent(record.relativePath)
-                    .standardizedFileURL
-                snapshotsByFileURL[fileURL.path] = LocalAudioFileSnapshot(record)
-            }
-            let snapshots = snapshotsByFileURL.values.sorted {
-                $0.relativePath.localizedStandardCompare($1.relativePath)
-                    == .orderedAscending
-            }
+            // The records already have stable root/path IDs. Standardizing each
+            // URL here performs a filesystem stat, which can wait on Dropbox's
+            // file provider and block the main thread during scene creation.
+            let snapshots = records
+                .filter { rootURLs[$0.rootID] != nil }
+                .map(LocalAudioFileSnapshot.init)
 
             lookup = LocalLibraryLookup(files: snapshots)
 
@@ -561,5 +626,104 @@ final class LocalLibraryStore: ObservableObject {
             bookmarkDataIsStale: &isStale
         )
         #endif
+    }
+}
+
+enum MusicFolderDisplayPath {
+    nonisolated static func label(for url: URL) -> String {
+        let values = try? url.resourceValues(forKeys: [
+            .volumeURLKey,
+            .volumeLocalizedNameKey,
+            .volumeIsInternalKey,
+            .volumeIsEjectableKey,
+            .volumeIsRemovableKey
+        ])
+        return label(
+            for: url,
+            volumeURL: values?.volume,
+            volumeName: values?.volumeLocalizedName,
+            isExternalVolume: values?.volumeIsInternal == false
+                || values?.volumeIsEjectable == true
+                || values?.volumeIsRemovable == true
+        )
+    }
+
+    nonisolated static func label(
+        for url: URL,
+        volumeURL: URL?,
+        volumeName: String?,
+        isExternalVolume: Bool
+    ) -> String {
+        let components = url.pathComponents
+        if let cloudStorageIndex = components.indices.first(where: { index in
+            index > components.startIndex
+                && components[index - 1].caseInsensitiveCompare("Library") == .orderedSame
+                && components[index].caseInsensitiveCompare("CloudStorage") == .orderedSame
+        }) {
+            var relativeComponents = Array(components.dropFirst(cloudStorageIndex + 1))
+            if let firstComponent = relativeComponents.first,
+               UUID(uuidString: firstComponent) != nil {
+                relativeComponents.removeFirst()
+                return relativeComponents.isEmpty
+                    ? "Cloud storage"
+                    : "Cloud storage/" + relativeComponents.joined(separator: "/")
+            }
+            if !relativeComponents.isEmpty {
+                return relativeComponents.joined(separator: "/")
+            }
+            return "Cloud storage"
+        }
+
+        if let iCloudIndex = components.firstIndex(of: "com~apple~CloudDocs"),
+           iCloudIndex > components.startIndex,
+           components[iCloudIndex - 1] == "Mobile Documents" {
+            let relativeComponents = components.dropFirst(iCloudIndex + 1)
+            return (["iCloud Drive"] + relativeComponents).joined(separator: "/")
+        }
+
+        let readableTail = readableTail(of: components)
+        let name = volumeName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if isExternalVolume, let name, !name.isEmpty,
+           UUID(uuidString: name) == nil {
+            let relativeComponents: [String]
+            if let volumeURL {
+                let volumeComponents = volumeURL.standardizedFileURL.pathComponents
+                let selectedComponents = url.standardizedFileURL.pathComponents
+                let belongsToVolume = volumeComponents.count > 1
+                    && selectedComponents.count >= volumeComponents.count
+                    && zip(selectedComponents, volumeComponents).allSatisfy { pair in
+                        pair.0.caseInsensitiveCompare(pair.1) == .orderedSame
+                    }
+                relativeComponents = belongsToVolume
+                    ? Array(selectedComponents.dropFirst(volumeComponents.count))
+                    : readableTail
+            } else {
+                relativeComponents = readableTail
+            }
+            if relativeComponents.first?.caseInsensitiveCompare(name) == .orderedSame {
+                return relativeComponents.joined(separator: "/")
+            }
+            return ([name] + relativeComponents).joined(separator: "/")
+        }
+
+        return readableTail.joined(separator: "/")
+    }
+
+    nonisolated private static func readableTail(of components: [String]) -> [String] {
+        let systemComponents: Set<String> = [
+            "Library", "CloudStorage", "Mobile Documents", "Application Support",
+            "File Provider Storage", "Containers", "AppGroup", "Shared",
+            "Volumes", "private", "var", "mobile", "Users", "System"
+        ]
+        var tail: [String] = []
+        for component in components.reversed() {
+            if component == "/" || UUID(uuidString: component) != nil
+                || systemComponents.contains(component) {
+                break
+            }
+            tail.insert(component, at: 0)
+            if tail.count == 2 { break }
+        }
+        return tail.isEmpty ? ["Music folder"] : tail
     }
 }

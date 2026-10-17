@@ -18,15 +18,27 @@ struct LibraryConnectionView: View {
 
     @State private var selectedSource: LibrarySource = .local
 
+    #if os(iOS)
+    private enum NavidromeField: Hashable {
+        case localAddress
+        case remoteAddress
+        case username
+        case password
+    }
+
+    @FocusState private var focusedNavidromeField: NavidromeField?
+    @State private var isEditingSavedPassword = false
+    #endif
+
     @Environment(\.colorScheme) private var colorScheme
 
     private var localIsConnected: Bool {
         localLibrary.summary.folderCount > 0
-            && localLibrary.connectionErrorMessage == nil
     }
 
     private var navidromeIsConnected: Bool {
-        navidromeConnection.isConfigured
+        navidromeConnection.savedProfile != nil
+            && navidromeConnection.identity != nil
     }
 
     private func syncSelectedSource(restoreDraft: Bool = true) {
@@ -41,7 +53,19 @@ struct LibraryConnectionView: View {
         }
     }
 
+    private func cancelPendingConnection(for source: LibrarySource) {
+        switch source {
+        case .local:
+            localLibrary.cancelPendingFolderConnection()
+        case .navidrome:
+            navidromeConnection.cancelPendingVerification()
+        }
+    }
+
     var body: some View {
+        #if os(iOS)
+        iosSourceSheet
+        #else
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 header
@@ -59,7 +83,12 @@ struct LibraryConnectionView: View {
                                 selectedSource == .navidrome
                             },
                             set: { isNavidrome in
-                                selectedSource = isNavidrome ? .navidrome : .local
+                                let nextSource: LibrarySource = isNavidrome
+                                    ? .navidrome : .local
+                                if selectedSource != nextSource {
+                                    cancelPendingConnection(for: selectedSource)
+                                }
+                                selectedSource = nextSource
                                 onDraftSourceChange?(selectedSource)
                             }
                         )
@@ -123,11 +152,305 @@ struct LibraryConnectionView: View {
             }
         }
         .scrollIndicators(.hidden)
-        #if os(iOS)
-        .presentationDetents([.fraction(0.45), .large])
-        .presentationDragIndicator(.visible)
         #endif
     }
+
+    #if os(iOS)
+    private var iosSourceSheet: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    HStack(spacing: 12) {
+                        sourceButton(.local, title: "This device")
+                        sourceButton(.navidrome, title: "Navidrome")
+                    }
+                    .listRowBackground(Color.clear)
+                }
+
+                if selectedSource == .navidrome {
+                    iosNavidromeContent
+                } else {
+                    iosLocalContent
+                }
+            }
+            .navigationTitle("Music source")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .onAppear {
+            syncSelectedSource(restoreDraft: false)
+            if activeLibrarySource == nil {
+                activeLibrarySource = selectedSource
+            }
+        }
+        .onChange(of: navidromeIsConnected) { oldValue, newValue in
+            guard oldValue && !newValue else { return }
+            activeLibrarySource = LibrarySourceSelectionPolicy
+                .sourceAfterDisconnect(
+                    .navidrome,
+                    activeSource: activeLibrarySource,
+                    localIsConnected: localIsConnected,
+                    navidromeIsConnected: false
+                ) ?? .local
+            syncSelectedSource(restoreDraft: false)
+        }
+        .onChange(of: localIsConnected) { oldValue, newValue in
+            guard oldValue && !newValue else { return }
+            activeLibrarySource = LibrarySourceSelectionPolicy
+                .sourceAfterDisconnect(
+                    .local,
+                    activeSource: activeLibrarySource,
+                    localIsConnected: false,
+                    navidromeIsConnected: navidromeIsConnected
+                ) ?? .local
+            syncSelectedSource(restoreDraft: false)
+        }
+        .onChange(of: navidromeConnection.isConnecting) { wasConnecting, isConnecting in
+            if wasConnecting && !isConnecting && isSavedNavidromeConnectionCurrent {
+                isEditingSavedPassword = false
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func sourceButton(_ source: LibrarySource, title: String) -> some View {
+        if selectedSource == source {
+            Button {
+                selectSource(source)
+            } label: {
+                Text(title)
+                    .frame(maxWidth: .infinity)
+            }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
+        } else {
+            Button {
+                selectSource(source)
+            } label: {
+                Text(title)
+                    .frame(maxWidth: .infinity)
+            }
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
+        }
+    }
+
+    private func selectSource(_ source: LibrarySource) {
+        guard selectedSource != source else { return }
+        cancelPendingConnection(for: selectedSource)
+        focusedNavidromeField = nil
+        selectedSource = source
+        activeLibrarySource = source
+    }
+
+    @ViewBuilder
+    private var iosLocalContent: some View {
+        Section {
+            Button(action: onConnectExisting) {
+                HStack {
+                    Text("Select music folder")
+                        .foregroundStyle(.primary)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(localLibrary.isScanning)
+
+            if let selectedFolderDisplayPath = localLibrary.selectedFolderDisplayPath {
+                Text(selectedFolderDisplayPath)
+                    .font(.system(.body, design: .monospaced))
+                    .lineLimit(2)
+                    .truncationMode(.middle)
+                    .textSelection(.enabled)
+            } else {
+                Text("No folder selected")
+                    .foregroundStyle(.secondary)
+            }
+        }
+
+        Section {
+            if localLibrary.isScanning {
+                Text("Connecting…")
+                    .foregroundStyle(.blue)
+                    .frame(maxWidth: .infinity)
+                    .alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
+            } else if localLibrary.summary.folderCount > 0 {
+                Text("Connected")
+                    .foregroundStyle(.blue)
+                    .frame(maxWidth: .infinity)
+                    .alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
+            } else {
+                Text("Not connected")
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+                    .alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
+            }
+
+            if localLibrary.summary.folderCount > 0 {
+                Button(role: .destructive, action: onDisconnect) {
+                    Text("Disconnect library")
+                        .frame(maxWidth: .infinity)
+                }
+            }
+        } footer: {
+            VStack(alignment: .leading, spacing: 12) {
+                if let errorMessage = localLibrary.connectionErrorMessage {
+                    Text(errorMessage)
+                        .foregroundStyle(.red)
+                }
+                Text("MusiCards is built around MusicBrainz metadata. To play music files selected through Files, it deliberately requires a valid \(Text("library.json").bold()) in that folder. The index matches your files to MusicBrainz releases and tracks.")
+                Text("Create or update \(Text("library.json").bold()) with \(Text("MusiCards for Mac").bold()) from MusicBrainz Picard-tagged files, then select the same folder here.")
+            }
+            .font(.subheadline)
+        }
+    }
+
+    @ViewBuilder
+    private var iosNavidromeContent: some View {
+        Section("Navidrome server") {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Local network address")
+                TextField(
+                    "http://server.local:4533",
+                    text: $navidromeConnection.homeServerURL
+                )
+                .font(.system(.body, design: .monospaced))
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .keyboardType(.URL)
+                .textContentType(.URL)
+                .focused($focusedNavidromeField, equals: .localAddress)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Remote address")
+                TextField(
+                    "https://",
+                    text: $navidromeConnection.remoteServerURL
+                )
+                .font(.system(.body, design: .monospaced))
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .keyboardType(.URL)
+                .textContentType(.URL)
+                .focused($focusedNavidromeField, equals: .remoteAddress)
+            }
+        }
+
+        Section {
+            LabeledContent("Username") {
+                TextField("Username", text: $navidromeConnection.username)
+                    .multilineTextAlignment(.trailing)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .textContentType(.username)
+                    .focused($focusedNavidromeField, equals: .username)
+            }
+
+            LabeledContent("Password") {
+                iosPasswordControl
+            }
+        }
+
+        Section {
+            if isSavedNavidromeConnectionCurrent {
+                Text("Connected")
+                    .foregroundStyle(.blue)
+                    .frame(maxWidth: .infinity)
+                    .alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
+            } else if navidromeConnection.isConnecting {
+                Text("Connecting…")
+                    .foregroundStyle(.blue)
+                    .frame(maxWidth: .infinity)
+                    .alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
+            } else {
+                Button {
+                    focusedNavidromeField = nil
+                    navidromeConnection.beginVerification()
+                } label: {
+                    Text("Connect")
+                        .frame(maxWidth: .infinity)
+                }
+                .tint(.blue)
+                .alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
+            }
+
+            if navidromeConnection.savedProfile != nil {
+                Button(role: .destructive) {
+                    focusedNavidromeField = nil
+                    isEditingSavedPassword = false
+                    navidromeConnection.removeServer()
+                } label: {
+                    Text("Disconnect Navidrome")
+                        .frame(maxWidth: .infinity)
+                }
+            }
+        } footer: {
+            VStack(alignment: .leading, spacing: 12) {
+                if let errorMessage = navidromeConnection.errorMessage {
+                    Text(errorMessage)
+                        .foregroundStyle(.red)
+                } else if let statusMessage = navidromeConnection.statusMessage,
+                          statusMessage.contains("other address") {
+                    Text(statusMessage)
+                }
+                Text("For playback on \(Text("THIS DEVICE").bold()), enter at least one address.")
+                Text("For playback on a \(Text("UPNP RENDERER").bold()), it must be able to reach the Navidrome server. A \(Text("LOCAL").bold()) network address is recommended.")
+            }
+            .font(.subheadline)
+        }
+    }
+
+    @ViewBuilder
+    private var iosPasswordControl: some View {
+        if navidromeConnection.hasStoredPassword
+            && navidromeConnection.password.isEmpty
+            && !isEditingSavedPassword {
+            Button {
+                isEditingSavedPassword = true
+                Task { @MainActor in
+                    await Task.yield()
+                    focusedNavidromeField = .password
+                }
+            } label: {
+                Text("••••••••••••")
+                    .foregroundStyle(.primary)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Change saved password")
+        } else {
+            SecureField("Password", text: $navidromeConnection.password)
+                .multilineTextAlignment(.trailing)
+                .textContentType(.password)
+                .focused($focusedNavidromeField, equals: .password)
+        }
+    }
+
+    private var isSavedNavidromeConnectionCurrent: Bool {
+        guard navidromeConnection.isConfigured,
+              let profile = navidromeConnection.savedProfile,
+              navidromeConnection.hasStoredPassword,
+              navidromeConnection.password.isEmpty else {
+            return false
+        }
+        return navidromeConnection.homeServerURL.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        ) == (navidromeConnection.homeBaseURL?.absoluteString ?? "")
+            && navidromeConnection.remoteServerURL.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            ) == (navidromeConnection.remoteBaseURL?.absoluteString ?? "")
+            && navidromeConnection.username.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            ) == profile.username
+    }
+    #endif
 
     @ViewBuilder
     private var localContent: some View {
@@ -311,9 +634,7 @@ struct LibraryConnectionView: View {
                 Spacer(minLength: 0)
 
                 Button {
-                    Task {
-                        await navidromeConnection.verifyAndSave()
-                    }
+                    navidromeConnection.beginVerification()
                 } label: {
                     Text(navidromeConnection.isConnecting ? "CONNECTING..." : "CONNECT")
                         .font(.system(.footnote, design: .monospaced).weight(.semibold))
