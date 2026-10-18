@@ -233,11 +233,11 @@ struct LibraryConnectionView: View {
                     Text(errorMessage)
                         .foregroundStyle(.red)
                 }
-                Text("MusiCards is built around MusicBrainz metadata. To play music files selected through Files, it deliberately requires a valid \(Text("library.json").bold()) in that folder. The index matches your files to MusicBrainz releases and tracks.")
+                Text("To play music from this device, first prepare your music folder with MusiCards for Mac, then select it here. MusiCards creates the index (\(Text("library.json").bold())) needed to match your files with MusicBrainz; you don’t need to edit it yourself.")
                 #if os(macOS)
-                Text("Create or update \(Text("library.json").bold()) from MusicBrainz Picard-tagged files on the home screen, then select the same folder here.")
+                Text("Tag your files with MusicBrainz Picard first. Use Create / update library index on the home screen whenever you add or change music.")
                 #else
-                Text("Create or update \(Text("library.json").bold()) with \(Text("MusiCards for Mac").bold()) from MusicBrainz Picard-tagged files, then select the same folder here.")
+                Text("Tag your files with MusicBrainz Picard first. Use MusiCards for Mac to update the index whenever you add or change music.")
                 #endif
             }
             .font(.subheadline)
@@ -358,6 +358,7 @@ struct LibraryConnectionView: View {
                           statusMessage.contains("other address") {
                     Text(statusMessage)
                 }
+                Text("Navidrome provides the music catalog and MusicBrainz IDs, so this source does not need \(Text("library.json").bold()). Tag your files with MusicBrainz Picard and let Navidrome scan them.")
                 Text("For playback on \(Text("THIS DEVICE").bold()), enter at least one address.")
                 Text("For playback on a \(Text("UPNP RENDERER").bold()), it must be able to reach the Navidrome server. A \(Text("LOCAL").bold()) network address is recommended.")
             }

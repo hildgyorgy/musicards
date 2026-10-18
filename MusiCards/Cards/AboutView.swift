@@ -6,6 +6,10 @@
 import SwiftUI
 
 struct AboutView: View {
+    private var currentVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
+    }
+
     #if os(macOS)
     @AppStorage("glassTransparent") private var glassTransparent = false
     #endif
@@ -21,7 +25,11 @@ struct AboutView: View {
                         .font(.title2.weight(.semibold))
                     #endif
 
-                    Text("Explore MusicBrainz artists, releases, tracks and credits. You can browse without connecting a music library; connect your own music to play matching tracks.")
+                    Text("Current version: \(currentVersion)")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+
+                    Text("Explore MusicBrainz artists, releases, tracks and credits. Connect your own music to play matching tracks.")
                 }
 
                 helpSection("Find music") {
@@ -33,7 +41,9 @@ struct AboutView: View {
                         searchExample("artist, release", "Find an artist’s release")
                     }
 
-                    Text("Use the search switch to look in your library only, or include MusicBrainz. You can also paste a MusicBrainz release ID to open a specific edition.")
+                    Text("Paste a MusicBrainz release ID to open a specific edition.")
+
+                    Text("Use the search switch to look in your library only, or include MusicBrainz.")
 
                     #if os(iOS)
                     Text("On iPhone, you can scan a CD barcode or use Shazam. When Apple Music is playing, its album may also appear in Search.")
@@ -43,17 +53,17 @@ struct AboutView: View {
                 helpSection("Choose a music source") {
                     Text("Open SOURCE on the home screen and choose This device or Navidrome. This choice affects playback, not MusicBrainz browsing.")
 
-                    Text("For This device, select a music folder containing a valid \(Text("library.json").font(.system(.body, design: .monospaced))). The index connects your files to MusicBrainz releases and tracks.")
+                    Text("For This device, first tag your files with MusicBrainz Picard and prepare the music folder with MusiCards for Mac. MusiCards creates the index (\(Text("library.json").font(.system(.body, design: .monospaced)))) needed to match your files with MusicBrainz; you don’t need to edit it yourself.")
 
                     #if os(macOS)
-                    Text("To prepare a folder, tag its music with MusicBrainz Picard, then use Create / update library index on the home screen. Afterwards, select that folder in SOURCE.")
+                    Text("Use Create / update library index on the home screen, then select the prepared folder in SOURCE. Update the index after adding or changing music.")
                     #else
-                    Text("Create or update \(Text("library.json").font(.system(.body, design: .monospaced))) with MusiCards for Mac from MusicBrainz Picard-tagged files, then select the same folder here.")
+                    Text("After preparing the folder on Mac, select it from Files in SOURCE. It can also be on supported external storage. Update the index on Mac after adding or changing music.")
                     #endif
 
                     Link("MusicBrainz Picard", destination: AboutLinks.picard)
 
-                    Text("For Navidrome, enter a reachable server address and your account details in SOURCE. A local network address is recommended when playing through a UPnP renderer.")
+                    Text("For Navidrome, no \(Text("library.json").font(.system(.body, design: .monospaced))) is needed: Navidrome provides the catalog and MusicBrainz IDs from your tagged files. Let it scan your music, then enter a reachable server address and your account details in SOURCE. A local network address is recommended for UPnP playback.")
                 }
 
                 helpSection("Choose audio output") {
