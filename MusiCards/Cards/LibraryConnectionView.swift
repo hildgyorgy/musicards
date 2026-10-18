@@ -223,6 +223,9 @@ struct LibraryConnectionView: View {
                         .foregroundStyle(.red)
                         .frame(maxWidth: .infinity)
                 }
+                #if os(macOS)
+                .buttonStyle(.plain)
+                #endif
             }
         } footer: {
             VStack(alignment: .leading, spacing: 12) {
@@ -342,6 +345,9 @@ struct LibraryConnectionView: View {
                         .foregroundStyle(.red)
                         .frame(maxWidth: .infinity)
                 }
+                #if os(macOS)
+                .buttonStyle(.plain)
+                #endif
             }
         } footer: {
             VStack(alignment: .leading, spacing: 12) {
