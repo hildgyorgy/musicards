@@ -16,10 +16,6 @@ enum DeckStyle {
     // MARK: - Deck geometry
 
     static let horizontalInset: CGFloat = 0
-    static let aboutOverlayHorizontalInset: CGFloat = 6
-    static var aboutOverlayCornerRadius: CGFloat {
-        max(AppStyle.cornerRadius - aboutOverlayHorizontalInset, 0)
-    }
     static let topInset: CGFloat = 0
     static let titlebarHeight: CGFloat = 65
     static var cornerRadius: CGFloat {

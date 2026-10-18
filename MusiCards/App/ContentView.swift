@@ -358,15 +358,8 @@ struct ContentView: View {
                         }
                     )
                 }
-
-                if isShowingAbout {
-                    AboutSheetView {
-                        isShowingAbout = false
-                    }
-                    .padding(.horizontal, DeckStyle.aboutOverlayHorizontalInset)
-                    .padding(.bottom, DeckStyle.aboutOverlayHorizontalInset)
-                    .zIndex(1_000)
-                    .transition(.scale.combined(with: .opacity))
+                .sheet(isPresented: $isShowingAbout) {
+                    AboutSheetView()
                 }
 
             #else
@@ -429,7 +422,6 @@ struct ContentView: View {
             .easeInOut(duration: 0.15),
             value: appModel.isBlockingNavigationLoad
         )
-        .animation(.spring(duration: 0.35), value: isShowingAbout)
         .onAppear {
             appModel.refreshActiveLibraryIfNeeded()
         }
@@ -439,13 +431,6 @@ struct ContentView: View {
             }
         }
         #if os(macOS)
-        .onKeyPress(.escape) {
-            if isShowingAbout {
-                isShowingAbout = false
-                return .handled
-            }
-            return .ignored
-        }
         .onReceive(
             NotificationCenter.default.publisher(
                 for: NSApplication.willTerminateNotification

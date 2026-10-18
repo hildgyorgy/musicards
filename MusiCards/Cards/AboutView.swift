@@ -2,304 +2,143 @@
 //  AboutView.swift
 //  MusiCards
 //
-//  Created by Hild György on 2026. 04. 24..
-//
 
 import SwiftUI
 
 struct AboutView: View {
-
     #if os(macOS)
-        @AppStorage("glassTransparent") private var glassTransparent = false
+    @AppStorage("glassTransparent") private var glassTransparent = false
     #endif
 
     @State private var isShowingThirdPartyLicenses = false
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                findSection
+            VStack(alignment: .leading, spacing: 28) {
+                VStack(alignment: .leading, spacing: 10) {
+                    #if os(iOS)
+                    Text("Help & support")
+                        .font(.title2.weight(.semibold))
+                    #endif
 
-                primaryDivider
-
-                prepareSection
-
-                playSection
-
-            Link(destination: AboutLinks.help) {
-                    HStack(spacing: 5) {
-                        Text("Detailed help")
-                        Image(systemName: "arrow.up.right")
-                            .font(.caption2.weight(.semibold))
-                    }
-                    .font(.callout.weight(.medium))
+                    Text("Explore MusicBrainz artists, releases, tracks and credits. You can browse without connecting a music library; connect your own music to play matching tracks.")
                 }
 
-                primaryDivider
+                helpSection("Find music") {
+                    Text("Type a name or title in Search:")
 
-                attributionSection
-
-                Button {
-                    isShowingThirdPartyLicenses = true
-                } label: {
-                    HStack {
-                        Text("Third-Party Licenses")
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.caption.weight(.semibold))
+                    VStack(alignment: .leading, spacing: 12) {
+                        searchExample("artist", "Find artists")
+                        searchExample(", release", "Find releases by title")
+                        searchExample("artist, release", "Find an artist’s release")
                     }
-                    .font(.callout.weight(.medium))
+
+                    Text("Use the search switch to look in your library only, or include MusicBrainz. You can also paste a MusicBrainz release ID to open a specific edition.")
+
+                    #if os(iOS)
+                    Text("On iPhone, you can scan a CD barcode or use Shazam. When Apple Music is playing, its album may also appear in Search.")
+                    #endif
                 }
-                .buttonStyle(.plain)
-                .sheet(isPresented: $isShowingThirdPartyLicenses) {
-                    ThirdPartyLicensesView()
+
+                helpSection("Choose a music source") {
+                    Text("Open SOURCE on the home screen and choose This device or Navidrome. This choice affects playback, not MusicBrainz browsing.")
+
+                    Text("For This device, select a music folder containing a valid \(Text("library.json").font(.system(.body, design: .monospaced))). The index connects your files to MusicBrainz releases and tracks.")
+
+                    #if os(macOS)
+                    Text("To prepare a folder, tag its music with MusicBrainz Picard, then use Create / update library index on the home screen. Afterwards, select that folder in SOURCE.")
+                    #else
+                    Text("Create or update \(Text("library.json").font(.system(.body, design: .monospaced))) with MusiCards for Mac from MusicBrainz Picard-tagged files, then select the same folder here.")
+                    #endif
+
+                    Link("MusicBrainz Picard", destination: AboutLinks.picard)
+
+                    Text("For Navidrome, enter a reachable server address and your account details in SOURCE. A local network address is recommended when playing through a UPnP renderer.")
+                }
+
+                helpSection("Choose audio output") {
+                    Text("Open OUTPUT on the home screen. System audio follows the output chosen on your device, including speakers, headphones, AirPlay, Bluetooth and connected DACs.")
+
+                    Text("You can also search for and select a UPnP renderer on your network. UPnP playback currently works with Navidrome tracks only; the renderer must be able to reach your Navidrome server.")
+
+                    Text("A blue play symbol marks a release or track available from the active music source.")
+                }
+
+                helpSection("If playback is unavailable") {
+                    Text("No play symbol? Check the active source. For files on this device, check the MusicBrainz tags and update \(Text("library.json").font(.system(.body, design: .monospaced))) after changing your music. For Navidrome, check that its library scan has finished.")
+
+                    Text("No renderer found? Try Deep search or enter its address in OUTPUT. No sound? Check the selected output here and in the system.")
+                }
+
+                helpSection("Support & privacy") {
+                    Link("Support", destination: AboutLinks.support)
+                    Link("Privacy policy", destination: AboutLinks.privacy)
+                    Button("Third-party licenses") {
+                        isShowingThirdPartyLicenses = true
+                    }
                 }
 
                 #if os(macOS)
-                    glassStylePicker
+                if #available(macOS 26.0, *) {
+                    helpSection("Window appearance") {
+                        Toggle("Liquid glass", isOn: $glassTransparent)
+                            .toggleStyle(.switch)
+                    }
+                }
                 #endif
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Music metadata: MusicBrainz. Cover art: Cover Art Archive.")
+                    Link("MusicBrainz", destination: AboutLinks.musicBrainz)
+                    Text("György Hild · 2026")
+                }
+                .font(.footnote)
+                .foregroundStyle(.secondary)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 24)
-            .padding(.top, 28)
-            .padding(.bottom, 24)
+            .font(.body)
+            .frame(maxWidth: 620, alignment: .leading)
+            .frame(maxWidth: .infinity)
+            .padding(24)
         }
-        .scrollIndicators(.hidden)
         .tint(.blue)
+        .sheet(isPresented: $isShowingThirdPartyLicenses) {
+            ThirdPartyLicensesView()
+        }
         #if os(iOS)
-            .presentationDetents([.large])
-            .presentationDragIndicator(.visible)
-            .presentationContentInteraction(.scrolls)
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .presentationContentInteraction(.scrolls)
         #endif
     }
 
-    private var primaryDivider: some View {
-        Rectangle()
-            .fill(Color.primary)
-            .frame(height: 1)
-    }
-
-    private var findSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            sectionTitle("FIND")
-
-            VStack(alignment: .leading, spacing: 12) {
-                SearchRecipeRow(
-                    example: "artist",
-                    explanation: "Search for an artist"
-                )
-
-                SearchRecipeRow(
-                    example: ", release",
-                    explanation: "Search for releases"
-                )
-
-                SearchRecipeRow(
-                    example: "artist, release",
-                    explanation: "Combined search"
-                )
-            }
-
-            VStack(alignment: .leading, spacing: 8) {
-                helpBullet("Paste a MusicBrainz release MBID")
-
-                #if os(iOS)
-                    helpBullet("Scan the barcode of a CD")
-                    helpBullet("Use Shazam to identify music")
-                #endif
-            }
-            .padding(.top, 2)
-        }
-    }
-
-    private var prepareSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            sectionTitle("PREPARE")
-
-            VStack(alignment: .leading, spacing: 11) {
-                instruction(
-                    1,
-                    "Tag your albums with [MusicBrainz Picard](https://picard.musicbrainz.org/)."
-                )
-                instruction(
-                    2,
-                    "On a Mac, choose CONNECT to create or update the library index."
-                )
-            }
-        }
-    }
-
-    private var playSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            sectionTitle("PLAY")
-
-            VStack(alignment: .leading, spacing: 11) {
-                instruction(
-                    1,
-                    "Choose an existing indexed music folder with CONNECT if it is not already connected."
-                )
-                instruction(
-                    2,
-                    "Play any release or track marked with the blue play symbol."
-                )
-            }
-        }
-    }
-
-    private var attributionSection: some View {
-        VStack(spacing: 7) {
-            Text("Data provided by MusicBrainz")
+    private func helpSection<Content: View>(
+        _ title: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
                 .font(.headline)
+            content()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
 
-            Link("musicbrainz.org", destination: AboutLinks.musicBrainz)
-
-            Text("MusicBrainz data is available under the CC0 license.")
-                .font(.footnote)
+    private func searchExample(
+        _ query: String,
+        _ explanation: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(query)
+                .font(.system(.body, design: .monospaced))
+            Text(explanation)
                 .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-
-            Text("Cover art is provided by the Cover Art Archive.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-
-            ViewThatFits(in: .horizontal) {
-                footerLinks
-
-                VStack(spacing: 5) {
-                    HStack(spacing: 5) {
-                        Link("Support", destination: AboutLinks.support)
-                        Text("•")
-                        Link("Privacy", destination: AboutLinks.privacy)
-                    }
-
-                    Text("György Hild • 2026")
-                }
-            }
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-            .padding(.top, 5)
         }
-        .frame(maxWidth: .infinity)
-    }
-
-    private var footerLinks: some View {
-        HStack(spacing: 5) {
-            Link("Support", destination: AboutLinks.support)
-            Text("•")
-            Link("Privacy", destination: AboutLinks.privacy)
-            Text("|")
-            Text("György Hild")
-            Text("•")
-            Text("2026")
-        }
-    }
-
-    #if os(macOS)
-        @ViewBuilder
-        private var glassStylePicker: some View {
-            if #available(macOS 26.0, *) {
-                HStack(spacing: 8) {
-                    Text("FROSTED")
-                        .foregroundStyle(
-                            glassTransparent ? .secondary : .primary
-                        )
-
-                    Toggle("", isOn: $glassTransparent)
-                        .toggleStyle(.switch)
-                        .labelsHidden()
-
-                    Text("LIQUID")
-                        .foregroundStyle(
-                            glassTransparent ? .primary : .secondary
-                        )
-                }
-                .font(.caption)
-                .tracking(1.5)
-                .frame(maxWidth: .infinity)
-                .padding(.top, 2)
-            }
-        }
-    #endif
-
-    private func sectionTitle(_ title: String) -> some View {
-        Text(title)
-            .font(.system(.headline, design: .monospaced).weight(.semibold))
-            .tracking(2)
-            .foregroundStyle(.primary)
-    }
-
-    private func helpBullet(_ text: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 9) {
-            Text("•")
-                .font(.system(.callout, design: .monospaced))
-
-            Text(text)
-                .font(.callout)
-                .foregroundStyle(.primary)
-        }
-    }
-
-    private func instruction(_ number: Int, _ markdown: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Text("\(number).")
-                .font(.system(.callout, design: .monospaced).weight(.semibold))
-                .frame(width: 20, alignment: .trailing)
-
-            Text(attributed(markdown))
-                .font(.callout)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-
-    private func attributed(_ markdown: String) -> AttributedString {
-        (try? AttributedString(markdown: markdown)) ?? AttributedString(markdown)
-    }
-}
-
-private struct SearchRecipeRow: View {
-    let example: String
-    let explanation: String
-
-    @Environment(\.colorScheme) private var colorScheme
-
-    var body: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .firstTextBaseline, spacing: 11) {
-                exampleToken
-                Text(explanation)
-                    .font(.callout)
-                    .foregroundStyle(.primary)
-            }
-
-            VStack(alignment: .leading, spacing: 6) {
-                exampleToken
-                Text(explanation)
-                    .font(.callout)
-                    .foregroundStyle(.primary)
-            }
-        }
-        .accessibilityElement(children: .combine)
-    }
-
-    private var exampleToken: some View {
-        Text(example)
-            .font(.system(.callout, design: .monospaced).weight(.semibold))
-            .foregroundStyle(colorScheme == .dark ? Color.black : .white)
-            .padding(.horizontal, 9)
-            .padding(.vertical, 5)
-            .background {
-                RoundedRectangle(cornerRadius: 3, style: .continuous)
-                    .fill(colorScheme == .dark ? Color.white : .black)
-            }
     }
 }
 
 private enum AboutLinks {
     static let musicBrainz = URL(string: "https://musicbrainz.org")!
-    static let help = URL(
-        string: "https://hildgyorgy.github.io/app-support/musicards/#help"
-    )!
+    static let picard = URL(string: "https://picard.musicbrainz.org/")!
     static let support = URL(
         string: "https://hildgyorgy.github.io/app-support/musicards/#support"
     )!

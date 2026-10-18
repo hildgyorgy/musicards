@@ -9,12 +9,19 @@ import SwiftUI
 
 #if os(macOS)
 struct AboutSheetView: View {
-    let onDismiss: () -> Void
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        MusiCardsPanelShell(onDismiss: onDismiss) {
+        VStack(spacing: 0) {
+            MusiCardsSettingsSheetHeader(title: "Help & support") {
+                dismiss()
+            }
             AboutView()
         }
+        .frame(
+            width: MacWindowMetrics.contentSize.width - 4,
+            height: MacWindowMetrics.contentSize.height * 0.78
+        )
     }
 }
 #endif
