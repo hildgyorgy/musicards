@@ -19,6 +19,15 @@ struct AboutView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
+                #if os(macOS)
+                if #available(macOS 26.0, *) {
+                    helpSection("Window appearance") {
+                        Toggle("Liquid glass", isOn: $glassTransparent)
+                            .toggleStyle(.switch)
+                    }
+                }
+                #endif
+
                 VStack(alignment: .leading, spacing: 10) {
                     #if os(iOS)
                     Text("Help & support")
@@ -87,15 +96,6 @@ struct AboutView: View {
                         isShowingThirdPartyLicenses = true
                     }
                 }
-
-                #if os(macOS)
-                if #available(macOS 26.0, *) {
-                    helpSection("Window appearance") {
-                        Toggle("Liquid glass", isOn: $glassTransparent)
-                            .toggleStyle(.switch)
-                    }
-                }
-                #endif
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Music metadata: MusicBrainz. Cover art: Cover Art Archive.")
