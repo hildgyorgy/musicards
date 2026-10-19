@@ -83,6 +83,16 @@ struct AudioOutputRoute: Equatable {
         transport == .builtIn ? builtInDeviceName : deviceName.uppercased()
     }
 
+    var detailDisplayName: String {
+        #if os(iOS)
+        if transport == .builtIn {
+            return UIDevice.current.userInterfaceIdiom == .pad
+                ? "This iPad" : "This iPhone"
+        }
+        #endif
+        return deviceName
+    }
+
     var sampleRateText: String? {
         guard transport.allowsDeviceSampleRateMatching,
               let sampleRate, sampleRate > 0 else {

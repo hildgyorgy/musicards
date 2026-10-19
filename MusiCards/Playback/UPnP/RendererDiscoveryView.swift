@@ -126,7 +126,7 @@ struct RendererDiscoveryView: View {
     private var systemAudioContent: some View {
         Section {
             Text("Active system audio output")
-            Text(controller.outputRoute.displayName)
+            Text(controller.outputRoute.detailDisplayName)
                 .font(.system(.body, design: .monospaced))
         } header: {
             Text("System audio")

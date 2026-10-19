@@ -137,6 +137,7 @@ struct PlayerCardContentView: View {
             .font(.footnote)
             .foregroundStyle(.secondary)
             .multilineTextAlignment(.leading)
+            .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.vertical, 6)
             .padding(.bottom, 6)
@@ -214,8 +215,9 @@ struct PlayerCardContentView: View {
     private func sourceTitle(_ item: PlaybackQueueItem) -> String {
         let source = sourceName(item.source)
         let format = audioFormatText(displayedAudioFormat(for: item))
-        let details = format.isEmpty ? source : "\(source) • \(format)"
-        return "SOURCE:\n\(details)"
+        return ["SOURCE:", source, format]
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n")
     }
 
     private var outputTitle: String {
@@ -224,7 +226,7 @@ struct PlayerCardContentView: View {
             controller.outputSampleRateText
         ]
             .compactMap { $0 }
-            .joined(separator: " • ")
+            .joined(separator: "\n")
         return "OUTPUT:\n\(details)"
     }
 
@@ -249,21 +251,7 @@ struct PlayerCardContentView: View {
     }
 
     private func sourceName(_ source: PlaybackSource) -> String {
-        switch source {
-        case .localFile(let url):
-            let path = url.absoluteString.lowercased()
-            if path.contains("dropbox") {
-                return "DROPBOX"
-            }
-            if path.contains("icloud") || path.contains("ubiquity") {
-                return "ICLOUD"
-            }
-            return "LOCAL"
-        case .remoteAudio(let asset):
-            return asset.displayName
-        case .libraryAsset(let reference):
-            return reference.displayName
-        }
+        isNavidromeSource(source) ? "Navidrome" : "This device"
     }
 
     private func audioFormatText(_ format: PlaybackAudioFormat?) -> String {

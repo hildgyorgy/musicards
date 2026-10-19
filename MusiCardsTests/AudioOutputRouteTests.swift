@@ -12,6 +12,7 @@ final class AudioOutputRouteTests: XCTestCase {
         )
 
         XCTAssertEqual(route.displayName, "CHORD MOJO 2")
+        XCTAssertEqual(route.detailDisplayName, "Chord Mojo 2")
         XCTAssertEqual(route.sampleRateText, "44.1 kHz")
     }
 
@@ -40,6 +41,7 @@ final class AudioOutputRouteTests: XCTestCase {
         XCTAssertEqual(route.displayName(builtInDeviceName: "THIS IPAD"), "THIS IPAD")
         #if os(macOS)
         XCTAssertEqual(route.displayName, "SPEAKER")
+        XCTAssertEqual(route.detailDisplayName, "Speaker")
         #endif
     }
 }

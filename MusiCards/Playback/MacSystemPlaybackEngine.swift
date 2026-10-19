@@ -7,6 +7,7 @@
 import AudioToolbox
 import CoreAudio
 import Foundation
+import OSLog
 
 @MainActor
 final class MacSystemPlaybackEngine: PlaybackEngine {
@@ -26,6 +27,10 @@ final class MacSystemPlaybackEngine: PlaybackEngine {
         let decodedPCM = try await core.decode(item, generation: generation)
 
         matchDefaultOutputSampleRate(decodedPCM.sampleRate)
+        let route = AudioOutputRouteInspector.current()
+        PlaybackQualityDiagnostics.logger.notice(
+            "Mac output prepare sourceHz=\(decodedPCM.sampleRate, privacy: .public) deviceHz=\(route.sampleRate ?? 0, privacy: .public) sampleRateMatching=\(route.transport.allowsDeviceSampleRateMatching, privacy: .public) remote=\(decodedPCM.isRemote, privacy: .public)"
+        )
         try configureOutputUnit(for: decodedPCM)
         core.completePreparation(
             decodedPCM: decodedPCM,

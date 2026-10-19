@@ -252,7 +252,7 @@ struct LibraryConnectionView: View {
                 TextField(
                     "",
                     text: $navidromeConnection.homeServerURL,
-                    prompt: Text("http://server.local:4533")
+                    prompt: addressPrompt("http://server.local:4533")
                 )
                 .font(.system(.body, design: .monospaced))
                 .accessibilityLabel("Local network address")
@@ -272,7 +272,7 @@ struct LibraryConnectionView: View {
                 TextField(
                     "",
                     text: $navidromeConnection.remoteServerURL,
-                    prompt: Text("https://")
+                    prompt: addressPrompt("https://")
                 )
                     .font(.system(.body, design: .monospaced))
                     .accessibilityLabel("Remote address")
@@ -364,6 +364,11 @@ struct LibraryConnectionView: View {
             }
             .font(.subheadline)
         }
+    }
+
+    private func addressPrompt(_ value: String) -> Text {
+        Text(verbatim: value)
+            .foregroundColor(.secondary)
     }
 
     @ViewBuilder

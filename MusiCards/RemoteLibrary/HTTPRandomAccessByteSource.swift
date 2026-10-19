@@ -117,6 +117,18 @@ nonisolated struct HTTPRandomAccessStatistics: Equatable, Sendable {
     let trace: [HTTPRangeAccessTrace]
 }
 
+/// Interval measurements for audio diagnostics. Duration includes the whole
+/// range transfer (and task scheduling), not just network round-trip time.
+nonisolated struct HTTPRangeQualityDiagnostics: Equatable, Sendable {
+    let completedCount: Int
+    let failureCount: Int
+    let minimumMilliseconds: Double
+    let averageMilliseconds: Double
+    let maximumMilliseconds: Double
+    let slowCount: Int
+    let inFlightCount: Int
+}
+
 nonisolated enum HTTPRandomAccessByteSourceError:
     LocalizedError, Equatable, Sendable
 {
@@ -172,6 +184,12 @@ nonisolated final class HTTPRandomAccessByteSource: @unchecked Sendable {
     private var reservedNetworkByteCount: Int64 = 0
     private var temporaryNetworkByteLimit: Int64?
     private var trace = [HTTPRangeAccessTrace]()
+    private var qualityCompletedCount = 0
+    private var qualityFailureCount = 0
+    private var qualityTotalMilliseconds = 0.0
+    private var qualityMinimumMilliseconds = Double.infinity
+    private var qualityMaximumMilliseconds = 0.0
+    private var qualitySlowCount = 0
 
     init(
         baseRequest: URLRequest,
@@ -256,6 +274,30 @@ nonisolated final class HTTPRandomAccessByteSource: @unchecked Sendable {
         }
     }
 
+    func takeQualityDiagnostics() -> HTTPRangeQualityDiagnostics {
+        condition.withLock {
+            let sample = HTTPRangeQualityDiagnostics(
+                completedCount: qualityCompletedCount,
+                failureCount: qualityFailureCount,
+                minimumMilliseconds: qualityCompletedCount > 0
+                    ? qualityMinimumMilliseconds : 0,
+                averageMilliseconds: qualityCompletedCount > 0
+                    ? qualityTotalMilliseconds / Double(qualityCompletedCount)
+                    : 0,
+                maximumMilliseconds: qualityMaximumMilliseconds,
+                slowCount: qualitySlowCount,
+                inFlightCount: inFlightLoads.count
+            )
+            qualityCompletedCount = 0
+            qualityFailureCount = 0
+            qualityTotalMilliseconds = 0
+            qualityMinimumMilliseconds = .infinity
+            qualityMaximumMilliseconds = 0
+            qualitySlowCount = 0
+            return sample
+        }
+    }
+
     func beginTemporaryNetworkBudget(additionalBytes: Int64) {
         condition.withLock {
             temporaryNetworkByteLimit = networkByteCount
@@ -297,6 +339,7 @@ nonisolated final class HTTPRandomAccessByteSource: @unchecked Sendable {
             throw HTTPRandomAccessByteSourceError.networkLimitExceeded
         }
         let load = ChunkLoad()
+        let startedAt = DispatchTime.now().uptimeNanoseconds
         inFlightLoads[start] = load
         reservedNetworkByteCount += requestedByteCount
         condition.unlock()
@@ -326,7 +369,10 @@ nonisolated final class HTTPRandomAccessByteSource: @unchecked Sendable {
                 end: end,
                 load: load,
                 dataResult: dataResult,
-                transportResult: try? transportResult.get()
+                transportResult: try? transportResult.get(),
+                durationMilliseconds: Double(
+                    DispatchTime.now().uptimeNanoseconds - startedAt
+                ) / 1_000_000
             )
         }
         return try load.wait()
@@ -368,9 +414,26 @@ nonisolated final class HTTPRandomAccessByteSource: @unchecked Sendable {
         end: Int64,
         load: ChunkLoad,
         dataResult: Result<Data, Error>,
-        transportResult: HTTPRangeLoadResult?
+        transportResult: HTTPRangeLoadResult?,
+        durationMilliseconds: Double
     ) {
         condition.lock()
+        qualityCompletedCount += 1
+        qualityTotalMilliseconds += durationMilliseconds
+        qualityMinimumMilliseconds = min(
+            qualityMinimumMilliseconds,
+            durationMilliseconds
+        )
+        qualityMaximumMilliseconds = max(
+            qualityMaximumMilliseconds,
+            durationMilliseconds
+        )
+        if durationMilliseconds >= 500 {
+            qualitySlowCount += 1
+        }
+        if case .failure = dataResult {
+            qualityFailureCount += 1
+        }
         inFlightLoads.removeValue(forKey: start)
         reservedNetworkByteCount = max(
             reservedNetworkByteCount - (end - start + 1),

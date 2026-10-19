@@ -173,6 +173,7 @@ nonisolated final class DecodedPCM: @unchecked Sendable {
     let seekCapabilityOverride: PlaybackSeekCapability?
     let sourceCodec: String?
     let sourceBitDepth: Int?
+    let remoteByteSource: HTTPRandomAccessByteSource?
 
     private let decoder: any PCMDecoderBackend
     private let feederQueue = DispatchQueue(
@@ -187,7 +188,11 @@ nonisolated final class DecodedPCM: @unchecked Sendable {
     private let didAccessSecurityScope: Bool
     private let sourceURL: URL?
     private let errorLock = NSLock()
+    private let qualityLock = NSLock()
     private var feederError: Error?
+    private var qualityReadCount = 0
+    private var qualityMaximumReadMilliseconds = 0.0
+    private var qualitySlowReadCount = 0
     private var didReachEndOfStream = false
     private var didReportFirstPCM = false
 
@@ -202,7 +207,8 @@ nonisolated final class DecodedPCM: @unchecked Sendable {
         didAccessSecurityScope: Bool,
         sourceURL: URL?,
         sourceCodec: String? = nil,
-        sourceBitDepth: Int? = nil
+        sourceBitDepth: Int? = nil,
+        remoteByteSource: HTTPRandomAccessByteSource? = nil
     ) {
         self.renderer = renderer
         self.sampleRate = sampleRate
@@ -212,6 +218,7 @@ nonisolated final class DecodedPCM: @unchecked Sendable {
         self.seekCapabilityOverride = decoder.seekCapabilityOverride
         self.sourceCodec = sourceCodec
         self.sourceBitDepth = sourceBitDepth
+        self.remoteByteSource = remoteByteSource
         self.decoder = decoder
         self.decodeBuffer = decodeBuffer
         self.decodeChunkFrames = decodeChunkFrames
@@ -308,6 +315,28 @@ nonisolated final class DecodedPCM: @unchecked Sendable {
         }
     }
 
+    var bufferedFrames: UInt64 {
+        frameCapacity - UInt64(MCPPCMRendererWritableFrames(renderer))
+    }
+
+    func takeFeederQualityDiagnostics() -> (
+        readCount: Int,
+        maximumReadMilliseconds: Double,
+        slowReadCount: Int
+    ) {
+        qualityLock.withLock {
+            let sample = (
+                qualityReadCount,
+                qualityMaximumReadMilliseconds,
+                qualitySlowReadCount
+            )
+            qualityReadCount = 0
+            qualityMaximumReadMilliseconds = 0
+            qualitySlowReadCount = 0
+            return sample
+        }
+    }
+
     private func fillAvailableSpace() {
         while !didReachEndOfStream,
               MCPPCMRendererWritableFrames(renderer) >= decodeChunkFrames {
@@ -331,6 +360,22 @@ nonisolated final class DecodedPCM: @unchecked Sendable {
         )
         guard framesToRead > 0 else { return }
 
+        let readStartedAt = DispatchTime.now().uptimeNanoseconds
+        defer {
+            let durationMilliseconds = Double(
+                DispatchTime.now().uptimeNanoseconds - readStartedAt
+            ) / 1_000_000
+            qualityLock.withLock {
+                qualityReadCount += 1
+                qualityMaximumReadMilliseconds = max(
+                    qualityMaximumReadMilliseconds,
+                    durationMilliseconds
+                )
+                if durationMilliseconds >= 100 {
+                    qualitySlowReadCount += 1
+                }
+            }
+        }
         do {
             framesToRead = try decoder.read(
                 into: UnsafeMutableRawPointer(decodeBuffer),

@@ -95,7 +95,7 @@ final class PlaybackController: ObservableObject {
     }
 
     var outputDisplayName: String {
-        externalOutputDisplayName ?? outputRoute.displayName
+        externalOutputDisplayName ?? outputRoute.detailDisplayName
     }
 
     var outputSampleRateText: String? {

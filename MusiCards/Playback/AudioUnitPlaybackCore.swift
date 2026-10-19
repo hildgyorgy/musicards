@@ -6,9 +6,14 @@
 #if os(macOS) || os(iOS)
 import AudioToolbox
 import Foundation
-#if DEBUG
 import OSLog
-#endif
+
+enum PlaybackQualityDiagnostics {
+    nonisolated static let logger = Logger(
+        subsystem: "com.hildgyorgy.MusiCards",
+        category: "PlaybackQuality"
+    )
+}
 
 /// Source-independent decoder and Audio Unit lifecycle shared by the platform
 /// playback engines. Route, device, and audio-session policy remains owned by
@@ -25,6 +30,8 @@ final class AudioUnitPlaybackCore {
     private var preparingRemoteByteSource: HTTPRandomAccessByteSource?
     private var progressTask: Task<Void, Never>?
     private var reportedUnderrunCount: UInt64 = 0
+    private var minimumBufferedFrames: UInt64?
+    private var nextQualityReportAt: UInt64 = 0
     private var currentSeekCapability: PlaybackSeekCapability = .supported
 
     var canSeek: Bool {
@@ -235,6 +242,9 @@ final class AudioUnitPlaybackCore {
         guard !isOutputRunning else { return }
         let status = AudioOutputUnitStart(outputUnit)
         guard status == noErr else {
+            PlaybackQualityDiagnostics.logger.error(
+                "Audio output start failed status=\(status, privacy: .public) remote=\(self.decodedPCM?.isRemote ?? false, privacy: .public)"
+            )
             if let decodedPCM {
                 MCPPCMRendererSetPlaying(decodedPCM.renderer, false)
             }
@@ -271,6 +281,9 @@ final class AudioUnitPlaybackCore {
 
     func startProgressUpdates() {
         cancelProgressUpdates()
+        minimumBufferedFrames = nil
+        nextQualityReportAt = DispatchTime.now().uptimeNanoseconds
+            + 15_000_000_000
         progressTask = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 100_000_000)
@@ -279,6 +292,9 @@ final class AudioUnitPlaybackCore {
                 }
 
                 if let error = decodedPCM.takeFeederError() {
+                    PlaybackQualityDiagnostics.logger.error(
+                        "PCM feeder failed remote=\(decodedPCM.isRemote, privacy: .public)"
+                    )
                     self.stopOutputUnit()
                     self.eventHandler?(.failed(PlaybackFailure(error)))
                     return
@@ -288,26 +304,64 @@ final class AudioUnitPlaybackCore {
                 self.eventHandler?(
                     .positionChanged(Double(frame) / decodedPCM.sampleRate)
                 )
+                guard self.decodedPCM === decodedPCM,
+                      !Task.isCancelled else { return }
 
-                #if DEBUG
                 let underrunCount = MCPPCMRendererUnderrunCount(
                     decodedPCM.renderer
                 )
-                if decodedPCM.isRemote,
-                   underrunCount > self.reportedUnderrunCount {
+                if underrunCount > self.reportedUnderrunCount {
                     self.reportedUnderrunCount = underrunCount
-                    RemotePlaybackDiagnostics.logger.notice(
-                        "Remote PCM underrun count=\(underrunCount, privacy: .public); outputting bounded silence while decoding refills"
+                    PlaybackQualityDiagnostics.logger.warning(
+                        "PCM buffer underrun count=\(underrunCount, privacy: .public) remote=\(decodedPCM.isRemote, privacy: .public)"
                     )
                 }
-                #endif
 
                 if MCPPCMRendererDidFinish(decodedPCM.renderer) {
                     self.stopOutputUnit()
                     self.eventHandler?(.finished)
                     return
                 }
+
+                let bufferedFrames = decodedPCM.bufferedFrames
+                self.minimumBufferedFrames = min(
+                    self.minimumBufferedFrames ?? bufferedFrames,
+                    bufferedFrames
+                )
+                let now = DispatchTime.now().uptimeNanoseconds
+                if now >= self.nextQualityReportAt {
+                    self.reportPlaybackQuality(
+                        decodedPCM,
+                        bufferedFrames: bufferedFrames,
+                        underrunCount: underrunCount
+                    )
+                    self.minimumBufferedFrames = nil
+                    self.nextQualityReportAt = now + 15_000_000_000
+                }
             }
+        }
+    }
+
+    private func reportPlaybackQuality(
+        _ decodedPCM: DecodedPCM,
+        bufferedFrames: UInt64,
+        underrunCount: UInt64
+    ) {
+        let bufferedNowMilliseconds = Int(
+            Double(bufferedFrames) * 1_000 / decodedPCM.sampleRate
+        )
+        let bufferedMinimumMilliseconds = Int(
+            Double(minimumBufferedFrames ?? bufferedFrames) * 1_000
+                / decodedPCM.sampleRate
+        )
+        let feeder = decodedPCM.takeFeederQualityDiagnostics()
+        PlaybackQualityDiagnostics.logger.notice(
+            "PCM quality remote=\(decodedPCM.isRemote, privacy: .public) bufferNowMs=\(bufferedNowMilliseconds, privacy: .public) bufferMinMs=\(bufferedMinimumMilliseconds, privacy: .public) underruns=\(underrunCount, privacy: .public) feederReads=\(feeder.readCount, privacy: .public) feederMaxMs=\(feeder.maximumReadMilliseconds, privacy: .public) feederSlow100ms=\(feeder.slowReadCount, privacy: .public)"
+        )
+        if let network = decodedPCM.remoteByteSource?.takeQualityDiagnostics() {
+            PlaybackQualityDiagnostics.logger.notice(
+                "Range quality requests=\(network.completedCount, privacy: .public) minMs=\(network.minimumMilliseconds, privacy: .public) avgMs=\(network.averageMilliseconds, privacy: .public) maxMs=\(network.maximumMilliseconds, privacy: .public) slow500ms=\(network.slowCount, privacy: .public) failures=\(network.failureCount, privacy: .public) inFlight=\(network.inFlightCount, privacy: .public)"
+            )
         }
     }
 

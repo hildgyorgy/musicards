@@ -125,7 +125,8 @@ nonisolated enum RemoteAudioFileDecoder {
                 didAccessSecurityScope: false,
                 sourceURL: nil,
                 sourceCodec: formatName(sourceFormat.mFormatID),
-                sourceBitDepth: sourceBitDepth(sourceFormat)
+                sourceBitDepth: sourceBitDepth(sourceFormat),
+                remoteByteSource: byteSource
             )
             ownershipTransferredToDecodedPCM = true
             let startupFrames = UInt64(

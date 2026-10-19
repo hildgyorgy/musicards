@@ -19,6 +19,11 @@ final class HTTPRandomAccessByteSourceTests: XCTestCase {
         XCTAssertEqual(requestCount, 2)
         XCTAssertEqual(source.statistics.rangeRequestCount, 2)
         XCTAssertEqual(source.statistics.networkByteCount, 512)
+        let quality = source.takeQualityDiagnostics()
+        XCTAssertEqual(quality.completedCount, 2)
+        XCTAssertEqual(quality.failureCount, 0)
+        XCTAssertGreaterThanOrEqual(quality.maximumMilliseconds, 0)
+        XCTAssertEqual(source.takeQualityDiagnostics().completedCount, 0)
     }
 
     func testConcurrentReadsCoalesceTheSameChunkLoad() async throws {
@@ -37,6 +42,26 @@ final class HTTPRandomAccessByteSourceTests: XCTestCase {
         let requestCount = await loader.requestCount()
         XCTAssertEqual(requestCount, 1)
         XCTAssertEqual(source.statistics.rangeRequestCount, 1)
+        XCTAssertGreaterThanOrEqual(
+            source.takeQualityDiagnostics().maximumMilliseconds,
+            50
+        )
+    }
+
+    func testSlowRangeIsCountedOnceAndIntervalResets() async throws {
+        let loader = RangeLoaderStub(
+            length: 1_024,
+            delayNanoseconds: 550_000_000
+        )
+        let source = try makeSource(loader: loader)
+
+        _ = try await detachedRead(source, offset: 0, count: 16)
+
+        let quality = source.takeQualityDiagnostics()
+        XCTAssertEqual(quality.completedCount, 1)
+        XCTAssertEqual(quality.slowCount, 1)
+        XCTAssertGreaterThanOrEqual(quality.minimumMilliseconds, 500)
+        XCTAssertEqual(source.takeQualityDiagnostics().slowCount, 0)
     }
 
     func testCancellationWakesBlockedSynchronousReader() async throws {
@@ -125,6 +150,9 @@ final class HTTPRandomAccessByteSourceTests: XCTestCase {
                 return XCTFail("Unexpected error: \(error)")
             }
         }
+        let quality = source.takeQualityDiagnostics()
+        XCTAssertEqual(quality.completedCount, 1)
+        XCTAssertEqual(quality.failureCount, 1)
     }
 
     private func makeSource(
