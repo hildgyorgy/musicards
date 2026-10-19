@@ -4,6 +4,44 @@ import XCTest
 
 final class UPnPDiscoveryTests: XCTestCase {
     @MainActor
+    func testSameRendererWithNewEndpointRefreshesTransportClients() async throws {
+        let transport = EndpointRefreshTransport()
+        let engine = UPnPPlaybackEngine(
+            streamURLProvider: NavidromeRendererStreamURLProvider(
+                connection: UnusedRendererConnection()
+            ),
+            clientFactory: { AVTransportClient(service: $0, transport: transport) }
+        )
+        let first = makeRenderer(id: "uuid:stable", host: "192.168.1.50:3000")
+        let refreshed = makeRenderer(id: "uuid:stable", host: "192.168.1.50:4000")
+        engine.configure(renderer: first)
+        _ = try await engine.rendererSnapshot()
+        engine.configure(renderer: refreshed)
+        _ = try await engine.rendererSnapshot()
+
+        let ports = await transport.ports()
+        XCTAssertEqual(ports, [3000, 3000, 4000, 4000])
+    }
+
+    @MainActor
+    func testReselectingSameRendererWithNewEndpointNotifiesResolution() {
+        let suiteName = "UPnPDiscoveryTests.endpointRefresh.\(UUID())"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let browser = UPnPRendererBrowser(userDefaults: defaults)
+        var selectionChanges = 0
+        var resolutions = 0
+        browser.selectionCommitHandler = { selectionChanges += 1 }
+        browser.selectedRendererResolvedHandler = { resolutions += 1 }
+        browser.selectImmediately(makeRenderer(id: "uuid:stable", host: "192.168.1.50:3000"))
+        browser.selectImmediately(makeRenderer(id: "uuid:stable", host: "192.168.1.50:4000"))
+
+        XCTAssertEqual(selectionChanges, 1)
+        XCTAssertEqual(resolutions, 1)
+        XCTAssertEqual(browser.selectedRenderer?.avTransport.controlURL.port, 4000)
+    }
+
+    @MainActor
     func testImmediateOutputSelectionPersistsAndCanReturnToSystemAudio() {
         let suiteName = "UPnPDiscoveryTests.immediateSelection"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -323,5 +361,32 @@ final class UPnPDiscoveryTests: XCTestCase {
             connectionManager: nil,
             capabilities: .unknown
         )
+    }
+}
+
+private actor EndpointRefreshTransport: UPnPHTTPTransport {
+    private var receivedPorts: [Int] = []
+
+    func data(for request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        receivedPorts.append(request.url?.port ?? 0)
+        let xml = """
+        <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+          <s:Body><Response><CurrentTransportState>STOPPED</CurrentTransportState>
+          <Track>1</Track><RelTime>0:00:00</RelTime></Response></s:Body>
+        </s:Envelope>
+        """
+        return (
+            Data(xml.utf8),
+            HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+        )
+    }
+
+    func ports() -> [Int] { receivedPorts }
+}
+
+@MainActor
+private final class UnusedRendererConnection: NavidromeCatalogConnectionProviding {
+    func catalogCredentials() throws -> NavidromeCatalogCredentials {
+        throw UPnPPlaybackError.missingNavidromeConnection
     }
 }

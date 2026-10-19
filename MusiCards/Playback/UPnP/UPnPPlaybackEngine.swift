@@ -103,7 +103,15 @@ final class UPnPPlaybackEngine: PlaybackEngine {
     }
 
     func configure(renderer: UPnPRendererDescriptor) {
-        guard self.renderer?.id != renderer.id else { return }
+        guard self.renderer != renderer else { return }
+        if self.renderer?.id == renderer.id {
+            // SSDP identity is stable, but a renderer can change its IP/port.
+            // Refresh the clients without discarding an adopted/playing queue.
+            self.renderer = renderer
+            client = clientFactory(renderer.avTransport)
+            volumeClient = renderer.renderingControl.map(volumeClientFactory)
+            return
+        }
         pollTask?.cancel()
         pollTask = nil
         self.renderer = renderer

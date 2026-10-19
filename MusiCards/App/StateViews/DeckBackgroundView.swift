@@ -286,7 +286,8 @@ struct DeckBackgroundView: View {
         PlaybackOutputStatusView(
             controller: playbackController,
             rendererBrowser: rendererBrowser,
-            navidromeConnection: navidromeConnection
+            navidromeConnection: navidromeConnection,
+            activeLibrarySource: activeLibrarySource
         )
     }
 
@@ -449,6 +450,7 @@ private struct PlaybackOutputStatusView: View {
     @ObservedObject var controller: PlaybackController
     @ObservedObject var rendererBrowser: UPnPRendererBrowser
     @ObservedObject var navidromeConnection: NavidromeConnectionStore
+    let activeLibrarySource: LibrarySource?
     @Environment(\.colorScheme) private var colorScheme
     @State private var isShowingOutputPicker = false
 
@@ -462,7 +464,8 @@ private struct PlaybackOutputStatusView: View {
         .sheet(isPresented: $isShowingOutputPicker) {
             RendererDiscoveryView(
                 browser: rendererBrowser,
-                controller: controller
+                controller: controller,
+                activeLibrarySource: activeLibrarySource
             )
         }
     }

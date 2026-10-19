@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 nonisolated protocol UPnPHTTPTransport: Sendable {
     func data(for request: URLRequest) async throws -> (Data, HTTPURLResponse)
@@ -69,6 +70,10 @@ nonisolated enum AVTransportClientError: LocalizedError, Equatable, Sendable {
 }
 
 nonisolated struct AVTransportClient: Sendable {
+    private static let logger = Logger(
+        subsystem: "com.hildgyorgy.MusiCards",
+        category: "AVTransport"
+    )
     private let service: UPnPServiceDescriptor
     private let transport: any UPnPHTTPTransport
 
@@ -174,7 +179,24 @@ nonisolated struct AVTransportClient: Sendable {
             arguments: [("InstanceID", "0")] + arguments
         )
 
-        let (data, response) = try await transport.data(for: request)
+        let result: (Data, HTTPURLResponse)
+        do {
+            result = try await transport.data(for: request)
+        } catch {
+            let nsError = error as NSError
+            Self.logger.error(
+                "AVTransport request failed action=\(action, privacy: .public) domain=\(nsError.domain, privacy: .public) code=\(nsError.code, privacy: .public)"
+            )
+            throw error
+        }
+        let (data, response) = result
+        if action != "GetTransportInfo" && action != "GetPositionInfo"
+            || !(200..<300 ~= response.statusCode) {
+            // Never log SOAP bodies or authenticated media URLs.
+            Self.logger.notice(
+                "AVTransport response action=\(action, privacy: .public) status=\(response.statusCode, privacy: .public)"
+            )
+        }
         guard 200..<300 ~= response.statusCode else {
             if let fault = try? UPnPSOAPResponseParser.parse(data),
                fault["errorCode"] != nil || fault["errorDescription"] != nil {

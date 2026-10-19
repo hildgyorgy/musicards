@@ -68,6 +68,10 @@ final class MusiCardsAppModel: ObservableObject {
         didSet {
             libraryManager.setActiveSource(activeLibrarySource)
             LibrarySourcePreference.save(activeLibrarySource)
+            if activeLibrarySource != .navidrome,
+               rendererBrowser.hasSelectedRendererPreference {
+                rendererBrowser.selectSystemAudioImmediately()
+            }
         }
     }
 
@@ -163,6 +167,9 @@ final class MusiCardsAppModel: ObservableObject {
                 systemEngine: PlaybackEngineFactory.makeDefault(),
                 rendererEngine: upnpRendererEngine
             ) {
+                guard libraryManager.source == .navidrome else {
+                    return .system
+                }
                 if let renderer = rendererBrowser.selectedRenderer {
                     return .renderer(renderer)
                 }
@@ -269,6 +276,9 @@ final class MusiCardsAppModel: ObservableObject {
         self.activeLibrarySource = restoredLibrarySource
         libraryManager.setActiveSource(restoredLibrarySource)
         LibrarySourcePreference.save(restoredLibrarySource)
+        if restoredLibrarySource != .navidrome {
+            rendererBrowser.selectSystemAudioImmediately()
+        }
 
         loadRecents()
         if rendererBrowser.hasSelectedRendererPreference {
@@ -288,6 +298,7 @@ final class MusiCardsAppModel: ObservableObject {
     private func adoptRendererPlaybackIfAvailable(
         provider: NavidromeLibraryProvider
     ) async {
+        guard activeLibrarySource == .navidrome else { return }
         guard playbackController.canAdoptRendererPlayback else { return }
         do {
             guard let snapshot = try await playbackController.rendererSnapshot(),

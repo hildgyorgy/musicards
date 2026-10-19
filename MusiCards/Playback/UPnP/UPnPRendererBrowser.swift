@@ -147,6 +147,7 @@ final class UPnPRendererBrowser: ObservableObject {
 
     func commitRendererSelection() {
         let didChangeSelection = selectedRendererID != draftRendererID
+        let didRefreshRenderer = selectedRenderer != draftRenderer
         selectedRendererID = draftRendererID
         if let draftRenderer {
             selectedRenderer = draftRenderer
@@ -170,6 +171,8 @@ final class UPnPRendererBrowser: ObservableObject {
 
         if didChangeSelection {
             selectionCommitHandler?()
+        } else if didRefreshRenderer {
+            selectedRendererResolvedHandler?()
         }
     }
 

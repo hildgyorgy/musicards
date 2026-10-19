@@ -8,6 +8,7 @@ struct RendererDiscoveryView: View {
 
     @ObservedObject var browser: UPnPRendererBrowser
     @ObservedObject var controller: PlaybackController
+    let activeLibrarySource: LibrarySource?
     @Environment(\.dismiss) private var dismiss
     @State private var rendererAddress = ""
     @State private var selectedOutputKind: OutputKind = .systemAudio
@@ -43,7 +44,8 @@ struct RendererDiscoveryView: View {
             #endif
         }
         .onAppear {
-            selectedOutputKind = browser.hasSelectedRendererPreference
+            selectedOutputKind = activeLibrarySource == .navidrome
+                && browser.hasSelectedRendererPreference
                 ? .upnpRenderer
                 : .systemAudio
             if selectedOutputKind == .upnpRenderer {
@@ -77,6 +79,7 @@ struct RendererDiscoveryView: View {
         HStack(spacing: 12) {
             outputButton(.systemAudio, title: "System audio")
             outputButton(.upnpRenderer, title: "UPnP renderer")
+                .disabled(activeLibrarySource != .navidrome)
         }
     }
 
@@ -109,6 +112,9 @@ struct RendererDiscoveryView: View {
     }
 
     private func selectOutputKind(_ kind: OutputKind) {
+        guard kind != .upnpRenderer || activeLibrarySource == .navidrome else {
+            return
+        }
         guard selectedOutputKind != kind else { return }
         selectedOutputKind = kind
         switch kind {
@@ -133,6 +139,10 @@ struct RendererDiscoveryView: View {
         } footer: {
             Text("Sound follows the output selected in the system, such as built-in speakers, headphones, Bluetooth, AirPlay, or a connected DAC.")
                 .font(.subheadline)
+            if activeLibrarySource != .navidrome {
+                Text("UPnP renderer playback requires a Navidrome source.")
+                    .font(.subheadline)
+            }
         }
     }
 
