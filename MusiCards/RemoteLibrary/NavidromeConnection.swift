@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 nonisolated struct NavidromeServerProfile: Codable, Equatable, Identifiable, Sendable {
     let id: UUID
@@ -102,18 +103,38 @@ nonisolated enum NavidromeRendererServerURL {
     }
 
     static func isLocalHost(_ host: String) -> Bool {
-        let normalized = host.lowercased()
-        if normalized.hasSuffix(".local") || !normalized.contains(".") {
-            return true
+        let normalized = host.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
+        if normalized.contains(":") {
+            var address = in6_addr()
+            guard inet_pton(AF_INET6, normalized, &address) == 1 else { return false }
+            let bytes = withUnsafeBytes(of: address) { Array($0) }
+            // Loopback, unique-local and link-local IPv6 only. Public and
+            // IPv4-mapped addresses must not bypass the cleartext policy.
+            return bytes == Array(repeating: 0, count: 15) + [1]
+                || bytes[0] & 0xfe == 0xfc
+                || (bytes[0] == 0xfe && bytes[1] & 0xc0 == 0x80)
         }
-        let octets = normalized.split(separator: ".").compactMap {
-            Int(String($0))
+        let labels = normalized.split(separator: ".", omittingEmptySubsequences: false)
+        if labels.count == 4, labels.allSatisfy({ label in
+            guard let value = UInt8(label) else { return false }
+            return String(value) == label
+        }) {
+            let octets = labels.compactMap { UInt8($0) }
+            return octets[0] == 10 || octets[0] == 127
+                || (octets[0] == 192 && octets[1] == 168)
+                || (octets[0] == 172 && (16...31).contains(octets[1]))
+                || (octets[0] == 169 && octets[1] == 254)
         }
-        guard octets.count == 4 else { return false }
-        if octets[0] == 10 || octets[0] == 127 { return true }
-        if octets[0] == 192, octets[1] == 168 { return true }
-        if octets[0] == 172, (16...31).contains(octets[1]) { return true }
-        return false
+        // Resolvers may interpret hex, octal or shortened IPv4 spellings as
+        // IP literals rather than DNS names. Only canonical literals above
+        // may pass, never a numeric alias disguised as a single-label host.
+        var legacyAddress = in_addr()
+        if inet_aton(normalized, &legacyAddress) == 1 { return false }
+        // Numeric-looking invalid IPv4 literals are not local hostnames.
+        return normalized.hasSuffix(".local")
+            || (!normalized.isEmpty && !normalized.contains(".")
+                && normalized.contains(where: { $0.isLetter })
+                && normalized.allSatisfy { $0.isLetter || $0.isNumber || $0 == "-" })
     }
 }
 

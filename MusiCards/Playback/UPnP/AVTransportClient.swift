@@ -14,7 +14,9 @@ nonisolated final class URLSessionUPnPHTTPTransport:
     }
 
     func data(for request: URLRequest) async throws -> (Data, HTTPURLResponse) {
-        let (data, response) = try await session.data(for: request)
+        guard let url = request.url else { throw UPnPDiscoveryError.unsafeEndpoint }
+        try UPnPEndpointPolicy.validate(url)
+        let (data, response) = try await session.data(for: request, delegate: UPnPRedirectPolicy())
         guard let response = response as? HTTPURLResponse else {
             throw UPnPDiscoveryError.invalidHTTPResponse
         }

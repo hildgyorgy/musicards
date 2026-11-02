@@ -81,6 +81,9 @@ final class UPnPPlaybackEngine: PlaybackEngine {
     private var currentStreamURL: URL?
     private var stagedNextItem: PlaybackQueueItem?
     private var stagedNextStreamURL: URL?
+    private var lastPlayingPosition: TimeInterval?
+    private var lastPlayingDuration: TimeInterval?
+    private var pollGeneration: UInt64 = 0
 
     var nextItemProvider: (() async throws -> PlaybackQueueItem?)?
 
@@ -112,6 +115,7 @@ final class UPnPPlaybackEngine: PlaybackEngine {
             volumeClient = renderer.renderingControl.map(volumeClientFactory)
             return
         }
+        pollGeneration &+= 1
         pollTask?.cancel()
         pollTask = nil
         self.renderer = renderer
@@ -134,6 +138,9 @@ final class UPnPPlaybackEngine: PlaybackEngine {
             throw UPnPPlaybackError.navidromeOnly
         }
 
+        pollGeneration &+= 1
+        lastPlayingPosition = nil
+        lastPlayingDuration = nil
         pollTask?.cancel()
         pollTask = nil
         hasObservedPlaying = false
@@ -166,6 +173,9 @@ final class UPnPPlaybackEngine: PlaybackEngine {
 
     func pause() async {
         guard let client else { return }
+        pollGeneration &+= 1
+        pollTask?.cancel()
+        pollTask = nil
         do {
             try await client.pause()
             eventHandler?(.paused)
@@ -175,6 +185,7 @@ final class UPnPPlaybackEngine: PlaybackEngine {
     }
 
     func stop() async {
+        pollGeneration &+= 1
         pollTask?.cancel()
         pollTask = nil
         hasObservedPlaying = false
@@ -189,6 +200,7 @@ final class UPnPPlaybackEngine: PlaybackEngine {
             )
         }
         try await client.seek(to: position)
+        lastPlayingPosition = position
         eventHandler?(.positionChanged(position))
     }
 
@@ -207,10 +219,12 @@ final class UPnPPlaybackEngine: PlaybackEngine {
         }
     }
 
-    private func pollRenderer() async {
+    func pollRenderer() async {
         guard let client else { return }
+        let generation = pollGeneration
         do {
             let snapshot = try await client.snapshot()
+            guard generation == pollGeneration, !Task.isCancelled else { return }
             consecutivePollFailures = 0
             let state = snapshot.transport.state.uppercased()
             if let stagedNextItem,
@@ -221,6 +235,8 @@ final class UPnPPlaybackEngine: PlaybackEngine {
                 currentStreamURL = stagedNextStreamURL
                 self.stagedNextItem = nil
                 self.stagedNextStreamURL = nil
+                lastPlayingPosition = nil
+                lastPlayingDuration = nil
                 eventHandler?(
                     .advancedToNext(
                         itemID: stagedNextItem.id,
@@ -233,6 +249,12 @@ final class UPnPPlaybackEngine: PlaybackEngine {
             }
             if state == "PLAYING" || state == "TRANSITIONING" {
                 hasObservedPlaying = true
+                if let position = snapshot.position.relativeTime, position.isFinite {
+                    lastPlayingPosition = position
+                }
+                if let duration = snapshot.position.duration, duration.isFinite, duration > 0 {
+                    lastPlayingDuration = duration
+                }
             }
             if let position = snapshot.position.relativeTime {
                 eventHandler?(.positionChanged(position))
@@ -242,16 +264,31 @@ final class UPnPPlaybackEngine: PlaybackEngine {
                 volumePollCounter = 0
                 await publishVolumeStateIfAvailable()
             }
+            guard generation == pollGeneration, !Task.isCancelled else { return }
             if hasObservedPlaying,
                state == "STOPPED" || state == "NO_MEDIA_PRESENT" {
                 pollTask?.cancel()
                 pollTask = nil
                 hasObservedPlaying = false
-                eventHandler?(.finished)
+                let duration = lastPlayingDuration ?? preparedItem?.track.duration
+                let position = max(lastPlayingPosition ?? 0, snapshot.position.relativeTime ?? 0)
+                if snapshot.transport.status?.uppercased() == "ERROR_OCCURRED" {
+                    eventHandler?(.failed(PlaybackFailure(NativePlaybackEngineError(
+                        "The renderer reported a playback error. Check its connection to Navidrome and try again."
+                    ))))
+                } else if let duration, duration.isFinite, duration > 0,
+                          position >= max(0, duration - min(2, duration * 0.02)) {
+                    eventHandler?(.finished)
+                } else {
+                    // An external Stop or mid-track failure must not consume
+                    // the remaining queue. Unknown duration is conservative.
+                    eventHandler?(.paused)
+                }
             }
         } catch is CancellationError {
             return
         } catch {
+            guard generation == pollGeneration, !Task.isCancelled else { return }
             consecutivePollFailures += 1
             if consecutivePollFailures >= 3 {
                 pollTask?.cancel()
@@ -426,6 +463,8 @@ extension UPnPPlaybackEngine: RendererPlaybackSessionControlling {
 
         preparedItem = item
         currentStreamURL = snapshot.position.trackURI ?? streamURL
+        lastPlayingPosition = snapshot.position.relativeTime
+        lastPlayingDuration = snapshot.position.duration
         hasObservedPlaying = snapshot.transport.state.uppercased() == "PLAYING"
         consecutivePollFailures = 0
         volumePollCounter = 0

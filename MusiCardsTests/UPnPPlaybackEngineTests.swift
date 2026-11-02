@@ -4,6 +4,24 @@ import XCTest
 
 final class UPnPPlaybackEngineTests: XCTestCase {
     @MainActor
+    func testEarlyRendererStopDoesNotFinishOrConsumeQueue() async throws {
+        let client = TransportSpy()
+        let engine = makeEngine(client: client)
+        engine.configure(renderer: makeRenderer())
+        try await engine.prepare(makeItem("first"))
+        await client.setSnapshots([
+            Self.snapshot(state: "PLAYING", songID: "first", position: 10),
+            Self.snapshot(state: "STOPPED", songID: "first", position: 10)
+        ])
+        var events: [PlaybackEngineEvent] = []
+        engine.eventHandler = { events.append($0) }
+        await engine.pollRenderer()
+        await engine.pollRenderer()
+        XCTAssertTrue(events.contains(.paused))
+        XCTAssertFalse(events.contains(.finished))
+        await engine.stop()
+    }
+    @MainActor
     func testPrepareStagesNextTrackAndPublishesPreparedEvent() async throws {
         let client = TransportSpy()
         let engine = makeEngine(client: client)
@@ -190,7 +208,7 @@ final class UPnPPlaybackEngineTests: XCTestCase {
     private func makeRenderer(
         supportsSetNext: Bool = false
     ) -> UPnPRendererDescriptor {
-        let baseURL = URL(string: "http://192.0.2.20:1400")!
+        let baseURL = URL(string: "http://192.168.1.20:1400")!
         let transport = UPnPServiceDescriptor(
             serviceType: "urn:schemas-upnp-org:service:AVTransport:1",
             serviceID: nil,
@@ -255,7 +273,7 @@ final class UPnPPlaybackEngineTests: XCTestCase {
                 trackNumber: 1,
                 duration: 180,
                 relativeTime: position,
-                trackURI: URL(string: "http://192.0.2.10/stream?id=\(songID)")
+                trackURI: URL(string: "http://192.168.1.10/stream?id=\(songID)")
             )
         )
     }
@@ -267,7 +285,7 @@ private final class RendererConnectionStub: NavidromeCatalogConnectionProviding 
         NavidromeCatalogCredentials(
             profile: NavidromeServerProfile(
                 name: "Test",
-                baseURL: URL(string: "http://192.0.2.10")!,
+                baseURL: URL(string: "http://192.168.1.10")!,
                 username: "test"
             ),
             password: "test"

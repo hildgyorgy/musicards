@@ -67,6 +67,7 @@ private nonisolated enum SSDPMessageParser {
             throw UPnPDiscoveryError.invalidHTTPResponse
         }
 
+        try UPnPEndpointPolicy.validate(location)
         return SSDPDiscoveryResponse(
             location: location,
             searchTarget: headers[targetHeader],
@@ -82,6 +83,7 @@ nonisolated enum UPnPDeviceDescriptionParser {
         descriptionURL: URL,
         capabilities: UPnPRendererCapabilities = .unknown
     ) throws -> UPnPRendererDescriptor {
+        try UPnPEndpointPolicy.validate(descriptionURL)
         let delegate = DeviceDescriptionXMLDelegate()
         let parser = XMLParser(data: data)
         parser.delegate = delegate
@@ -96,8 +98,14 @@ nonisolated enum UPnPDeviceDescriptionParser {
         }
 
         let baseURL = delegate.urlBase.flatMap(URL.init(string:)) ?? descriptionURL
+        try UPnPEndpointPolicy.validate(baseURL, relativeTo: descriptionURL)
         let services = delegate.services.compactMap {
             serviceDescriptor(from: $0, baseURL: baseURL)
+        }
+        for service in services {
+            for url in [service.controlURL, service.eventSubscriptionURL, service.serviceDescriptionURL].compactMap({ $0 }) {
+                try UPnPEndpointPolicy.validate(url, relativeTo: descriptionURL)
+            }
         }
         guard let avTransport = preferredService(
             containing: "schemas-upnp-org:service:AVTransport:",

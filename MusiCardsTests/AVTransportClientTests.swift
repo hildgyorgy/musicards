@@ -1,8 +1,38 @@
 import Foundation
+import Network
 import XCTest
 @testable import MusiCards
 
 final class AVTransportClientTests: XCTestCase {
+    func testSOAPTransportDoesNotFollowHTTPRedirects() async throws {
+        let listener = try NWListener(using: .tcp, on: .any)
+        let ready = expectation(description: "loopback redirect server ready")
+        listener.stateUpdateHandler = { state in
+            if case .ready = state { ready.fulfill() }
+        }
+        listener.newConnectionHandler = { connection in
+            connection.start(queue: .global())
+            connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { data, _, _, _ in
+                let request = data.flatMap { String(data: $0, encoding: .utf8) } ?? ""
+                let response = request.contains("/unexpected")
+                    ? "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                    : "HTTP/1.1 307 Temporary Redirect\r\nLocation: /unexpected\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                connection.send(content: Data(response.utf8), completion: .contentProcessed { _ in connection.cancel() })
+            }
+        }
+        listener.start(queue: .global())
+        defer { listener.cancel() }
+        await fulfillment(of: [ready], timeout: 3)
+        let port = try XCTUnwrap(listener.port)
+        let session = URLSession(configuration: .ephemeral)
+        defer { session.invalidateAndCancel() }
+        let transport = URLSessionUPnPHTTPTransport(session: session)
+        var request = URLRequest(url: URL(string: "http://127.0.0.1:\(port.rawValue)/control")!)
+        request.httpMethod = "POST"
+        request.httpBody = Data("test-body".utf8)
+        let (_, response) = try await transport.data(for: request)
+        XCTAssertEqual(response.statusCode, 307, "A redirect must not receive the SOAP request body")
+    }
     func testSnapshotBuildsSOAPRequestsAndParsesRendererState() async throws {
         let transport = AVTransportTransportStub()
         let client = AVTransportClient(

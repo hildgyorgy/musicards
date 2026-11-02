@@ -63,6 +63,10 @@ final class IOSSystemPlaybackEngine: NSObject, PlaybackEngine {
     }
 
     func play() async throws {
+        try await core.play { try self.startPlayback() }
+    }
+
+    private func startPlayback() throws {
         guard let decodedPCM = core.decodedPCM else {
             throw NativePlaybackEngineError("No decoded track is ready")
         }
@@ -82,9 +86,6 @@ final class IOSSystemPlaybackEngine: NSObject, PlaybackEngine {
         resumeBlockedByRouteDisconnect = false
         try activateAudioSession()
 
-        if MCPPCMRendererDidFinish(decodedPCM.renderer) {
-            try await core.seekDecoder(decodedPCM, to: 0)
-        }
         guard core.isCurrent(decodedPCM, generation: generation) else {
             throw CancellationError()
         }
@@ -113,7 +114,7 @@ final class IOSSystemPlaybackEngine: NSObject, PlaybackEngine {
     func seek(to position: TimeInterval) async throws {
         try await core.seek(to: position) { [weak self] in
             guard let self else { throw CancellationError() }
-            try await self.play()
+            try self.startPlayback()
         }
     }
 
@@ -206,6 +207,7 @@ final class IOSSystemPlaybackEngine: NSObject, PlaybackEngine {
 
     private func rebuildOutput(resumeWhenReady: Bool) async {
         do {
+            suspendOutputForLifecycleEvent()
             try reconfigureOutput()
 
             if resumeWhenReady, !isInterrupted {
@@ -221,7 +223,9 @@ final class IOSSystemPlaybackEngine: NSObject, PlaybackEngine {
             throw NativePlaybackEngineError("No decoded track is ready")
         }
 
-        suspendOutputForLifecycleEvent()
+        // Reconfiguration can also happen inside an explicit Play command.
+        // The caller owns whether this is a pause or a continuing play intent.
+        core.suspendOutputForLifecycleEvent(preservePlaybackIntent: true)
         core.disposeOutputUnit()
         try configureAudioSession(sourceSampleRate: decodedPCM.sampleRate)
         try configureOutputUnit(for: decodedPCM)

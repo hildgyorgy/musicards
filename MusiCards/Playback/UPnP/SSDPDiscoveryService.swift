@@ -304,7 +304,10 @@ nonisolated struct UPnPRendererInspector: Sendable {
     }
 
     private func load(_ url: URL) async throws -> Data {
-        let (data, response) = try await session.data(from: url)
+        try UPnPEndpointPolicy.validate(url)
+        let (data, response) = try await session.data(
+            for: URLRequest(url: url), delegate: UPnPRedirectPolicy()
+        )
         guard let httpResponse = response as? HTTPURLResponse else {
             throw UPnPDiscoveryError.invalidHTTPResponse
         }

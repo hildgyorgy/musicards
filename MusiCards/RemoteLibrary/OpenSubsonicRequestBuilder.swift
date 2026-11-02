@@ -15,6 +15,8 @@ nonisolated struct OpenSubsonicRequestBuilder: Sendable {
         salt: String,
         allowsInsecureLocalHTTP: Bool = false
     ) throws -> URLRequest {
+        // The legacy opt-in remains source-compatible, but never bypasses
+        // host validation: all cleartext endpoints must be local.
         try authenticatedRequest(
             endpoint: "ping",
             profile: profile,
@@ -107,7 +109,8 @@ nonisolated struct OpenSubsonicRequestBuilder: Sendable {
             resolvingAgainstBaseURL: false
         ),
         let scheme = components.scheme?.lowercased(),
-        scheme == "https" || scheme == "http" else {
+        let host = components.host,
+        scheme == "https" || (scheme == "http" && NavidromeRendererServerURL.isLocalHost(host)) else {
             throw NavidromeConnectionError.secureConnectionRequired
         }
         guard components.host != nil,
@@ -166,8 +169,7 @@ nonisolated struct OpenSubsonicRequestBuilder: Sendable {
         let host = components.host,
         scheme == "https"
             || (scheme == "http"
-                && (allowsInsecureLocalHTTP
-                    || NavidromeRendererServerURL.isLocalHost(host))) else {
+                && NavidromeRendererServerURL.isLocalHost(host)) else {
             throw NavidromeConnectionError.secureConnectionRequired
         }
         guard components.user == nil,

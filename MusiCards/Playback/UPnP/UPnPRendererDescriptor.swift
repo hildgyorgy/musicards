@@ -1,5 +1,38 @@
 import Foundation
 
+/// Discovery is a LAN operation. Service URLs may use another port, but must
+/// remain on the host whose description the user discovered.
+nonisolated enum UPnPEndpointPolicy {
+    static func validate(_ url: URL, relativeTo deviceURL: URL? = nil) throws {
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let scheme = components.scheme?.lowercased(),
+              scheme == "http" || scheme == "https",
+              let host = components.host,
+              NavidromeRendererServerURL.isLocalHost(host),
+              components.user == nil, components.password == nil,
+              components.fragment == nil else {
+            throw UPnPDiscoveryError.unsafeEndpoint
+        }
+        if let deviceURL,
+           host.lowercased() != deviceURL.host?.lowercased() {
+            throw UPnPDiscoveryError.unsafeEndpoint
+        }
+    }
+}
+
+/// Never forward a SOAP body (which can contain a media authentication token)
+/// or a discovery request through a server-chosen redirect.
+nonisolated final class UPnPRedirectPolicy: NSObject, URLSessionTaskDelegate, Sendable {
+    func urlSession(
+        _ session: URLSession, task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest,
+        completionHandler: @escaping @Sendable (URLRequest?) -> Void
+    ) {
+        completionHandler(nil)
+    }
+}
+
 nonisolated struct UPnPServiceDescriptor: Hashable, Sendable {
     let serviceType: String
     let serviceID: String?
@@ -67,6 +100,7 @@ nonisolated enum UPnPDiscoveryError: LocalizedError, Equatable {
     case missingAVTransport
     case invalidServiceDescription
     case invalidHTTPStatus(Int)
+    case unsafeEndpoint
 
     var errorDescription: String? {
         switch self {
@@ -88,6 +122,8 @@ nonisolated enum UPnPDiscoveryError: LocalizedError, Equatable {
             "The renderer service description could not be read."
         case let .invalidHTTPStatus(status):
             "The renderer returned HTTP status \(status)."
+        case .unsafeEndpoint:
+            "The renderer advertises an unsafe network address. Its services must stay on the discovered local device."
         }
     }
 }

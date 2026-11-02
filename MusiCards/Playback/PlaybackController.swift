@@ -419,7 +419,9 @@ final class PlaybackController: ObservableObject {
     }
 
     func seek(to requestedPosition: TimeInterval) async {
-        guard currentItem != nil else { return }
+        guard let currentItem, requestedPosition.isFinite else { return }
+        let generation = playbackGeneration
+        let itemID = currentItem.id
         guard canSeek else {
             #if DEBUG
             RemotePlaybackDiagnostics.logger.notice(
@@ -429,13 +431,17 @@ final class PlaybackController: ObservableObject {
             return
         }
 
-        let upperBound = preparedDuration ?? currentItem?.track.duration
+        let upperBound = preparedDuration ?? currentItem.track.duration
         let position = min(max(requestedPosition, 0), upperBound ?? requestedPosition)
 
         do {
             try await engine.seek(to: position)
+            guard isCurrent(generation: generation, itemID: itemID) else { return }
             self.position = position
+        } catch is CancellationError {
+            return
         } catch {
+            guard isCurrent(generation: generation, itemID: itemID) else { return }
             preparedItemID = nil
             preparedAudioFormat = nil
             fail(with: error)

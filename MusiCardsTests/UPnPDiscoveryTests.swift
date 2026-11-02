@@ -3,6 +3,36 @@ import XCTest
 @testable import MusiCards
 
 final class UPnPDiscoveryTests: XCTestCase {
+    func testDeviceServicesCannotEscapeDiscoveredHost() throws {
+        let deviceURL = URL(string: "http://192.168.1.50/device.xml")!
+        func description(base: String = "", control: String) -> Data {
+            Data("""
+            <root>\(base)<device>
+            <deviceType>urn:schemas-upnp-org:device:MediaRenderer:1</deviceType>
+            <serviceList><service>
+            <serviceType>urn:schemas-upnp-org:service:AVTransport:1</serviceType>
+            <controlURL>\(control)</controlURL>
+            </service></serviceList></device></root>
+            """.utf8)
+        }
+        for control in ["https://attacker.example/control", "http://192.168.1.99/control", "file:///tmp/control", "http://user:password@192.168.1.50/control"] {
+            XCTAssertThrowsError(try UPnPDeviceDescriptionParser.parse(description(control: control), descriptionURL: deviceURL))
+        }
+        XCTAssertThrowsError(try UPnPDeviceDescriptionParser.parse(
+            description(base: "<URLBase>https://attacker.example/</URLBase>", control: "control"), descriptionURL: deviceURL
+        ))
+        let renderer = try UPnPDeviceDescriptionParser.parse(
+            description(control: "http://192.168.1.50:49152/control"), descriptionURL: deviceURL
+        )
+        XCTAssertEqual(renderer.avTransport.controlURL.port, 49152)
+    }
+
+    func testSSDPRejectsPublicAndNonHTTPDescriptionLocations() {
+        for location in ["https://attacker.example/device.xml", "http://10.0.0.1.evil.example/device.xml", "file:///tmp/device.xml"] {
+            let response = Data("HTTP/1.1 200 OK\r\nLOCATION: \(location)\r\n\r\n".utf8)
+            XCTAssertThrowsError(try SSDPResponseParser.parse(response))
+        }
+    }
     @MainActor
     func testSameRendererWithNewEndpointRefreshesTransportClients() async throws {
         let transport = EndpointRefreshTransport()

@@ -40,14 +40,15 @@ final class MacSystemPlaybackEngine: PlaybackEngine {
     }
 
     func play() async throws {
+        try await core.play { try self.startPlayback() }
+    }
+
+    private func startPlayback() throws {
         guard let decodedPCM = core.decodedPCM else {
             throw NativePlaybackEngineError("No decoded track is ready")
         }
         let generation = core.preparationGeneration
 
-        if MCPPCMRendererDidFinish(decodedPCM.renderer) {
-            try await core.seekDecoder(decodedPCM, to: 0)
-        }
         guard core.isCurrent(decodedPCM, generation: generation),
               let outputUnit = core.outputUnit else {
             throw CancellationError()
@@ -73,7 +74,7 @@ final class MacSystemPlaybackEngine: PlaybackEngine {
     func seek(to position: TimeInterval) async throws {
         try await core.seek(to: position) { [weak self] in
             guard let self else { throw CancellationError() }
-            try await self.play()
+            try self.startPlayback()
         }
     }
 

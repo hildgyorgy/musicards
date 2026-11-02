@@ -3,6 +3,19 @@ import XCTest
 @testable import MusiCards
 
 final class NavidromeConnectionTests: XCTestCase {
+    func testPublicAndMalformedHostsNeverPassLocalHTTPPolicy() throws {
+        for host in ["10.0.0.1.example.net", "192.168.1.5.evil.net", "[2001:db8::1]", "192.168.999.1", "2130706433", "0x08080808", "010.0.0.1", "[::ffff:8.8.8.8]"] {
+            let url = URL(string: "http://\(host):4533")!
+            XCTAssertThrowsError(try NavidromeRendererServerURL.validated(url.absoluteString), host)
+            let profile = NavidromeServerProfile(name: "Test", baseURL: url, username: "listener")
+            let builder = OpenSubsonicRequestBuilder()
+            XCTAssertThrowsError(try builder.rendererStreamURL(profile: profile, password: "test", salt: "abcdef", songID: "1"), host)
+            XCTAssertThrowsError(try builder.pingRequest(profile: profile, password: "test", salt: "abcdef", allowsInsecureLocalHTTP: true), host)
+        }
+        for host in ["192.168.1.5", "10.0.0.1", "server.local", "umbrel", "[::1]", "[fd00::1]", "[fe80::1]"] {
+            XCTAssertNoThrow(try NavidromeRendererServerURL.validated("http://\(host):4533"), host)
+        }
+    }
     @MainActor
     func testCancelledVerificationCannotSaveLateResponse() async throws {
         let suiteName = "NavidromeConnectionCancellationTests.\(UUID().uuidString)"

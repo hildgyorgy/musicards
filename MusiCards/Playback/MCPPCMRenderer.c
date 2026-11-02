@@ -3,6 +3,7 @@
 #include <stdatomic.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sched.h>
 
 struct MCPPCMRenderer {
     float *samples;
@@ -15,6 +16,7 @@ struct MCPPCMRenderer {
     _Atomic bool isPlaying;
     _Atomic bool reachedEndOfStream;
     _Atomic bool didFinish;
+    atomic_flag renderAccess;
 };
 
 MCPPCMRenderer *MCPPCMRendererCreate(
@@ -54,6 +56,7 @@ MCPPCMRenderer *MCPPCMRendererCreate(
     atomic_init(&renderer->isPlaying, false);
     atomic_init(&renderer->reachedEndOfStream, false);
     atomic_init(&renderer->didFinish, false);
+    atomic_flag_clear(&renderer->renderAccess);
     return renderer;
 }
 
@@ -179,6 +182,11 @@ void MCPPCMRendererReset(
         return;
     }
 
+    // Only the non-realtime feeder waits. The callback below never waits;
+    // it returns silence if a reset is in progress.
+    while (atomic_flag_test_and_set_explicit(&renderer->renderAccess, memory_order_acquire)) {
+        sched_yield();
+    }
     atomic_store_explicit(&renderer->readCursor, 0, memory_order_release);
     atomic_store_explicit(&renderer->writeCursor, 0, memory_order_release);
     atomic_store_explicit(
@@ -196,6 +204,7 @@ void MCPPCMRendererReset(
         false,
         memory_order_release
     );
+    atomic_flag_clear_explicit(&renderer->renderAccess, memory_order_release);
 }
 
 uint64_t MCPPCMRendererCurrentFrame(const MCPPCMRenderer *renderer) {
@@ -233,7 +242,7 @@ static void MCPZeroOutput(AudioBufferList *ioData) {
     }
 }
 
-OSStatus MCPPCMRenderCallback(
+static OSStatus MCPPCMRenderUnlocked(
     void *inRefCon,
     AudioUnitRenderActionFlags *ioActionFlags,
     const AudioTimeStamp *inTimeStamp,
@@ -339,4 +348,24 @@ OSStatus MCPPCMRenderCallback(
     }
 
     return noErr;
+}
+
+OSStatus MCPPCMRenderCallback(
+    void *inRefCon, AudioUnitRenderActionFlags *ioActionFlags,
+    const AudioTimeStamp *inTimeStamp, UInt32 inBusNumber,
+    UInt32 inNumberFrames, AudioBufferList *ioData
+) {
+    MCPPCMRenderer *renderer = inRefCon;
+    if (renderer == NULL || ioData == NULL || ioData->mNumberBuffers != 1) {
+        return kAudio_ParamError;
+    }
+    if (atomic_flag_test_and_set_explicit(&renderer->renderAccess, memory_order_acquire)) {
+        MCPZeroOutput(ioData);
+        *ioActionFlags |= kAudioUnitRenderAction_OutputIsSilence;
+        return noErr;
+    }
+    OSStatus result = MCPPCMRenderUnlocked(inRefCon, ioActionFlags, inTimeStamp,
+        inBusNumber, inNumberFrames, ioData);
+    atomic_flag_clear_explicit(&renderer->renderAccess, memory_order_release);
+    return result;
 }
