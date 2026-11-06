@@ -20,6 +20,23 @@ media URLs, private server addresses or signing material here.
 
 Start with `git status --short --branch` and `git log -5 --oneline`.
 
+### Player UI update — 2026-11-06
+
+Expanded source/output metadata now uses one line per source/output, without
+SOURCE/OUTPUT headings. The expanded player's reserved row below the seek bar
+shows two fine dotted RMS signal meters for native system playback only.
+The C callback measures the rendered PCM without modifying it and publishes a
+single atomic stereo-energy snapshot. The main actor reads it using existing
+10 Hz progress updates; the view adds short interpolation, with no new timer.
+Mono is mirrored. The scale is logarithmic (-50 to 0 dBFS), before OS/DAC volume.
+UPnP has no local PCM and never displays a fabricated meter. Pause/failure/queue
+changes clear the level; route changes clear old system data. Reduce Motion hides
+the decorative animation. Collapsed players retain their output-name row.
+Tests check stereo RMS, mono/underrun silence, unchanged output samples, the
+display scale and pause/renderer/queue transitions. This update is uncommitted.
+The full `Tools/verify.sh` run passed on 2026-11-06: main macOS tests, generic
+iOS device build and all 62 Sync tests.
+
 ## Current product
 
 - MusicBrainz Search, Release, Tracks, Artist & Discography and Player use the

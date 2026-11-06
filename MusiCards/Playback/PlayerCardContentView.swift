@@ -83,11 +83,15 @@ struct PlayerCardContentView: View {
             .scrollIndicators(.hidden)
 
             VStack(spacing: 0) {
-                playerMetadataLabel(sourceTitle(item))
-                    .padding(.bottom, 4)
+                playerMetadataLabel(sourceTitle(item), compact: true)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .padding(.top, 6)
 
-                playerMetadataLabel(outputTitle)
-                    .padding(.bottom, playerFooterInfoSpacing)
+                playerMetadataLabel(outputTitle, compact: true)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .padding(.bottom, 12 + playerFooterInfoSpacing)
 
                 if controller.canControlOutputVolume {
                     RendererVolumeControl(controller: controller)
@@ -132,15 +136,15 @@ struct PlayerCardContentView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func playerMetadataLabel(_ title: String) -> some View {
+    private func playerMetadataLabel(_ title: String, compact: Bool = false) -> some View {
         Text(title)
             .font(.footnote)
             .foregroundStyle(.secondary)
             .multilineTextAlignment(.leading)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.vertical, 6)
-            .padding(.bottom, 6)
+            .padding(.vertical, compact ? 0 : 6)
+            .padding(.bottom, compact ? 0 : 6)
     }
 
     @ViewBuilder
@@ -215,19 +219,18 @@ struct PlayerCardContentView: View {
     private func sourceTitle(_ item: PlaybackQueueItem) -> String {
         let source = sourceName(item.source)
         let format = audioFormatText(displayedAudioFormat(for: item))
-        return ["SOURCE:", source, format]
+        return [source, format]
             .filter { !$0.isEmpty }
-            .joined(separator: "\n")
+            .joined(separator: " · ")
     }
 
     private var outputTitle: String {
-        let details = [
+        return [
             controller.outputDisplayName,
             controller.outputSampleRateText
         ]
             .compactMap { $0 }
-            .joined(separator: "\n")
-        return "OUTPUT:\n\(details)"
+            .joined(separator: " · ")
     }
 
     private func displayedAudioFormat(

@@ -232,6 +232,7 @@ final class AudioUnitPlaybackCore {
             duration: duration(of: decodedPCM),
             audioFormat: audioFormat
         ))
+        eventHandler?(.signalLevelsChanged(.silence))
     }
 
     func pause() {
@@ -375,6 +376,7 @@ final class AudioUnitPlaybackCore {
         }
         stopOutputUnit()
         cancelProgressUpdates()
+        eventHandler?(.signalLevelsChanged(.silence))
     }
 
     func startProgressUpdates() {
@@ -404,6 +406,11 @@ final class AudioUnitPlaybackCore {
                 )
                 guard self.decodedPCM === decodedPCM,
                       !Task.isCancelled else { return }
+
+                let signal = MCPPCMRendererSignalLevels(decodedPCM.renderer)
+                self.eventHandler?(.signalLevelsChanged(PlaybackSignalLevels(
+                    left: Double(signal.left), right: Double(signal.right)
+                )))
 
                 let underrunCount = MCPPCMRendererUnderrunCount(
                     decodedPCM.renderer

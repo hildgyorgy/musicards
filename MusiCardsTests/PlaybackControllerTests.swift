@@ -4,6 +4,24 @@ import XCTest
 
 final class PlaybackControllerTests: XCTestCase {
     @MainActor
+    func testSignalMeterClearsOnPauseRouteChangeAndQueueReplacement() async throws {
+        let engine = PlaybackEngineSpy()
+        let controller = PlaybackController(engine: engine)
+        await controller.replaceQueue(with: [item(1)])
+        await controller.play()
+        engine.emit(.signalLevelsChanged(.init(left: 0.5, right: 0.25)))
+        XCTAssertEqual(controller.signalLevels?.left, 0.5)
+        await controller.pause()
+        XCTAssertEqual(controller.signalLevels, .silence)
+        controller.setExternalOutputDisplayName("Test renderer")
+        engine.emit(.signalLevelsChanged(.init(left: 1, right: 1)))
+        XCTAssertNil(controller.signalLevels, "UPnP must never show a fabricated or stale system level")
+        controller.setExternalOutputDisplayName(nil)
+        engine.emit(.signalLevelsChanged(.init(left: 0.5, right: 0.25)))
+        await controller.replaceQueue(with: [item(2)])
+        XCTAssertNil(controller.signalLevels)
+    }
+    @MainActor
     func testRendererVolumeStateAndCommandsStaySeparateFromPlaybackStatus() async {
         let engine = PlaybackEngineSpy()
         engine.canControlVolume = true

@@ -393,6 +393,24 @@ enum AudioOutputRouteInspector {
     #endif
 }
 
+nonisolated struct PlaybackSignalLevels: Equatable, Sendable {
+    let left: Double
+    let right: Double
+
+    static let silence = PlaybackSignalLevels(left: 0, right: 0)
+
+    init(left: Double, right: Double) {
+        self.left = left.isFinite ? min(max(left, 0), 1) : 0
+        self.right = right.isFinite ? min(max(right, 0), 1) : 0
+    }
+
+    /// A quiet -50 dBFS floor and a logarithmic display, independent of volume.
+    static func displayFraction(_ rms: Double) -> Double {
+        guard rms.isFinite, rms > 0 else { return 0 }
+        return min(max((20 * log10(rms) + 50) / 50, 0), 1)
+    }
+}
+
 enum PlaybackEngineEvent: Equatable {
     case prepared(
         duration: TimeInterval?,
@@ -401,6 +419,7 @@ enum PlaybackEngineEvent: Equatable {
     case started
     case paused
     case positionChanged(TimeInterval)
+    case signalLevelsChanged(PlaybackSignalLevels)
     case advancedToNext(
         itemID: String,
         duration: TimeInterval?,

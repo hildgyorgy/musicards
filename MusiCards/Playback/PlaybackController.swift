@@ -28,6 +28,7 @@ final class PlaybackController: ObservableObject {
     @Published private(set) var externalOutputDisplayName: String?
     @Published private(set) var outputVolumeState: PlaybackVolumeState?
     @Published private(set) var outputVolumeErrorMessage: String?
+    @Published private(set) var signalLevels: PlaybackSignalLevels?
 
     private let engine: PlaybackEngine
     private let assetResolver: (any PlaybackAssetResolving)?
@@ -256,6 +257,7 @@ final class PlaybackController: ObservableObject {
         guard status.isPlaying else { return }
         await engine.pause()
         status = .paused
+        silenceSignalMeter()
     }
 
     func togglePlayback() async {
@@ -284,6 +286,7 @@ final class PlaybackController: ObservableObject {
 
     func setExternalOutputDisplayName(_ name: String?) {
         externalOutputDisplayName = name
+        signalLevels = nil
         if name == nil {
             outputVolumeState = nil
             outputVolumeErrorMessage = nil
@@ -482,6 +485,7 @@ final class PlaybackController: ObservableObject {
     private func handle(_ event: PlaybackEngineEvent) {
         switch event {
         case .prepared(let duration, let audioFormat):
+            signalLevels = nil
             refreshOutputRoute()
             preparedDuration = duration ?? currentItem?.track.duration
             preparedAudioFormat = audioFormat
@@ -490,6 +494,16 @@ final class PlaybackController: ObservableObject {
             status = .playing
         case .paused:
             status = .paused
+            silenceSignalMeter()
+        case .signalLevelsChanged(let levels):
+            guard externalOutputDisplayName == nil else { return }
+            let previous = levels == .silence ? .silence : (signalLevels ?? .silence)
+            // Fast attack, gentle fall. No extra UI timer: use existing 10 Hz
+            // playback updates, with a short interpolation in the meter view.
+            signalLevels = PlaybackSignalLevels(
+                left: max(levels.left, previous.left * 0.65),
+                right: max(levels.right, previous.right * 0.65)
+            )
         case .positionChanged(let position):
             self.position = max(position, 0)
         case let .advancedToNext(itemID, duration, audioFormat, position):
@@ -509,6 +523,7 @@ final class PlaybackController: ObservableObject {
         case .outputConfigurationChanged:
             refreshOutputRoute()
         case .finished:
+            silenceSignalMeter()
             Task {
                 if hasNext {
                     await selectNext(autoplay: true)
@@ -517,6 +532,7 @@ final class PlaybackController: ObservableObject {
                 }
             }
         case .failed(let failure):
+            silenceSignalMeter()
             preparedItemID = nil
             preparedAudioFormat = nil
             status = .failed(failure)
@@ -531,7 +547,12 @@ final class PlaybackController: ObservableObject {
     }
 
     private func fail(with error: Error) {
+        silenceSignalMeter()
         status = .failed(PlaybackFailure(error))
+    }
+
+    private func silenceSignalMeter() {
+        if signalLevels != nil { signalLevels = .silence }
     }
 
     private func resolvedItem(
@@ -558,6 +579,7 @@ final class PlaybackController: ObservableObject {
 
     @discardableResult
     private func advancePlaybackGeneration() -> UInt64 {
+        signalLevels = nil
         playbackGeneration &+= 1
         return playbackGeneration
     }

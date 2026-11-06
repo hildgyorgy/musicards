@@ -7,6 +7,11 @@
 
 typedef struct MCPPCMRenderer MCPPCMRenderer;
 
+typedef struct {
+    float left;
+    float right;
+} MCPPCMSignalLevels;
+
 #if __has_feature(nullability)
 #pragma clang assume_nonnull begin
 #endif
@@ -41,6 +46,8 @@ void MCPPCMRendererReset(
 uint64_t MCPPCMRendererCurrentFrame(const MCPPCMRenderer *renderer);
 uint64_t MCPPCMRendererUnderrunCount(const MCPPCMRenderer *renderer);
 bool MCPPCMRendererDidFinish(const MCPPCMRenderer *renderer);
+// RMS of the last rendered block, before system/DAC volume. Mono is mirrored.
+MCPPCMSignalLevels MCPPCMRendererSignalLevels(const MCPPCMRenderer *renderer);
 
 OSStatus MCPPCMRenderCallback(
     void *inRefCon,

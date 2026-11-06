@@ -3,6 +3,63 @@ import XCTest
 @testable import MusiCards
 
 final class AudioRenderCallbackTests: XCTestCase {
+    func testSignalMeterReadsStereoRMSWithoutChangingSamples() throws {
+        let renderer = try XCTUnwrap(MCPPCMRendererCreate(8, 2))
+        defer { MCPPCMRendererDestroy(renderer) }
+        let samples: [Float] = [0.5, 0.25, -0.5, -0.25, 0.5, 0.25, -0.5, -0.25]
+        samples.withUnsafeBufferPointer { XCTAssertEqual(MCPPCMRendererWrite(renderer, $0.baseAddress!, 4), 4) }
+        MCPPCMRendererSetPlaying(renderer, true)
+        var output = [Float](repeating: 99, count: 8)
+        output.withUnsafeMutableBytes { bytes in
+            var buffers = AudioBufferList(mNumberBuffers: 1, mBuffers: AudioBuffer(
+                mNumberChannels: 2, mDataByteSize: UInt32(bytes.count), mData: bytes.baseAddress
+            ))
+            var flags: AudioUnitRenderActionFlags = []
+            var timestamp = AudioTimeStamp()
+            XCTAssertEqual(MCPPCMRenderCallback(UnsafeMutableRawPointer(renderer), &flags, &timestamp, 0, 4, &buffers), noErr)
+        }
+        let levels = MCPPCMRendererSignalLevels(renderer)
+        XCTAssertEqual(levels.left, 0.5, accuracy: 0.0001)
+        XCTAssertEqual(levels.right, 0.25, accuracy: 0.0001)
+        XCTAssertEqual(output, samples)
+        XCTAssertEqual(MCPPCMRendererCurrentFrame(renderer), 4)
+        MCPPCMRendererSetPlaying(renderer, false)
+        XCTAssertEqual(MCPPCMRendererSignalLevels(renderer).left, 0)
+        XCTAssertEqual(MCPPCMRendererSignalLevels(renderer).right, 0)
+        MCPPCMRendererReset(renderer, 0)
+        MCPPCMRendererSetPlaying(renderer, true)
+        XCTAssertEqual(MCPPCMRendererSignalLevels(renderer).left, 0)
+    }
+
+    func testSignalMeterMirrorsMonoAndIncludesUnderrunSilence() throws {
+        let renderer = try XCTUnwrap(MCPPCMRendererCreate(4, 1))
+        defer { MCPPCMRendererDestroy(renderer) }
+        let samples: [Float] = [1, -1]
+        samples.withUnsafeBufferPointer { _ = MCPPCMRendererWrite(renderer, $0.baseAddress!, 2) }
+        MCPPCMRendererSetPlaying(renderer, true)
+        var output = [Float](repeating: 99, count: 4)
+        output.withUnsafeMutableBytes { bytes in
+            var buffers = AudioBufferList(mNumberBuffers: 1, mBuffers: AudioBuffer(
+                mNumberChannels: 1, mDataByteSize: UInt32(bytes.count), mData: bytes.baseAddress
+            ))
+            var flags: AudioUnitRenderActionFlags = []
+            var timestamp = AudioTimeStamp()
+            XCTAssertEqual(MCPPCMRenderCallback(UnsafeMutableRawPointer(renderer), &flags, &timestamp, 0, 4, &buffers), noErr)
+        }
+        let levels = MCPPCMRendererSignalLevels(renderer)
+        XCTAssertEqual(levels.left, Float(sqrt(0.5)), accuracy: 0.0001)
+        XCTAssertEqual(levels.right, levels.left)
+        XCTAssertEqual(output, [1, -1, 0, 0])
+    }
+
+    func testSignalDisplayUsesDecibelsAndRejectsInvalidValues() {
+        XCTAssertEqual(PlaybackSignalLevels.displayFraction(1), 1)
+        XCTAssertEqual(PlaybackSignalLevels.displayFraction(0.1), 0.6, accuracy: 0.001)
+        XCTAssertEqual(PlaybackSignalLevels.displayFraction(0), 0)
+        XCTAssertEqual(PlaybackSignalLevels.displayFraction(0.001), 0)
+        XCTAssertEqual(PlaybackSignalLevels.displayFraction(.nan), 0)
+        XCTAssertEqual(PlaybackSignalLevels(left: .nan, right: .infinity), .silence)
+    }
     @MainActor
     func testPauseDuringReplayPreparationCancelsPendingStart() async throws {
         let coordinator = AudioPlaybackOperationCoordinator()

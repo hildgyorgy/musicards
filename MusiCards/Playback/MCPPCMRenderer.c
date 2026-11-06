@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sched.h>
+#include <math.h>
 
 struct MCPPCMRenderer {
     float *samples;
@@ -17,6 +18,7 @@ struct MCPPCMRenderer {
     _Atomic bool reachedEndOfStream;
     _Atomic bool didFinish;
     atomic_flag renderAccess;
+    _Atomic uint64_t signalEnergy;
 };
 
 MCPPCMRenderer *MCPPCMRendererCreate(
@@ -57,6 +59,7 @@ MCPPCMRenderer *MCPPCMRendererCreate(
     atomic_init(&renderer->reachedEndOfStream, false);
     atomic_init(&renderer->didFinish, false);
     atomic_flag_clear(&renderer->renderAccess);
+    atomic_init(&renderer->signalEnergy, 0);
     return renderer;
 }
 
@@ -159,6 +162,7 @@ void MCPPCMRendererSetPlaying(
         return;
     }
 
+    atomic_store_explicit(&renderer->signalEnergy, 0, memory_order_relaxed);
     atomic_store_explicit(
         &renderer->isPlaying,
         isPlaying,
@@ -188,6 +192,7 @@ void MCPPCMRendererReset(
         sched_yield();
     }
     atomic_store_explicit(&renderer->readCursor, 0, memory_order_release);
+    atomic_store_explicit(&renderer->signalEnergy, 0, memory_order_relaxed);
     atomic_store_explicit(&renderer->writeCursor, 0, memory_order_release);
     atomic_store_explicit(
         &renderer->currentFrame,
@@ -231,6 +236,33 @@ bool MCPPCMRendererDidFinish(const MCPPCMRenderer *renderer) {
             &renderer->didFinish,
             memory_order_acquire
         );
+}
+
+MCPPCMSignalLevels MCPPCMRendererSignalLevels(const MCPPCMRenderer *renderer) {
+    if (renderer == NULL || !atomic_load_explicit(&renderer->isPlaying, memory_order_acquire)) {
+        return (MCPPCMSignalLevels){0, 0};
+    }
+    // One lock-free snapshot for both channels. Square roots happen on the
+    // UI polling thread, not the realtime callback.
+    uint64_t energy = atomic_load_explicit(&renderer->signalEnergy, memory_order_relaxed);
+    return (MCPPCMSignalLevels){
+        sqrtf((float)(energy >> 32) / (float)UINT32_MAX),
+        sqrtf((float)(energy & UINT32_MAX) / (float)UINT32_MAX)
+    };
+}
+
+static void MCPMeasureSignal(MCPPCMRenderer *renderer, const float *samples, UInt32 frames) {
+    double left = 0, right = 0;
+    uint32_t channels = renderer->channelCount;
+    for (UInt32 frame = 0; frame < frames; frame++) {
+        double l = samples[(size_t)frame * channels];
+        double r = channels > 1 ? samples[(size_t)frame * channels + 1] : l;
+        if (isfinite(l)) { left += l * l; }
+        if (isfinite(r)) { right += r * r; }
+    }
+    uint32_t l = frames > 0 ? (uint32_t)(fmin(left / frames, 1.0) * UINT32_MAX) : 0;
+    uint32_t r = frames > 0 ? (uint32_t)(fmin(right / frames, 1.0) * UINT32_MAX) : 0;
+    atomic_store_explicit(&renderer->signalEnergy, ((uint64_t)l << 32) | r, memory_order_relaxed);
 }
 
 static void MCPZeroOutput(AudioBufferList *ioData) {
@@ -308,6 +340,8 @@ static OSStatus MCPPCMRenderUnlocked(
                (size_t)secondFrames * bytesPerFrame);
     }
     memset((uint8_t *)output->mData + bytesToCopy, 0, requestedBytes - bytesToCopy);
+    // Observe only the copied/zero-filled output; never modify audio for metering.
+    MCPMeasureSignal(renderer, output->mData, inNumberFrames);
     atomic_store_explicit(
         &renderer->readCursor,
         readCursor + framesToCopy,
@@ -360,6 +394,7 @@ OSStatus MCPPCMRenderCallback(
         return kAudio_ParamError;
     }
     if (atomic_flag_test_and_set_explicit(&renderer->renderAccess, memory_order_acquire)) {
+        atomic_store_explicit(&renderer->signalEnergy, 0, memory_order_relaxed);
         MCPZeroOutput(ioData);
         *ioActionFlags |= kAudioUnitRenderAction_OutputIsSilence;
         return noErr;

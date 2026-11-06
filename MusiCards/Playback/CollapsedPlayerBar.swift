@@ -17,6 +17,7 @@ struct CollapsedPlayerBar: View {
 
     @State private var scrubPosition: TimeInterval = 0
     @State private var isScrubbing = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(
         controller: PlaybackController,
@@ -104,6 +105,18 @@ struct CollapsedPlayerBar: View {
                         .accessibilityLabel(
                             "Output: \(controller.outputDisplayName)"
                         )
+                } else if !isPlaceholder && !showsOutputStatus && !reduceMotion,
+                          controller.externalOutputDisplayName == nil,
+                          let levels = controller.signalLevels {
+                    PlaybackSignalMeter(
+                        left: PlaybackSignalLevels.displayFraction(levels.left),
+                        right: PlaybackSignalLevels.displayFraction(levels.right)
+                    )
+                    .frame(height: 8)
+                    .frame(height: metadataRowHeight)
+                    .animation(.linear(duration: 0.1), value: levels)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
                 } else {
                     Color.clear
                         .frame(height: metadataRowHeight)
@@ -269,6 +282,39 @@ struct CollapsedPlayerBar: View {
     private let idleSeekHeight: CGFloat = 3
     private let activeSeekHeight: CGFloat = 7
     #endif
+}
+
+/// Two quiet, decorative RMS rows. This view has no timer or audio ownership.
+private struct PlaybackSignalMeter: View, Animatable {
+    var left: Double
+    var right: Double
+
+    var animatableData: AnimatablePair<Double, Double> {
+        get { AnimatablePair(left, right) }
+        set { left = newValue.first; right = newValue.second }
+    }
+
+    var body: some View {
+        Canvas { context, size in
+            let count = 32
+            let step = min(6, size.width / CGFloat(count))
+            let diameter = min(2.3, step * 0.6)
+            for (row, level) in [left, right].enumerated() {
+                for dot in 0..<count {
+                    let lit = level > Double(dot) / Double(count)
+                    let color = lit
+                        ? (dot >= count - 3 ? Color.red : Color.accentColor)
+                        : Color.secondary.opacity(0.12)
+                    let rect = CGRect(
+                        x: CGFloat(dot) * step,
+                        y: CGFloat(row) * 5,
+                        width: diameter, height: diameter
+                    )
+                    context.fill(Path(ellipseIn: rect), with: .color(color))
+                }
+            }
+        }
+    }
 }
 
 #if os(macOS)
