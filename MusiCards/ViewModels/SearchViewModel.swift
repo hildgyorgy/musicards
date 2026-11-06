@@ -54,6 +54,7 @@ final class SearchViewModel: ObservableObject {
     private let libraryManager: LibraryManager
     private let searchDebounceNanoseconds: UInt64
     private let searchBehavior: SearchBehavior
+    private let coverArtLoader: @Sendable (String, CoverArtSize) async -> PlatformImage?
     private var searchGeneration: UInt64 = 0
     private var activeSearchRequest: SearchRequest?
     private var lastScheduledNormalizedQuery: String?
@@ -71,12 +72,16 @@ final class SearchViewModel: ObservableObject {
         service: any MusicBrainzSearchServing,
         libraryManager: LibraryManager,
         searchDebounceNanoseconds: UInt64 = 350_000_000,
-        searchBehavior: SearchBehavior = .scoped
+        searchBehavior: SearchBehavior = .scoped,
+        coverArtLoader: @escaping @Sendable (String, CoverArtSize) async -> PlatformImage? = {
+            await CoverArtCache.shared.image(for: $0, size: $1)
+        }
     ) {
         self.musicBrainzService = service
         self.libraryManager = libraryManager
         self.searchDebounceNanoseconds = searchDebounceNanoseconds
         self.searchBehavior = searchBehavior
+        self.coverArtLoader = coverArtLoader
         libraryAvailabilityObservation = libraryManager.objectWillChange.sink {
             @MainActor [weak self] in
             // ObservableObject publishes immediately before its state changes.
@@ -1241,6 +1246,7 @@ final class SearchViewModel: ObservableObject {
         var prepared: [Int: SearchReleaseRow] = [:]
         var iterator = releases.enumerated().makeIterator()
         let promotedIDs = promotedReleaseIDs
+        let coverArtLoader = self.coverArtLoader
 
         await withTaskGroup(of: (Int, SearchReleaseRow).self) { group in
             for _ in 0..<min(maxConcurrent, releases.count) {
@@ -1249,7 +1255,7 @@ final class SearchViewModel: ObservableObject {
                     let artworkSize: CoverArtSize = promotedIDs.contains(r.id)
                         ? .full
                         : .thumbnail
-                    let img = await CoverArtCache.shared.image(for: r.id, size: artworkSize)
+                    let img = await coverArtLoader(r.id, artworkSize)
                     let row = self.makeReleaseRow(
                         id: r.id,
                         title: r.title,
@@ -1285,7 +1291,7 @@ final class SearchViewModel: ObservableObject {
                         let artworkSize: CoverArtSize = promotedIDs.contains(nextR.id)
                             ? .full
                             : .thumbnail
-                        let img = await CoverArtCache.shared.image(for: nextR.id, size: artworkSize)
+                        let img = await coverArtLoader(nextR.id, artworkSize)
                         let row = self.makeReleaseRow(
                             id: nextR.id,
                             title: nextR.title,

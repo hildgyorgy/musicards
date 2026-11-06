@@ -48,6 +48,8 @@ uint64_t MCPPCMRendererUnderrunCount(const MCPPCMRenderer *renderer);
 bool MCPPCMRendererDidFinish(const MCPPCMRenderer *renderer);
 // RMS of the last rendered block, before system/DAC volume. Mono is mirrored.
 MCPPCMSignalLevels MCPPCMRendererSignalLevels(const MCPPCMRenderer *renderer);
+// Disabled by default; only visible, active player views request measurement.
+void MCPPCMRendererSetSignalMeteringEnabled(MCPPCMRenderer *renderer, bool enabled);
 
 OSStatus MCPPCMRenderCallback(
     void *inRefCon,

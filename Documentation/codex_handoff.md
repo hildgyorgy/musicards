@@ -4,15 +4,16 @@ Living handoff for continuing on another Mac. Git and the user's latest
 instructions take precedence. Never commit passwords, tokens, authenticated
 media URLs, private server addresses or signing material here.
 
-## Current checkpoint — 2026-11-02
+## Current checkpoint — 2026-11-06
 
-- Branch: main; last committed checkpoint: a8215d5 (Update MusiCards.xcscheme).
+- Branch: main; last committed checkpoint: cba4d7c (ui). It includes the original
+  VU/UI update; 673e02a (refine) includes the earlier five review fixes.
 - At session start main matched the local origin/main reference. No fetch was
   performed; this does not assert the live remote state.
 - Main project: **2.2, build 11**. The user submitted 2.1; current App Store
   availability has not been rechecked. Project version does not prove publication.
-- Existing user change: removal of the iPad landscape override in both project
-  configurations. **Portrait-only iPad is intentional; preserve this change.**
+- The iPad landscape override was removed intentionally and is committed.
+  **Portrait-only iPad is intentional; preserve this change.**
 - Shared scheme Run uses Release without LLDB intentionally. The user did not
   reproduce crackles outside Xcode. Audio System Trace showed deadline misses
   with debugger involvement; the exact mechanism was not proven. Temporary
@@ -33,9 +34,54 @@ UPnP has no local PCM and never displays a fabricated meter. Pause/failure/queue
 changes clear the level; route changes clear old system data. Reduce Motion hides
 the decorative animation. Collapsed players retain their output-name row.
 Tests check stereo RMS, mono/underrun silence, unchanged output samples, the
-display scale and pause/renderer/queue transitions. This update is uncommitted.
+display scale and pause/renderer/queue transitions. This update is in cba4d7c.
 The full `Tools/verify.sh` run passed on 2026-11-06: main macOS tests, generic
 iOS device build and all 62 Sync tests.
+
+### Playback safety and testability update — 2026-11-06 (uncommitted)
+
+- FLAC bridge initialization requires all callbacks and a live context, rejects
+  repeat initialization before changing callback/context pointers, and leaves
+  rejected wrappers reusable. Tests cover every missing argument and repeat init.
+- The common playback coordinator explicitly tracks user intent and session
+  lifetime. It skips superseded queued seeks, waits for seeks arriving during
+  Play preparation, preserves Play when a newer user seek supersedes an implicit
+  replay rewind, and prevents duplicate starts. Reset detaches old-session I/O
+  logically: retained old decoders can finish but cannot delay or control new
+  output. Pause is immediate; a later Play waits for same-session mutations.
+- AudioUnitOutputDriving is an internal start/stop/dispose seam. The default
+  driver calls the same Apple APIs; headless tests use the real core, DecodedPCM,
+  feeder and C renderer with an inert output driver and controllably blocked
+  decoder. They cover Pause, Play, replacement, start failure, non-finite seek,
+  stop-before-dispose and release after in-flight cancellation.
+- DecodedPCM still cancels before draining the feeder queue. In-flight work
+  retains the session until it exits; tests verify Stop can return while old
+  seek I/O stays blocked and that the session is freed once that seek returns.
+  Do not remove the drain or free the renderer eagerly. Queue identity is now
+  per decoder, so another decoder's feeder is not mistaken for this one.
+- VU measurement is opt-in at the C boundary, disabled by default. Visible,
+  active expanded-player views hold independent UUID leases; backgrounding,
+  closing the player or Reduce Motion releases the view's lease. Routing enables
+  it only for system playback and preserves that preference for new decoders.
+  No signal scan or meter events occur without a request. PCM remains unchanged.
+- A local optimized C microbenchmark (five median runs, 512 stereo frames,
+  write plus render) measured about 0.124 microseconds/block disabled and 1.124
+  enabled. This is a Mac microbenchmark, not an iPhone deadline certification.
+  Full-sample double precision was retained; visibility gating saves the work
+  entirely when unused. No extra timer was added.
+- SearchViewModel accepts an injected coverArtLoader, defaulting to the existing
+  shared cache. Library-first search tests now inject no network artwork loader.
+  This removes real Cover Art Archive traffic from the barcode pagination test,
+  which had exceeded its one-second polling allowance in a full run.
+
+Verification: complete Tools/verify.sh passed (main macOS suite, generic iOS
+device build, 62 Sync tests). All 23 targeted core/renderer/FLAC tests passed
+with Address Sanitizer, including the final per-session feeder identity.
+All 36 focused core/renderer/controller tests also passed with Thread Sanitizer;
+no data races were reported in that run. A subsequent complete verify.sh run
+passed with the additional actual-core replay-versus-explicit-seek regression.
+Manual follow-up remains: real iPhone/Mac pause/seek/replay/route changes and
+VU visibility/background transitions; no physical AVM was used in this session.
 
 ## Current product
 
@@ -54,8 +100,8 @@ iOS device build and all 62 Sync tests.
   required. Prefer reachable local, otherwise remote; renderers receive local
   when present. One unverified endpoint can be retained if the other verifies.
 - System audio follows OS-selected speakers, USB DAC, Bluetooth or AirPlay.
-  Route display is reactive. Names use normal case consistently; expanded format
-  details are separate lines. Never fabricate output bit depth.
+  Route display is reactive. Names use normal case consistently; expanded
+  source/output metadata use one line each. Never fabricate output bit depth.
 - UPnP playback is functional for **Navidrome tracks only**, with direct
   server-to-renderer audio, AVTransport/DIDL-Lite, polling, optional volume/mute,
   SetNext staging and existing-renderer-session adoption.
@@ -70,7 +116,7 @@ iOS device build and all 62 Sync tests.
 - Wikipedia prefers English, otherwise an artist-appropriate available language;
   the link displays the actual language code.
 
-## Review fixes in working tree — 2026-11-02
+## Review fixes committed in 673e02a — 2026-11-02
 
 1. Local-HTTP validation parses complete IPv4 and explicit local IPv6 ranges.
    Public, malformed and numeric-disguised hosts are rejected. Stream URL building
@@ -101,7 +147,7 @@ Regression tests cover disguised/public hosts, renderer stream validation,
 hostile device/service URLs, same-host different ports, real loopback redirects,
 Pause/Play/Stop during suspended seek, superseded seeks, concurrent C reset/render
 and early renderer Stop. Existing natural-end/SetNext tests must remain green.
-Changes are not yet committed.
+These five fixes are committed; the later safety changes above remain uncommitted.
 
 ## Verification
 

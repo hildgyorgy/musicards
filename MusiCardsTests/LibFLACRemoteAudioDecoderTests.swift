@@ -4,6 +4,35 @@ import XCTest
 @testable import MusiCards
 
 final class LibFLACRemoteAudioDecoderTests: XCTestCase {
+    func testBridgeRejectsMissingCallbacksAndRepeatInitialization() throws {
+        let read: MCPFLACReadCallback = { _, _, count in count?.pointee = 0; return 1 }
+        let seek: MCPFLACSeekCallback = { _, _ in 0 }
+        let tell: MCPFLACTellCallback = { _, offset in offset?.pointee = 0; return 0 }
+        let length: MCPFLACLengthCallback = { _, size in size?.pointee = 0; return 0 }
+        let eof: MCPFLACEofCallback = { _ in true }
+        let write: MCPFLACWriteCallback = { _, _, _, _, _ in 0 }
+        let metadata: MCPFLACMetadataCallback = { _, _, _, _, _ in }
+        let error: MCPFLACErrorCallback = { _, _ in }
+        for missing in 0..<9 {
+            let context = UnsafeMutablePointer<UInt8>.allocate(capacity: 1)
+            context.initialize(to: 0)
+            defer { context.deinitialize(count: 1); context.deallocate() }
+            let decoder = try XCTUnwrap(MCPFLACDecoderCreate())
+            defer { MCPFLACDecoderDestroy(decoder) }
+            let status = MCPFLACDecoderInitialize(
+                decoder, missing == 0 ? nil : read, missing == 1 ? nil : seek,
+                missing == 2 ? nil : tell, missing == 3 ? nil : length,
+                missing == 4 ? nil : eof, missing == 5 ? nil : write,
+                missing == 6 ? nil : metadata, missing == 7 ? nil : error,
+                missing == 8 ? nil : UnsafeMutableRawPointer(context)
+            )
+            XCTAssertEqual(status, -1, "Missing callback/context \(missing) must be rejected")
+            // Rejection must leave the wrapper usable for a complete setup.
+            XCTAssertEqual(MCPFLACDecoderInitialize(decoder, read, seek, tell, length, eof, write, metadata, error, context), 0)
+            XCTAssertEqual(MCPFLACDecoderInitialize(decoder, read, seek, tell, length, eof, write, metadata, error, context), -1)
+        }
+    }
+
     func testMetadataAndSequential16BitDecodeFromRangeSource() throws {
         let fixture = try loadFixture(named: "remote-stereo-16")
         let source = try makeSource(fixture)

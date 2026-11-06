@@ -194,7 +194,8 @@ final class SearchViewModelLibraryFirstTests: XCTestCase {
         let viewModel = SearchViewModel(
             service: service,
             libraryManager: LibraryManager(provider: provider),
-            searchDebounceNanoseconds: 0
+            searchDebounceNanoseconds: 0,
+            coverArtLoader: { _, _ in nil }
         )
 
         viewModel.searchQuery = "Miles Davis, So What"
@@ -438,7 +439,8 @@ final class SearchViewModelLibraryFirstTests: XCTestCase {
         let viewModel = SearchViewModel(
             service: service,
             libraryManager: LibraryManager(provider: provider),
-            searchDebounceNanoseconds: 0
+            searchDebounceNanoseconds: 0,
+            coverArtLoader: { _, _ in nil }
         )
 
         viewModel.searchQuery = "Nirvana, Nevermind"
@@ -474,7 +476,8 @@ final class SearchViewModelLibraryFirstTests: XCTestCase {
         let viewModel = SearchViewModel(
             service: service,
             libraryManager: LibraryManager(provider: provider),
-            searchDebounceNanoseconds: 0
+            searchDebounceNanoseconds: 0,
+            coverArtLoader: { _, _ in nil }
         )
         viewModel.loadReleaseGroupResults(
             releaseGroupID: releaseGroupID,
@@ -502,7 +505,8 @@ final class SearchViewModelLibraryFirstTests: XCTestCase {
         let viewModel = SearchViewModel(
             service: service,
             libraryManager: LibraryManager(provider: provider),
-            searchDebounceNanoseconds: 0
+            searchDebounceNanoseconds: 0,
+            coverArtLoader: { _, _ in nil }
         )
         viewModel.loadReleaseGroupResults(
             releaseGroupID: releaseGroupID,
@@ -570,7 +574,8 @@ final class SearchViewModelLibraryFirstTests: XCTestCase {
         let viewModel = SearchViewModel(
             service: service,
             libraryManager: LibraryManager(provider: provider),
-            searchDebounceNanoseconds: 0
+            searchDebounceNanoseconds: 0,
+            coverArtLoader: { _, _ in nil }
         )
 
         viewModel.searchQuery = "Nirvana, Nevermind"
@@ -622,7 +627,8 @@ final class SearchViewModelLibraryFirstTests: XCTestCase {
         let viewModel = SearchViewModel(
             service: service,
             libraryManager: LibraryManager(provider: provider),
-            searchDebounceNanoseconds: 0
+            searchDebounceNanoseconds: 0,
+            coverArtLoader: { _, _ in nil }
         )
 
         viewModel.searchQuery = "Nirvana, Nevermind"
@@ -658,7 +664,8 @@ final class SearchViewModelLibraryFirstTests: XCTestCase {
         let viewModel = SearchViewModel(
             service: service,
             libraryManager: LibraryManager(provider: provider),
-            searchDebounceNanoseconds: 0
+            searchDebounceNanoseconds: 0,
+            coverArtLoader: { _, _ in nil }
         )
         viewModel.searchQuery = "Nirvana, Nevermind"
         viewModel.queryDidChange()
@@ -698,7 +705,8 @@ final class SearchViewModelLibraryFirstTests: XCTestCase {
         let viewModel = SearchViewModel(
             service: SearchServiceStub(),
             libraryManager: manager,
-            searchDebounceNanoseconds: 0
+            searchDebounceNanoseconds: 0,
+            coverArtLoader: { _, _ in nil }
         )
         viewModel.searchQuery = "Shared Artist, Shared Album"
         viewModel.queryDidChange()
@@ -731,7 +739,8 @@ final class SearchViewModelLibraryFirstTests: XCTestCase {
         let viewModel = SearchViewModel(
             service: service,
             libraryManager: LibraryManager(provider: provider),
-            searchDebounceNanoseconds: 0
+            searchDebounceNanoseconds: 0,
+            coverArtLoader: { _, _ in nil }
         )
 
         viewModel.searchQuery = "Artist, First"
@@ -755,7 +764,8 @@ final class SearchViewModelLibraryFirstTests: XCTestCase {
         let viewModel = SearchViewModel(
             service: service,
             libraryManager: LibraryManager(provider: provider),
-            searchDebounceNanoseconds: 0
+            searchDebounceNanoseconds: 0,
+            coverArtLoader: { _, _ in nil }
         )
 
         viewModel.searchQuery = "Nirvana"
@@ -813,7 +823,8 @@ final class SearchViewModelLibraryFirstTests: XCTestCase {
             libraryManager: LibraryManager(
                 provider: SearchLibraryProvider(source: .local)
             ),
-            searchDebounceNanoseconds: 0
+            searchDebounceNanoseconds: 0,
+            coverArtLoader: { _, _ in nil }
         )
     }
 

@@ -11,6 +11,9 @@ struct PlayerCardContentView: View {
     let onSelectArtist: (String) -> Void
 
     @State private var selectedDetailPage = 1
+    @State private var signalMeterObserverID = UUID()
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Group {
@@ -21,12 +24,25 @@ struct PlayerCardContentView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear { updateSignalMetering() }
+        .onDisappear {
+            controller.setSignalMeteringActive(false, observerID: signalMeterObserverID)
+        }
+        .onChange(of: scenePhase) { _, _ in updateSignalMetering() }
+        .onChange(of: reduceMotion) { _, _ in updateSignalMetering() }
         .task(id: controller.currentItem?.track.recordingID) {
             selectedDetailPage = 1
             if let recordingID = controller.currentItem?.track.recordingID {
                 detailStore.fetchIfNeeded(recordingID: recordingID)
             }
         }
+    }
+
+    private func updateSignalMetering() {
+        controller.setSignalMeteringActive(
+            scenePhase == .active && !reduceMotion,
+            observerID: signalMeterObserverID
+        )
     }
 
     private var idlePlayer: some View {

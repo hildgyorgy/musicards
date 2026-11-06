@@ -52,6 +52,9 @@ nonisolated struct PCMDecoderFormat: Equatable, Sendable {
     let sampleFormat: PCMDecoderSampleFormat
 }
 
+/// read/seek are serialized by DecodedPCM's feeder queue. cancel must be
+/// thread-safe, promptly wake I/O, and never wait for that same feeder queue.
+/// Backends own their native decoder handles until all in-flight calls return.
 nonisolated protocol PCMDecoderBackend: AnyObject, Sendable {
     var format: PCMDecoderFormat { get }
     var frameCount: UInt64 { get }
@@ -163,7 +166,10 @@ nonisolated final class ExtAudioFilePCMDecoderBackend:
 }
 
 nonisolated final class DecodedPCM: @unchecked Sendable {
-    private static let feederQueueKey = DispatchSpecificKey<Void>()
+    // Decoder and feeder state are confined to feederQueue; errors/diagnostics
+    // use locks, and the C renderer publishes atomic snapshots to the UI.
+    // Identity is per session: another decoder's feeder is not our queue.
+    private let feederQueueKey = DispatchSpecificKey<Void>()
 
     let renderer: OpaquePointer
     let sampleRate: Double
@@ -229,7 +235,7 @@ nonisolated final class DecodedPCM: @unchecked Sendable {
         self.didAccessSecurityScope = didAccessSecurityScope
         self.sourceURL = sourceURL
         self.feederTimer = DispatchSource.makeTimerSource(queue: feederQueue)
-        feederQueue.setSpecific(key: Self.feederQueueKey, value: ())
+        feederQueue.setSpecific(key: feederQueueKey, value: ())
 
         feederTimer.setEventHandler { [weak self] in
             self?.fillAvailableSpace()
@@ -239,9 +245,12 @@ nonisolated final class DecodedPCM: @unchecked Sendable {
     }
 
     deinit {
+        // Operations retain this session while using its buffers. Cancel before
+        // draining, and never wait on our own serial queue. Keep this barrier:
+        // removing it would weaken the buffer/renderer ownership contract.
         decoder.cancel()
         feederTimer.cancel()
-        if DispatchQueue.getSpecific(key: Self.feederQueueKey) == nil {
+        if DispatchQueue.getSpecific(key: feederQueueKey) == nil {
             feederQueue.sync {}
         }
         decodeBuffer.deallocate()

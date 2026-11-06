@@ -4,9 +4,31 @@ import XCTest
 
 final class PlaybackControllerTests: XCTestCase {
     @MainActor
+    func testSignalMeterRunsOnlyWhileAtLeastOneViewRequestsIt() {
+        let engine = PlaybackEngineSpy()
+        let controller = PlaybackController(engine: engine)
+        let first = UUID(), second = UUID()
+        engine.emit(.signalLevelsChanged(.init(left: 1, right: 1)))
+        XCTAssertNil(controller.signalLevels)
+        controller.setSignalMeteringActive(true, observerID: first)
+        controller.setSignalMeteringActive(true, observerID: first)
+        controller.setSignalMeteringActive(true, observerID: second)
+        XCTAssertEqual(engine.signalMeteringRequests, [true])
+        engine.emit(.signalLevelsChanged(.init(left: 0.5, right: 0.25)))
+        XCTAssertNotNil(controller.signalLevels)
+        controller.setSignalMeteringActive(false, observerID: first)
+        XCTAssertEqual(engine.signalMeteringRequests, [true])
+        controller.setSignalMeteringActive(false, observerID: second)
+        XCTAssertEqual(engine.signalMeteringRequests, [true, false])
+        XCTAssertNil(controller.signalLevels)
+        engine.emit(.signalLevelsChanged(.init(left: 1, right: 1)))
+        XCTAssertNil(controller.signalLevels)
+    }
+    @MainActor
     func testSignalMeterClearsOnPauseRouteChangeAndQueueReplacement() async throws {
         let engine = PlaybackEngineSpy()
         let controller = PlaybackController(engine: engine)
+        controller.setSignalMeteringActive(true, observerID: UUID())
         await controller.replaceQueue(with: [item(1)])
         await controller.play()
         engine.emit(.signalLevelsChanged(.init(left: 0.5, right: 0.25)))
@@ -544,6 +566,11 @@ private final class PlaybackEngineSpy: PlaybackEngine, PlaybackVolumeControlling
     var stubbedVolumeState: PlaybackVolumeState?
     var volumeLevels: [Double] = []
     var muteStates: [Bool] = []
+    var signalMeteringRequests: [Bool] = []
+
+    func setSignalMeteringEnabled(_ enabled: Bool) {
+        signalMeteringRequests.append(enabled)
+    }
 
     func prepare(_ item: PlaybackQueueItem) async throws {
         preparedIDs.append(item.id)

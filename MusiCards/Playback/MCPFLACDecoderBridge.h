@@ -40,6 +40,8 @@ typedef void (*MCPFLACErrorCallback)(void *context, int status);
 
 MCPFLACDecoder *MCPFLACDecoderCreate(void);
 
+// All callbacks and context are mandatory. Returns -1 on missing arguments
+// or repeat initialization, without changing an already initialized decoder.
 int MCPFLACDecoderInitialize(
     MCPFLACDecoder *decoder,
     MCPFLACReadCallback readCallback,

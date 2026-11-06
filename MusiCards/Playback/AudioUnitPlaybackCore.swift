@@ -15,46 +15,62 @@ enum PlaybackQualityDiagnostics {
     )
 }
 
-/// Serialises decoder mutations and preserves the latest user transport intent.
+/// Serialises mutations within a decoder session. Reset ends that session;
+/// its retained in-flight decoder may finish, but cannot restart current output.
 @MainActor
 final class AudioPlaybackOperationCoordinator {
-    private var pendingSeek: Task<Void, Error>?
-    private var pendingSeekID: UInt64?
+    private enum Intent { case paused, playing }
+    private struct PendingSeek {
+        let revision: UInt64
+        let task: Task<Void, Error>
+    }
+    private var pendingSeek: PendingSeek?
     private var seekRevision: UInt64 = 0
     private var playRevision: UInt64 = 0
-    private var wantsPlayback = false
+    private var intent: Intent = .paused
     private var waitingPlayRevision: UInt64?
+    private var lastStartedSeekRevision: UInt64 = 0
+
+    var hasPendingSeek: Bool { pendingSeek != nil }
 
     func pause() {
-        wantsPlayback = false
+        intent = .paused
         playRevision &+= 1
     }
 
     func reset() {
         pause()
         seekRevision &+= 1
+        // A new decoder need not wait for an old decoder's cancelled I/O.
+        // The old task retains its decoder until the mutation has returned.
+        pendingSeek = nil
     }
 
     func play(prepare: () async throws -> Void = {}, start: () throws -> Void) async throws {
-        wantsPlayback = true
+        intent = .playing
         playRevision &+= 1
         let revision = playRevision
         waitingPlayRevision = revision
         defer {
             if waitingPlayRevision == revision { waitingPlayRevision = nil }
         }
-        while let pendingSeek {
-            try await pendingSeek.value
-            try Task.checkCancellation()
-            guard wantsPlayback, revision == playRevision else { throw CancellationError() }
-            // The seek owner clears this reference on the same actor.
-            await Task.yield()
-        }
-        guard wantsPlayback, revision == playRevision else { throw CancellationError() }
-        try await prepare()
-        guard wantsPlayback, revision == playRevision else { throw CancellationError() }
         do {
+            try await waitForPendingSeeks(playRevision: revision)
+            guard intent == .playing, revision == playRevision else { throw CancellationError() }
+            let seekBeforePreparation = seekRevision
+            do {
+                try await prepare()
+            } catch is CancellationError where !Task.isCancelled
+                && revision == playRevision && intent == .playing
+                && seekRevision != seekBeforePreparation {
+                // A newer user seek superseded the implicit rewind used by
+                // replay. Preserve Play intent and wait for that newer seek.
+            }
+            try await waitForPendingSeeks(playRevision: revision)
+            try Task.checkCancellation()
+            guard intent == .playing, revision == playRevision else { throw CancellationError() }
             try start()
+            lastStartedSeekRevision = seekRevision
         } catch {
             if revision == playRevision { pause() }
             throw error
@@ -67,30 +83,62 @@ final class AudioPlaybackOperationCoordinator {
     ) async throws {
         seekRevision &+= 1
         let revision = seekRevision
-        let previous = pendingSeek
+        let previous = pendingSeek?.task
         let task = Task {
-            // Serialise decoder mutations, including superseded seeks.
             _ = try? await previous?.value
             try Task.checkCancellation()
+            guard revision == self.seekRevision else { throw CancellationError() }
             try await operation()
         }
-        pendingSeek = task
-        pendingSeekID = revision
+        pendingSeek = PendingSeek(revision: revision, task: task)
         do {
             try await task.value
-        } catch {
-            if pendingSeekID == revision { pendingSeek = nil; pendingSeekID = nil }
+            clearPending(revision: revision)
             guard revision == seekRevision else { throw CancellationError() }
+            try Task.checkCancellation()
+            if intent == .playing, waitingPlayRevision == nil,
+               lastStartedSeekRevision != revision {
+                try resume()
+                lastStartedSeekRevision = revision
+            }
+        } catch {
+            clearPending(revision: revision)
+            guard revision == seekRevision else { throw CancellationError() }
+            pause()
             throw error
         }
-        guard revision == seekRevision else {
-            // A reset without a replacement seek must release the waiter.
-            if pendingSeekID == revision { pendingSeek = nil; pendingSeekID = nil }
-            throw CancellationError()
+    }
+
+    private func clearPending(revision: UInt64) {
+        if pendingSeek?.revision == revision { pendingSeek = nil }
+    }
+
+    private func waitForPendingSeeks(playRevision revision: UInt64) async throws {
+        while let pending = pendingSeek {
+            try await pending.task.value
+            clearPending(revision: pending.revision)
+            try Task.checkCancellation()
+            guard intent == .playing, revision == playRevision else { throw CancellationError() }
         }
-        pendingSeek = nil
-        pendingSeekID = nil
-        if wantsPlayback, waitingPlayRevision == nil { try resume() }
+    }
+}
+
+/// Narrow hardware boundary: tests can drive the actual core with an inert
+/// output unit, including delayed decoder operations and disposal ordering.
+@MainActor
+protocol AudioUnitOutputDriving {
+    func start(_ unit: AudioUnit) -> OSStatus
+    func stop(_ unit: AudioUnit) -> OSStatus
+    func dispose(_ unit: AudioUnit)
+}
+
+@MainActor
+private struct SystemAudioUnitOutputDriver: AudioUnitOutputDriving {
+    func start(_ unit: AudioUnit) -> OSStatus { AudioOutputUnitStart(unit) }
+    func stop(_ unit: AudioUnit) -> OSStatus { AudioOutputUnitStop(unit) }
+    func dispose(_ unit: AudioUnit) {
+        AudioUnitUninitialize(unit)
+        AudioComponentInstanceDispose(unit)
     }
 }
 
@@ -113,9 +161,23 @@ final class AudioUnitPlaybackCore {
     private var nextQualityReportAt: UInt64 = 0
     private var currentSeekCapability: PlaybackSeekCapability = .supported
     private let operations = AudioPlaybackOperationCoordinator()
+    private let outputDriver: any AudioUnitOutputDriving
+    private var signalMeteringEnabled = false
+
+    init(outputDriver: (any AudioUnitOutputDriving)? = nil) {
+        self.outputDriver = outputDriver ?? SystemAudioUnitOutputDriver()
+    }
 
     var canSeek: Bool {
         currentSeekCapability.isSupported
+    }
+
+    func setSignalMeteringEnabled(_ enabled: Bool) {
+        signalMeteringEnabled = enabled
+        if let decodedPCM {
+            MCPPCMRendererSetSignalMeteringEnabled(decodedPCM.renderer, enabled)
+            if enabled { eventHandler?(.signalLevelsChanged(.silence)) }
+        }
     }
 
     func beginPreparation(
@@ -208,6 +270,7 @@ final class AudioUnitPlaybackCore {
         audioFormatHint: PlaybackAudioFormat?
     ) {
         self.decodedPCM = decodedPCM
+        MCPPCMRendererSetSignalMeteringEnabled(decodedPCM.renderer, signalMeteringEnabled)
         currentSeekCapability = decodedPCM.seekCapabilityOverride
             ?? seekCapability
         reportedUnderrunCount = 0
@@ -232,7 +295,7 @@ final class AudioUnitPlaybackCore {
             duration: duration(of: decodedPCM),
             audioFormat: audioFormat
         ))
-        eventHandler?(.signalLevelsChanged(.silence))
+        if signalMeteringEnabled { eventHandler?(.signalLevelsChanged(.silence)) }
     }
 
     func pause() {
@@ -247,10 +310,12 @@ final class AudioUnitPlaybackCore {
     func stop(beforeStopping: () -> Void = {}) async {
         operations.reset()
         preparationGeneration &+= 1
+        let generation = preparationGeneration
         preparingRemoteByteSource?.cancel()
         preparingRemoteByteSource = nil
         beforeStopping()
         await stopPlayback()
+        guard generation == preparationGeneration else { return }
         disposeOutputUnit()
         disposeDecoder()
         currentSeekCapability = .supported
@@ -268,6 +333,9 @@ final class AudioUnitPlaybackCore {
         to position: TimeInterval,
         resumePlayback: () throws -> Void
     ) async throws {
+        guard position.isFinite else {
+            throw NativePlaybackEngineError("The playback position must be finite")
+        }
         guard let decodedPCM else {
             throw NativePlaybackEngineError("No decoded track is ready")
         }
@@ -282,9 +350,8 @@ final class AudioUnitPlaybackCore {
         let generation = preparationGeneration
 
         let requestedFrame = position * decodedPCM.sampleRate
-        let boundedFrame = UInt64(
-            min(max(requestedFrame, 0), Double(decodedPCM.frameCount))
-        )
+        let boundedFrame = !requestedFrame.isFinite || requestedFrame >= Double(decodedPCM.frameCount)
+            ? decodedPCM.frameCount : UInt64(max(requestedFrame, 0))
         MCPPCMRendererSetPlaying(decodedPCM.renderer, false)
         stopOutputUnit()
         do {
@@ -323,7 +390,8 @@ final class AudioUnitPlaybackCore {
     func play(startOutput: () throws -> Void) async throws {
         try await operations.play(prepare: {
             if let decodedPCM = self.decodedPCM,
-               MCPPCMRendererDidFinish(decodedPCM.renderer) {
+               MCPPCMRendererDidFinish(decodedPCM.renderer),
+               !self.operations.hasPendingSeek {
                 try await self.seek(to: 0, resumePlayback: {})
             }
         }, start: startOutput)
@@ -338,7 +406,7 @@ final class AudioUnitPlaybackCore {
         failureMessage: String
     ) throws {
         guard !isOutputRunning else { return }
-        let status = AudioOutputUnitStart(outputUnit)
+        let status = outputDriver.start(outputUnit)
         guard status == noErr else {
             PlaybackQualityDiagnostics.logger.error(
                 "Audio output start failed status=\(status, privacy: .public) remote=\(self.decodedPCM?.isRemote ?? false, privacy: .public)"
@@ -356,15 +424,14 @@ final class AudioUnitPlaybackCore {
 
     func stopOutputUnit() {
         guard isOutputRunning, let outputUnit else { return }
-        AudioOutputUnitStop(outputUnit)
+        _ = outputDriver.stop(outputUnit)
         isOutputRunning = false
     }
 
     func disposeOutputUnit() {
         stopOutputUnit()
         if let outputUnit {
-            AudioUnitUninitialize(outputUnit)
-            AudioComponentInstanceDispose(outputUnit)
+            outputDriver.dispose(outputUnit)
         }
         outputUnit = nil
     }
@@ -376,7 +443,7 @@ final class AudioUnitPlaybackCore {
         }
         stopOutputUnit()
         cancelProgressUpdates()
-        eventHandler?(.signalLevelsChanged(.silence))
+        if signalMeteringEnabled { eventHandler?(.signalLevelsChanged(.silence)) }
     }
 
     func startProgressUpdates() {
@@ -407,10 +474,12 @@ final class AudioUnitPlaybackCore {
                 guard self.decodedPCM === decodedPCM,
                       !Task.isCancelled else { return }
 
-                let signal = MCPPCMRendererSignalLevels(decodedPCM.renderer)
-                self.eventHandler?(.signalLevelsChanged(PlaybackSignalLevels(
-                    left: Double(signal.left), right: Double(signal.right)
-                )))
+                if self.signalMeteringEnabled {
+                    let signal = MCPPCMRendererSignalLevels(decodedPCM.renderer)
+                    self.eventHandler?(.signalLevelsChanged(PlaybackSignalLevels(
+                        left: Double(signal.left), right: Double(signal.right)
+                    )))
+                }
 
                 let underrunCount = MCPPCMRendererUnderrunCount(
                     decodedPCM.renderer

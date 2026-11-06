@@ -446,10 +446,12 @@ protocol PlaybackEngine: AnyObject {
     func stop() async
     func seek(to position: TimeInterval) async throws
     func restoreOutputConfiguration()
+    func setSignalMeteringEnabled(_ enabled: Bool)
 }
 
 extension PlaybackEngine {
     func restoreOutputConfiguration() {}
+    func setSignalMeteringEnabled(_ enabled: Bool) {}
 }
 
 enum PendingPlaybackEngineError: LocalizedError {

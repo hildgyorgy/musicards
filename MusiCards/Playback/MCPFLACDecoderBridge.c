@@ -195,7 +195,9 @@ int MCPFLACDecoderInitialize(
     MCPFLACErrorCallback errorCallback,
     void *context
 ) {
-    if (wrapper == NULL || readCallback == NULL || writeCallback == NULL
+    if (wrapper == NULL || wrapper->initialized || context == NULL
+        || readCallback == NULL || seekCallback == NULL || tellCallback == NULL
+        || lengthCallback == NULL || eofCallback == NULL || writeCallback == NULL
         || metadataCallback == NULL || errorCallback == NULL) {
         return -1;
     }

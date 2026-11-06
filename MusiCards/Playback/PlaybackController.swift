@@ -36,6 +36,19 @@ final class PlaybackController: ObservableObject {
     private var pendingOutputResumePosition: TimeInterval?
     private var playbackGeneration: UInt64 = 0
     private var outputVolumeGeneration: UInt64 = 0
+    private var signalMeterObservers: Set<UUID> = []
+
+    /// A lease per visible view avoids one closing window disabling another.
+    func setSignalMeteringActive(_ active: Bool, observerID: UUID) {
+        let wasActive = !signalMeterObservers.isEmpty
+        if active { signalMeterObservers.insert(observerID) }
+        else { signalMeterObservers.remove(observerID) }
+        let isActive = !signalMeterObservers.isEmpty
+        if wasActive != isActive {
+            engine.setSignalMeteringEnabled(isActive)
+            if !isActive { signalLevels = nil }
+        }
+    }
     private var outputRouteObservation: AnyCancellable?
     #if os(macOS)
     private var macOutputRouteObserver: MacOutputRouteObserver?
@@ -496,7 +509,7 @@ final class PlaybackController: ObservableObject {
             status = .paused
             silenceSignalMeter()
         case .signalLevelsChanged(let levels):
-            guard externalOutputDisplayName == nil else { return }
+            guard !signalMeterObservers.isEmpty, externalOutputDisplayName == nil else { return }
             let previous = levels == .silence ? .silence : (signalLevels ?? .silence)
             // Fast attack, gentle fall. No extra UI timer: use existing 10 Hz
             // playback updates, with a short interpolation in the meter view.

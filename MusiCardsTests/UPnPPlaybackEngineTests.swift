@@ -4,6 +4,30 @@ import XCTest
 
 final class UPnPPlaybackEngineTests: XCTestCase {
     @MainActor
+    func testMeterRequestFollowsOnlyTheActiveSystemRoute() async throws {
+        let system = MeteringSystemEngine()
+        var selection: OutputRoutingPlaybackEngine.Selection = .system
+        let routing = OutputRoutingPlaybackEngine(
+            systemEngine: system,
+            rendererEngine: makeEngine(client: TransportSpy()),
+            selection: { selection }
+        )
+        routing.setSignalMeteringEnabled(true)
+        XCTAssertFalse(system.meteringEnabled)
+        try await routing.prepare(makeItem("first"))
+        XCTAssertTrue(system.meteringEnabled)
+        selection = .renderer(makeRenderer())
+        try await routing.prepare(makeItem("first"))
+        XCTAssertFalse(system.meteringEnabled)
+        routing.setSignalMeteringEnabled(true)
+        XCTAssertFalse(system.meteringEnabled, "A visible UPnP player must not measure local PCM")
+        selection = .system
+        try await routing.prepare(makeItem("first"))
+        XCTAssertTrue(system.meteringEnabled)
+        await routing.stop()
+        XCTAssertFalse(system.meteringEnabled)
+    }
+    @MainActor
     func testEarlyRendererStopDoesNotFinishOrConsumeQueue() async throws {
         let client = TransportSpy()
         let engine = makeEngine(client: client)
@@ -277,6 +301,19 @@ final class UPnPPlaybackEngineTests: XCTestCase {
             )
         )
     }
+}
+
+@MainActor
+private final class MeteringSystemEngine: PlaybackEngine {
+    var eventHandler: ((PlaybackEngineEvent) -> Void)?
+    var canSeek: Bool { true }
+    private(set) var meteringEnabled = false
+    func prepare(_ item: PlaybackQueueItem) async throws {}
+    func play() async throws {}
+    func pause() async {}
+    func stop() async {}
+    func seek(to position: TimeInterval) async throws {}
+    func setSignalMeteringEnabled(_ enabled: Bool) { meteringEnabled = enabled }
 }
 
 @MainActor

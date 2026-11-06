@@ -43,6 +43,10 @@ final class MacSystemPlaybackEngine: PlaybackEngine {
         try await core.play { try self.startPlayback() }
     }
 
+    func setSignalMeteringEnabled(_ enabled: Bool) {
+        core.setSignalMeteringEnabled(enabled)
+    }
+
     private func startPlayback() throws {
         guard let decodedPCM = core.decodedPCM else {
             throw NativePlaybackEngineError("No decoded track is ready")

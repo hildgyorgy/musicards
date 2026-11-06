@@ -3,8 +3,61 @@ import XCTest
 @testable import MusiCards
 
 final class AudioRenderCallbackTests: XCTestCase {
+    @MainActor
+    func testPlayAlsoWaitsForSeekRequestedDuringItsPreparation() async throws {
+        let coordinator = AudioPlaybackOperationCoordinator()
+        let preparing = SeekOperationLatch(), seeking = SeekOperationLatch()
+        var seekFinished = false
+        let returned = expectation(description: "Play preparation returned")
+        let play = Task {
+            try await coordinator.play(prepare: {
+                await preparing.run()
+                returned.fulfill()
+            }, start: {
+                XCTAssertTrue(seekFinished, "Output started while a newer seek was still mutating PCM")
+            })
+        }
+        await preparing.waitUntilEntered()
+        let seek = Task {
+            try await coordinator.seek(operation: {
+                await seeking.run()
+                await MainActor.run { seekFinished = true }
+            }, resume: { XCTFail("Explicit Play should own this resume") })
+        }
+        await seeking.waitUntilEntered()
+        await preparing.release()
+        await fulfillment(of: [returned], timeout: 2)
+        await seeking.release()
+        try await seek.value
+        try await play.value
+    }
+    func testMeterIsOptInAndTogglingItNeverChangesPCMOutput() throws {
+        let renderer = try XCTUnwrap(MCPPCMRendererCreate(4, 2))
+        defer { MCPPCMRendererDestroy(renderer) }
+        let samples: [Float] = [0.5, 0.25, -0.5, -0.25]
+        for enabled in [false, true, false] {
+            MCPPCMRendererReset(renderer, 0)
+            MCPPCMRendererSetSignalMeteringEnabled(renderer, enabled)
+            samples.withUnsafeBufferPointer { _ = MCPPCMRendererWrite(renderer, $0.baseAddress!, 2) }
+            MCPPCMRendererSetPlaying(renderer, true)
+            var output = [Float](repeating: 99, count: 4)
+            output.withUnsafeMutableBytes { bytes in
+                var buffers = AudioBufferList(mNumberBuffers: 1, mBuffers: AudioBuffer(
+                    mNumberChannels: 2, mDataByteSize: UInt32(bytes.count), mData: bytes.baseAddress
+                ))
+                var flags: AudioUnitRenderActionFlags = []
+                var timestamp = AudioTimeStamp()
+                XCTAssertEqual(MCPPCMRenderCallback(UnsafeMutableRawPointer(renderer), &flags, &timestamp, 0, 2, &buffers), noErr)
+            }
+            XCTAssertEqual(output, samples)
+            let levels = MCPPCMRendererSignalLevels(renderer)
+            XCTAssertEqual(levels.left, enabled ? 0.5 : 0, accuracy: 0.0001)
+            XCTAssertEqual(levels.right, enabled ? 0.25 : 0, accuracy: 0.0001)
+        }
+    }
     func testSignalMeterReadsStereoRMSWithoutChangingSamples() throws {
         let renderer = try XCTUnwrap(MCPPCMRendererCreate(8, 2))
+        MCPPCMRendererSetSignalMeteringEnabled(renderer, true)
         defer { MCPPCMRendererDestroy(renderer) }
         let samples: [Float] = [0.5, 0.25, -0.5, -0.25, 0.5, 0.25, -0.5, -0.25]
         samples.withUnsafeBufferPointer { XCTAssertEqual(MCPPCMRendererWrite(renderer, $0.baseAddress!, 4), 4) }
@@ -33,6 +86,7 @@ final class AudioRenderCallbackTests: XCTestCase {
 
     func testSignalMeterMirrorsMonoAndIncludesUnderrunSilence() throws {
         let renderer = try XCTUnwrap(MCPPCMRendererCreate(4, 1))
+        MCPPCMRendererSetSignalMeteringEnabled(renderer, true)
         defer { MCPPCMRendererDestroy(renderer) }
         let samples: [Float] = [1, -1]
         samples.withUnsafeBufferPointer { _ = MCPPCMRendererWrite(renderer, $0.baseAddress!, 2) }

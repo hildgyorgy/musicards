@@ -29,6 +29,12 @@ final class OutputRoutingPlaybackEngine: PlaybackEngine {
     private let selection: () -> Selection
     private var activeRoute: Route?
     private var preparedItem: PlaybackQueueItem?
+    private var signalMeteringRequested = false
+
+    func setSignalMeteringEnabled(_ enabled: Bool) {
+        signalMeteringRequested = enabled
+        systemEngine.setSignalMeteringEnabled(enabled && activeRoute == .system)
+    }
 
     init(
         systemEngine: PlaybackEngine,
@@ -57,9 +63,11 @@ final class OutputRoutingPlaybackEngine: PlaybackEngine {
                 await rendererEngine.stop()
             }
             activeRoute = .system
+            systemEngine.setSignalMeteringEnabled(signalMeteringRequested)
             try await systemEngine.prepare(item)
 
         case .renderer(let renderer):
+            systemEngine.setSignalMeteringEnabled(false)
             if activeRoute == .system {
                 await systemEngine.stop()
             }
@@ -68,6 +76,7 @@ final class OutputRoutingPlaybackEngine: PlaybackEngine {
             try await rendererEngine.prepare(item)
 
         case .unavailable(let name):
+            systemEngine.setSignalMeteringEnabled(false)
             throw UPnPPlaybackError.rendererUnavailable(name)
         }
     }
@@ -103,6 +112,7 @@ final class OutputRoutingPlaybackEngine: PlaybackEngine {
     }
 
     func stop() async {
+        systemEngine.setSignalMeteringEnabled(false)
         switch activeRoute {
         case .system:
             await systemEngine.stop()

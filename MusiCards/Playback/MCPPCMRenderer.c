@@ -19,6 +19,7 @@ struct MCPPCMRenderer {
     _Atomic bool didFinish;
     atomic_flag renderAccess;
     _Atomic uint64_t signalEnergy;
+    _Atomic bool signalMeteringEnabled;
 };
 
 MCPPCMRenderer *MCPPCMRendererCreate(
@@ -60,6 +61,7 @@ MCPPCMRenderer *MCPPCMRendererCreate(
     atomic_init(&renderer->didFinish, false);
     atomic_flag_clear(&renderer->renderAccess);
     atomic_init(&renderer->signalEnergy, 0);
+    atomic_init(&renderer->signalMeteringEnabled, false);
     return renderer;
 }
 
@@ -239,7 +241,9 @@ bool MCPPCMRendererDidFinish(const MCPPCMRenderer *renderer) {
 }
 
 MCPPCMSignalLevels MCPPCMRendererSignalLevels(const MCPPCMRenderer *renderer) {
-    if (renderer == NULL || !atomic_load_explicit(&renderer->isPlaying, memory_order_acquire)) {
+    if (renderer == NULL
+        || !atomic_load_explicit(&renderer->signalMeteringEnabled, memory_order_relaxed)
+        || !atomic_load_explicit(&renderer->isPlaying, memory_order_acquire)) {
         return (MCPPCMSignalLevels){0, 0};
     }
     // One lock-free snapshot for both channels. Square roots happen on the
@@ -249,6 +253,12 @@ MCPPCMSignalLevels MCPPCMRendererSignalLevels(const MCPPCMRenderer *renderer) {
         sqrtf((float)(energy >> 32) / (float)UINT32_MAX),
         sqrtf((float)(energy & UINT32_MAX) / (float)UINT32_MAX)
     };
+}
+
+void MCPPCMRendererSetSignalMeteringEnabled(MCPPCMRenderer *renderer, bool enabled) {
+    if (renderer == NULL) { return; }
+    atomic_store_explicit(&renderer->signalEnergy, 0, memory_order_relaxed);
+    atomic_store_explicit(&renderer->signalMeteringEnabled, enabled, memory_order_relaxed);
 }
 
 static void MCPMeasureSignal(MCPPCMRenderer *renderer, const float *samples, UInt32 frames) {
@@ -341,7 +351,9 @@ static OSStatus MCPPCMRenderUnlocked(
     }
     memset((uint8_t *)output->mData + bytesToCopy, 0, requestedBytes - bytesToCopy);
     // Observe only the copied/zero-filled output; never modify audio for metering.
-    MCPMeasureSignal(renderer, output->mData, inNumberFrames);
+    if (atomic_load_explicit(&renderer->signalMeteringEnabled, memory_order_relaxed)) {
+        MCPMeasureSignal(renderer, output->mData, inNumberFrames);
+    }
     atomic_store_explicit(
         &renderer->readCursor,
         readCursor + framesToCopy,

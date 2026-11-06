@@ -1,7 +1,45 @@
 # MusiCards Player — Product and Architecture Decisions
 
-This document preserves the decisions made before implementation of the
-MusiCards audio player. It is the shared starting point for future player work.
+This document preserves stable product decisions and the playback contracts.
+See Documentation/codex_handoff.md for the latest tested checkpoint. Dated
+August implementation notes below are historical, not a current task list.
+
+## Current playback contracts — 2026-11-06
+
+- System audio and UPnP routing are implemented. SOURCE, OUTPUT and help are
+  native sheets. UPnP supports Navidrome streams directly; local-file hosting,
+  local hog mode and local gapless remain separate future decisions.
+- User intent (Play/Pause) is separate from whether hardware is currently
+  running: seeking temporarily stops output without changing that intent.
+  Decoder mutations serialize within a session. The newest user command wins;
+  superseded work cannot publish into or restart a replacement session.
+- End-of-track replay is an implicit rewind. A newer explicit user seek takes
+  precedence over it. Play must wait for mutations requested during preparation
+  as well as mutations already pending at entry, and start output only once.
+- Stop invalidates logical ownership, cancels I/O and stops/disposes output
+  before dropping the core's decoder reference. In-flight decoder tasks retain
+  their own buffers until they return. Never free resources solely because a
+  task was cancelled, and never make a new decoder wait for old cancelled I/O.
+- PCMDecoderBackend read/seek belong to the session's serial feeder queue.
+  Cancellation is thread-safe and must not wait on that queue. Destruction
+  cancels before draining, and uses the individual session's queue identity.
+- The FLAC C bridge requires every callback and a live context at initialization;
+  initialization is single-use. Swift keeps that context alive through native
+  decoder destruction. Failures must be returned before invoking missing callbacks.
+- The render callback does not allocate, log, enter Swift actors or wait for a
+  lock. A reset collision returns silence via a non-waiting atomic access guard.
+  VU RMS measurement is read-only and opt-in, with one atomic stereo snapshot.
+  Invisible/inactive players and UPnP do not request measurement. UI reads use
+  the existing progress timer, independent of OS/DAC volume.
+- The hardware start/stop/dispose boundary is injectable. Tests exercise the
+  actual core/feeder/C renderer with a fake output driver and stalled/failing
+  decoder, rather than requiring a physical sound device for lifecycle rules.
+- Network-dependent artwork loading is injectable in search tests. Delays and
+  cancellation must be controlled explicitly when testing request ordering.
+
+Use these contracts and their regression tests when extending playback. Device
+route behavior still requires physical iPhone/DAC/renderer checks. Sanitizers
+test exercised memory/concurrency paths; their timing is not audio-quality proof.
 
 ## Product identity
 
@@ -27,8 +65,8 @@ MusiCards audio player. It is the shared starting point for future player work.
 - The Player section should itself be expandable, just like every other
   section. Playback controls should not become a visually dominant,
   permanently floating player chrome.
-- The current placeholder Player section is only a structural milestone. Its
-  visual design should follow the existing MusiCards language.
+- The Player follows the existing MusiCards visual language; configuration
+  belongs in the native SOURCE/OUTPUT sheets.
 
 ## Shared versus platform-specific code
 
@@ -223,7 +261,7 @@ MusiCards audio player. It is the shared starting point for future player work.
 - The existing iOS Apple Music now-playing observer remains a separate viewer
   feature and is not part of the MusiCards playback engine.
 
-## Next task
+## Historical next task — August 2026
 
 The next implementation phase is deliberately a stabilization phase, not a
 feature phase:
