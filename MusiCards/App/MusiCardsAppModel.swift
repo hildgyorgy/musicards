@@ -9,6 +9,7 @@ import Foundation
 import SwiftUI
 import Combine
 import OSLog
+import Network
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -90,6 +91,8 @@ final class MusiCardsAppModel: ObservableObject {
     private var playbackItemObservation: AnyCancellable?
     private var searchModeObservation: AnyCancellable?
     private var rendererOutputObservation: AnyCancellable?
+    private var endpointObservation: AnyCancellable?
+    private let networkMonitor = NWPathMonitor()
 
     private let musicBrainzService = MusicBrainzService()
     private let releaseDetailLoader: @Sendable (String) async throws -> MBRelease
@@ -125,6 +128,7 @@ final class MusiCardsAppModel: ObservableObject {
     private var artistWikipediaTask: Task<Void, Never>?
     private var artistDiscographyTask: Task<Void, Never>?
     private var artistPaginationTask: Task<Void, Never>?
+    private var libraryArtistResolutionTask: Task<Void, Never>?
 
     init(
         playbackEngine: PlaybackEngine? = nil,
@@ -165,22 +169,34 @@ final class MusiCardsAppModel: ObservableObject {
             rendererEngine = upnpRendererEngine
             effectivePlaybackEngine = OutputRoutingPlaybackEngine(
                 systemEngine: PlaybackEngineFactory.makeDefault(),
-                rendererEngine: upnpRendererEngine
-            ) {
-                guard libraryManager.source == .navidrome else {
+                rendererEngine: upnpRendererEngine,
+                selection: {
+                    guard libraryManager.source == .navidrome else {
+                        return .system
+                    }
+                    if let renderer = rendererBrowser.selectedRenderer {
+                        guard navidromeConnection.canUseRenderer else {
+                            return .unavailable(name: renderer.friendlyName)
+                        }
+                        return .renderer(renderer)
+                    }
+                    if rendererBrowser.hasSelectedRendererPreference {
+                        return .unavailable(
+                            name: rendererBrowser.selectedRendererDisplayName
+                                ?? "network renderer"
+                        )
+                    }
                     return .system
+                },
+                validatePlayback: {
+                    guard libraryManager.source == .navidrome else { return }
+                    try await navidromeConnection.requirePlaybackConnection()
+                    if rendererBrowser.hasSelectedRendererPreference,
+                       !navidromeConnection.canUseRenderer {
+                        throw NavidromeConnectionStoreError.localConnectionRequired
+                    }
                 }
-                if let renderer = rendererBrowser.selectedRenderer {
-                    return .renderer(renderer)
-                }
-                if rendererBrowser.hasSelectedRendererPreference {
-                    return .unavailable(
-                        name: rendererBrowser.selectedRendererDisplayName
-                            ?? "network renderer"
-                    )
-                }
-                return .system
-            }
+            )
         }
         let playbackController = PlaybackController(
             engine: effectivePlaybackEngine,
@@ -244,6 +260,26 @@ final class MusiCardsAppModel: ObservableObject {
             }
         self.localPlaybackNowPlayingCoordinator =
             PlatformNowPlayingCoordinator(controller: self.playbackController)
+        var previousEndpoint: URL?
+        self.endpointObservation = navidromeConnection.$endpointState
+            .removeDuplicates()
+            .sink { [weak playbackController, weak navidromeConnection] state in
+                guard state == .local || state == .remote || state == .unavailable else { return }
+                Task { @MainActor [weak playbackController, weak navidromeConnection] in
+                    await Task.yield()
+                    guard let playbackController, let navidromeConnection,
+                          navidromeConnection.endpointState == state else { return }
+                    let endpoint = navidromeConnection.activeEndpointURL
+                    if endpoint != previousEndpoint {
+                        previousEndpoint = endpoint
+                        playbackController.navidromeEndpointDidChange()
+                    }
+                    guard state != .local,
+                          playbackController.externalOutputDisplayName != nil,
+                          playbackController.status.isPlaying else { return }
+                    await playbackController.pause()
+                }
+            }
         self.playbackItemObservation = self.playbackController.$currentIndex
             .map { $0 != nil }
             .removeDuplicates()
@@ -281,6 +317,14 @@ final class MusiCardsAppModel: ObservableObject {
         }
 
         loadRecents()
+        networkMonitor.pathUpdateHandler = { [weak self] _ in
+            Task { @MainActor [weak self] in
+                await self?.navidromeConnection.networkDidChange()
+            }
+        }
+        if playbackEngine == nil {
+            networkMonitor.start(queue: DispatchQueue(label: "MusiCards.network-path"))
+        }
         if rendererBrowser.hasSelectedRendererPreference {
             rendererBrowser.refresh()
         }
@@ -293,6 +337,10 @@ final class MusiCardsAppModel: ObservableObject {
         #if os(macOS)
         localLibrary.startAutomaticRefresh()
         #endif
+    }
+
+    deinit {
+        networkMonitor.cancel()
     }
 
     private func adoptRendererPlaybackIfAvailable(
@@ -498,6 +546,7 @@ final class MusiCardsAppModel: ObservableObject {
         _ row: SearchReleaseRow,
         activateImmediately: Bool = false
     ) {
+        libraryArtistResolutionTask?.cancel()
         releaseLoadTask?.cancel()
         releaseSelectionGeneration &+= 1
         let generation = releaseSelectionGeneration
@@ -589,6 +638,9 @@ final class MusiCardsAppModel: ObservableObject {
             }
 
             selectedRelease = release
+            if let group = release.releaseGroup {
+                libraryManager.rememberReleaseGroup(id: group.id, releaseIDs: [release.id])
+            }
             selectedReleaseCover = cover
             isLoadingRelease = false
             releaseError = nil
@@ -650,19 +702,33 @@ final class MusiCardsAppModel: ObservableObject {
     // MARK: - Artist
 
     func selectArtist(_ row: SearchArtistRow) {
+        libraryArtistResolutionTask?.cancel()
         if row.id.hasPrefix("library-artist-") {
-            // Library-only artist rows do not have a MusicBrainz artist ID.
-            // Resolve the ID only after the user explicitly opens the card.
-            Task { [weak self] in
+            let query = searchViewModel.searchQuery
+            let generation = artistSelectionGeneration
+            libraryArtistResolutionTask = Task { [weak self] in
                 guard let self else { return }
+                if let artist = await libraryManager.artistForLibraryCredit(row) {
+                    guard !Task.isCancelled,
+                          generation == artistSelectionGeneration,
+                          query == searchViewModel.searchQuery else { return }
+                    selectArtist(id: artist.id, name: artist.name, lifeSpan: nil)
+                    return
+                }
+                guard !Task.isCancelled else { return }
+                // Preserve exact-name resolution for older/single-artist rows
+                // when release metadata is temporarily unavailable.
                 do {
                     let matches = try await musicBrainzService.searchArtists(
                         query: row.name, limit: 5, offset: 0
                     )
-                    guard let match = Self.exactArtistMatch(
-                        named: row.name,
-                        in: matches
-                    ) else { return }
+                    guard !Task.isCancelled,
+                          generation == artistSelectionGeneration,
+                          query == searchViewModel.searchQuery,
+                          let match = Self.exactArtistMatch(
+                              named: row.name,
+                              in: matches
+                          ) else { return }
                     selectArtist(
                         id: match.id,
                         name: match.name,
@@ -716,6 +782,7 @@ final class MusiCardsAppModel: ObservableObject {
         activateImmediately: Bool = true,
         priority: TaskPriority? = nil
     ) {
+        libraryArtistResolutionTask?.cancel()
         artistLoadTask?.cancel()
         artistWikipediaTask?.cancel()
         artistDiscographyTask?.cancel()

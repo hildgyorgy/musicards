@@ -557,6 +557,7 @@ struct MusicBrainzService {
             disambiguation: release.disambiguation,
             score: 100,
             artistCredit: release.artistCredit,
+            releaseGroup: release.releaseGroup,
             labelInfo: release.labelInfo,
             media: release.media
         )

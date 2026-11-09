@@ -34,6 +34,7 @@ final class PlaybackController: ObservableObject {
     private let assetResolver: (any PlaybackAssetResolving)?
     private var preparedItemID: PlaybackQueueItem.ID?
     private var pendingOutputResumePosition: TimeInterval?
+    private var needsNavidromePreparation = false
     private var playbackGeneration: UInt64 = 0
     private var outputVolumeGeneration: UInt64 = 0
     private var signalMeterObservers: Set<UUID> = []
@@ -205,6 +206,13 @@ final class PlaybackController: ObservableObject {
 
     func play() async {
         guard status != .loading, let currentItem else { return }
+        if needsNavidromePreparation {
+            needsNavidromePreparation = false
+            if isNavidromeItem(currentItem) {
+                preparedItemID = nil
+                pendingOutputResumePosition = position > 0 ? position : nil
+            }
+        }
         let generation = playbackGeneration
         let itemID = currentItem.id
 
@@ -271,6 +279,22 @@ final class PlaybackController: ObservableObject {
         await engine.pause()
         status = .paused
         silenceSignalMeter()
+    }
+
+    /// A new endpoint must be used on the next explicit Play, without
+    /// interrupting buffered system audio or starting another output now.
+    func navidromeEndpointDidChange() {
+        if let currentItem, isNavidromeItem(currentItem) {
+            needsNavidromePreparation = true
+        }
+    }
+
+    private func isNavidromeItem(_ item: PlaybackQueueItem) -> Bool {
+        switch item.source {
+        case .libraryAsset(let reference): reference.source == .navidrome
+        case .remoteAudio(let asset): asset.source == .navidrome
+        case .localFile: false
+        }
     }
 
     func togglePlayback() async {

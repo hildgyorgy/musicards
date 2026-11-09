@@ -44,6 +44,8 @@ final class NavidromeRendererStreamURLProvider {
         let credentials: NavidromeCatalogCredentials
         do {
             credentials = try connection.rendererCredentials()
+        } catch let error as NavidromeConnectionStoreError {
+            throw error
         } catch {
             throw UPnPPlaybackError.missingNavidromeConnection
         }

@@ -23,6 +23,9 @@ struct DeckBackgroundView: View {
     let onShowLibraryConnection: (() -> Void)?
 
     @Environment(\.colorScheme) private var colorScheme
+    #if os(iOS)
+    @Environment(\.compactDeckLayout) private var compactDeckLayout
+    #endif
     @State private var isShowingAbout = false
     @State private var isHoveringLogo = false
     @State private var isFolderImporterPresented = false
@@ -185,7 +188,7 @@ struct DeckBackgroundView: View {
     #if os(iOS)
     private func iosHome(verticalDeckInset: CGFloat) -> some View {
         VStack(spacing: 0) {
-            VStack(spacing: 16) {
+            VStack(spacing: compactDeckLayout ? 8 : 16) {
                 Text("MusiCards")
                     .font(.largeTitle.weight(.bold))
                     .foregroundStyle(.primary)
@@ -196,14 +199,14 @@ struct DeckBackgroundView: View {
                     .scaledToFit()
                     .frame(width: 52, height: 52)
                     .foregroundStyle(.primary)
-                    .padding(.top, 10)
-                    .padding(.bottom, 4)
+                    .padding(.top, compactDeckLayout ? 0 : 10)
+                    .padding(.bottom, compactDeckLayout ? 0 : 4)
                     .contentShape(Rectangle())
                     .onTapGesture {
                         isShowingAbout = true
                     }
 
-                VStack(spacing: 14) {
+                VStack(spacing: compactDeckLayout ? 8 : 14) {
                     homePrompt("PLAYBACK SETUP")
 
                     Button {
@@ -236,7 +239,7 @@ struct DeckBackgroundView: View {
                     if let report = compatibilityReport {
                         homePrompt(report)
                             .multilineTextAlignment(.center)
-                            .padding(.top, 28)
+                            .padding(.top, compactDeckLayout ? 12 : 28)
                     }
 
                     if let message = connectionMessage {
@@ -249,7 +252,7 @@ struct DeckBackgroundView: View {
                     }
                 }
             }
-            .padding(.top, 100)
+            .padding(.top, compactDeckLayout ? 52 : 100)
 
             Spacer(minLength: 24)
 
@@ -465,6 +468,7 @@ private struct PlaybackOutputStatusView: View {
             RendererDiscoveryView(
                 browser: rendererBrowser,
                 controller: controller,
+                navidromeConnection: navidromeConnection,
                 activeLibrarySource: activeLibrarySource
             )
         }

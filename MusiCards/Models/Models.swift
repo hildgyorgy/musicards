@@ -124,6 +124,7 @@ struct MBReleaseSearchResult: Decodable, Identifiable {
     let score: Int?
 
     let artistCredit: [MBArtistCredit]?
+    let releaseGroup: MBReleaseGroupRef?
     let labelInfo: [MBLabelInfo]?
     let media: [MBMedium]?
 
@@ -135,6 +136,7 @@ struct MBReleaseSearchResult: Decodable, Identifiable {
         case disambiguation
         case score
         case artistCredit = "artist-credit"
+        case releaseGroup = "release-group"
         case labelInfo = "label-info"
         case media
     }
@@ -147,6 +149,7 @@ struct MBReleaseSearchResult: Decodable, Identifiable {
         disambiguation: String? = nil,
         score: Int? = nil,
         artistCredit: [MBArtistCredit]? = nil,
+        releaseGroup: MBReleaseGroupRef? = nil,
         labelInfo: [MBLabelInfo]? = nil,
         media: [MBMedium]? = nil
     ) {
@@ -157,6 +160,7 @@ struct MBReleaseSearchResult: Decodable, Identifiable {
         self.disambiguation = disambiguation
         self.score = score
         self.artistCredit = artistCredit
+        self.releaseGroup = releaseGroup
         self.labelInfo = labelInfo
         self.media = media
     }

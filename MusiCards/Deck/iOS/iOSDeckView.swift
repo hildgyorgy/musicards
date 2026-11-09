@@ -9,7 +9,33 @@ private struct DeckContentBottomInsetKey: EnvironmentKey {
     static let defaultValue: CGFloat = 0
 }
 
+private struct CompactDeckLayoutKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+private struct DeckVisibleContentHeightKey: EnvironmentKey {
+    static let defaultValue: CGFloat = 0
+}
+
+private struct DeckScrollsWholeCardKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
 extension EnvironmentValues {
+    var compactDeckLayout: Bool {
+        get { self[CompactDeckLayoutKey.self] }
+        set { self[CompactDeckLayoutKey.self] = newValue }
+    }
+
+    var deckVisibleContentHeight: CGFloat {
+        get { self[DeckVisibleContentHeightKey.self] }
+        set { self[DeckVisibleContentHeightKey.self] = newValue }
+    }
+
+    var deckScrollsWholeCard: Bool {
+        get { self[DeckScrollsWholeCardKey.self] }
+        set { self[DeckScrollsWholeCardKey.self] = newValue }
+    }
     var deckContentBottomInset: CGFloat {
         get { self[DeckContentBottomInsetKey.self] }
         set { self[DeckContentBottomInsetKey.self] = newValue }
@@ -88,8 +114,10 @@ struct DeckView<ID: Hashable, BackgroundContent: View, CollapsedHeaderContent: V
 
             let cardWidth =
                 UIDevice.current.userInterfaceIdiom == .pad
-                ? min(padAvailableWidth, DeckStyle.maximumPadCardWidth)
+                ? min(padAvailableWidth, DeckStyle.maximumPadCardWidth, proxy.size.height * 0.64)
                 : phoneCardWidth
+            let isCompact = UIDevice.current.userInterfaceIdiom == .pad
+                && (proxy.size.width > proxy.size.height || proxy.size.height < 850)
 
             let verticalDeckInset = DeckStyle.verticalDeckInset(
                 viewportSize: proxy.size
@@ -114,6 +142,7 @@ struct DeckView<ID: Hashable, BackgroundContent: View, CollapsedHeaderContent: V
                     )
 
                 backgroundProvider()
+                    .environment(\.compactDeckLayout, isCompact)
                     .frame(
                         width: proxy.size.width,
                         height: proxy.size.height
@@ -235,6 +264,13 @@ struct DeckView<ID: Hashable, BackgroundContent: View, CollapsedHeaderContent: V
                                     )
                                 )
                         }
+                    )
+                    .environment(\.compactDeckLayout, isCompact)
+                    .environment(
+                        \.deckVisibleContentHeight,
+                        max(1, cardHeight - DeckStyle.cardLabelHitHeight
+                            - DeckStyle.headerTopSpacing - DeckStyle.contentTopSpacing
+                            - contentBottomInset(for: index, containerHeight: deckContainerHeight, safeAreaTop: deckSafeAreaTop))
                     )
                     .offset(
                         x: (proxy.size.width - cardWidth) / 2,

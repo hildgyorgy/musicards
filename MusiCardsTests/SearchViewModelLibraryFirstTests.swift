@@ -4,6 +4,138 @@ import XCTest
 @testable import MusiCards
 
 final class SearchViewModelLibraryFirstTests: XCTestCase {
+    @MainActor
+    func testSharedLibraryCreditOpensTheSearchedCreditedArtistAndVerifiesGroup() async throws {
+        let releaseID = "00000000-0000-0000-0000-000000000001"
+        let groupID = "00000000-0000-0000-0000-000000000002"
+        let steveID = "00000000-0000-0000-0000-000000000003"
+        let johnID = "00000000-0000-0000-0000-000000000004"
+        let credit = "Steve Khan, John Patitucci, Jack DeJohnette"
+        let provider = SearchLibraryProvider(source: .navidrome)
+        provider.catalogReleases = [LibraryCatalogRelease(
+            releaseID: releaseID,
+            title: "The Green Field = El Prado Verde",
+            artistName: credit
+        )]
+        let service = SearchServiceStub()
+        service.behaviors["reid:\(releaseID)"] = .results([
+            MBReleaseSearchResult(
+                id: releaseID,
+                title: "The Green Field = El Prado Verde",
+                artistCredit: [
+                    // Deliberately not in display order: selection uses identity,
+                    // never the first name in the library's combined credit.
+                    MBArtistCredit(name: "John Patitucci", artist: MBArtist(id: johnID, name: "John Patitucci"), joinPhrase: ", "),
+                    MBArtistCredit(name: "Steve Khan", artist: MBArtist(id: steveID, name: "Steve Khan"), joinPhrase: nil)
+                ],
+                releaseGroup: MBReleaseGroupRef(id: groupID, title: "The Green Field")
+            )
+        ], 0)
+        let manager = LibraryManager(provider: provider, metadataService: service)
+        let viewModel = SearchViewModel(
+            service: service, libraryManager: manager,
+            searchDebounceNanoseconds: 0, coverArtLoader: { _, _ in nil }
+        )
+        viewModel.searchScope = .libraryOnly
+        viewModel.searchQuery = "Steve Khan"
+        viewModel.queryDidChange()
+        await eventually { viewModel.artistRows.count == 1 && !viewModel.isSearching }
+        let steveRow = try XCTUnwrap(viewModel.artistRows.first)
+        XCTAssertEqual(steveRow.librarySearchTerm, "Steve Khan")
+        let steve = await manager.artistForLibraryCredit(steveRow)
+        XCTAssertEqual(steve?.id, steveID)
+        XCTAssertTrue(manager.containsReleaseGroup(id: groupID))
+        XCTAssertFalse(manager.containsReleaseGroup(id: "different-group"))
+
+        let john = await manager.artistForLibraryCredit(SearchArtistRow(
+            id: steveRow.id, name: credit, lifeSpan: "", librarySearchTerm: "John Patitucci"
+        ))
+        XCTAssertEqual(john?.id, johnID)
+        XCTAssertEqual(service.requestedQueries, ["reid:\(releaseID)"])
+
+        let ambiguous = await manager.artistForLibraryCredit(SearchArtistRow(
+            id: steveRow.id, name: credit, lifeSpan: "", librarySearchTerm: "a"
+        ))
+        XCTAssertNil(ambiguous, "An ambiguous query must never pick the first credited artist")
+        let absent = await manager.artistForLibraryCredit(SearchArtistRow(
+            id: steveRow.id, name: credit, lifeSpan: "", librarySearchTerm: "Chaka Khan"
+        ))
+        XCTAssertNil(absent, "A name is insufficient unless it occurs in the release's MB credits")
+
+        provider.catalogReleases = []
+        XCTAssertFalse(manager.containsReleaseGroup(id: groupID))
+    }
+
+    @MainActor
+    func testReleaseMetadataFailureCanBeRetriedAndRejectsUnrequestedReleases() async {
+        let releaseID = "00000000-0000-0000-0000-000000000001"
+        let service = SearchServiceStub()
+        let query = "reid:\(releaseID)"
+        service.behaviors[query] = .failure(0)
+        let provider = SearchLibraryProvider(source: .local)
+        provider.catalogReleases = [
+            LibraryCatalogRelease(releaseID: releaseID, title: "Album", artistName: "Artist"),
+            LibraryCatalogRelease(releaseID: "unrequested-release", title: "Other", artistName: "Other")
+        ]
+        let manager = LibraryManager(
+            provider: provider, metadataService: service
+        )
+        await manager.prepareReleaseMetadata(for: [releaseID])
+        service.behaviors[query] = .results([
+            MBReleaseSearchResult(
+                id: "unrequested-release", title: "Wrong result",
+                releaseGroup: MBReleaseGroupRef(id: "wrong-group", title: nil)
+            )
+        ], 0)
+        await manager.prepareReleaseMetadata(for: [releaseID])
+        XCTAssertEqual(service.requestedQueries.count, 2)
+        XCTAssertFalse(manager.containsReleaseGroup(id: "wrong-group"))
+        service.behaviors[query] = .results([
+            MBReleaseSearchResult(
+                id: releaseID, title: "Album",
+                releaseGroup: MBReleaseGroupRef(id: "correct-group", title: nil)
+            )
+        ], 0)
+        await manager.prepareReleaseMetadata(for: [releaseID])
+        XCTAssertTrue(manager.containsReleaseGroup(id: "correct-group"))
+        await manager.prepareReleaseMetadata(for: [releaseID])
+        XCTAssertEqual(service.requestedQueries.count, 3, "Only successful metadata is cached")
+    }
+
+    @MainActor
+    func testCancelledMetadataResponseDoesNotPublishMembership() async {
+        let releaseID = "00000000-0000-0000-0000-000000000001"
+        let service = SearchServiceStub()
+        service.behaviors["reid:\(releaseID)"] = .results([
+            MBReleaseSearchResult(
+                id: releaseID, title: "Album",
+                releaseGroup: MBReleaseGroupRef(id: "group", title: nil)
+            )
+        ], 30_000_000)
+        let provider = SearchLibraryProvider(source: .local)
+        provider.catalogReleases = [LibraryCatalogRelease(
+            releaseID: releaseID, title: "Album", artistName: "Artist"
+        )]
+        let manager = LibraryManager(provider: provider, metadataService: service)
+        let task = Task { await manager.prepareReleaseMetadata(for: [releaseID]) }
+        await eventually { !service.requestedQueries.isEmpty }
+        task.cancel()
+        await task.value
+        XCTAssertFalse(manager.containsReleaseGroup(id: "group"))
+    }
+
+    @MainActor
+    func testSearchResultDecodesReleaseGroupAndOldArtistRowsRemainReadable() throws {
+        let release = try JSONDecoder().decode(MBReleaseSearchResult.self, from: Data(
+            #"{"id":"release","title":"Edition title","release-group":{"id":"group","title":"Album title"}}"#.utf8
+        ))
+        XCTAssertEqual(release.releaseGroup?.id, "group")
+        let oldRow = try JSONDecoder().decode(SearchArtistRow.self, from: Data(
+            #"{"id":"artist","name":"Steve Khan","lifeSpan":"1947–"}"#.utf8
+        ))
+        XCTAssertNil(oldRow.librarySearchTerm)
+    }
+
     func testLibraryCatalogQueryMakesCommaSyntaxExplicit() {
         XCTAssertEqual(
             SearchViewModel.libraryCatalogQuery(from: "Miles Davis"),

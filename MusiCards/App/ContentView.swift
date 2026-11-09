@@ -54,7 +54,8 @@ struct ContentView: View {
                 slotIndex: MusiCardID.release.slotIndex,
                 cardLabel: "Release",
                 title: releaseTitle,
-                subtitle: releaseSubtitle
+                subtitle: releaseSubtitle,
+                scrollsHeaderInCompactLayout: true
             ),
             DeckCard(
                 id: .tracks,

@@ -3,6 +3,150 @@ import XCTest
 @testable import MusiCards
 
 final class NavidromeConnectionTests: XCTestCase {
+    private let endpointIdentity = NavidromeServerIdentity(
+        serverVersion: "0.58.0", protocolVersion: "1.16.1"
+    )
+
+    @MainActor
+    private func savedStore(
+        home: String = "", remote: String = "",
+        identifier: NavidromeIdentifierStub,
+        reachability: (any NavidromeIdentifying)? = nil
+    ) async throws -> NavidromeConnectionStore {
+        let suite = "NavidromeEndpointTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        addTeardownBlock { UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite) }
+        let store = NavidromeConnectionStore(
+            defaults: defaults, credentialStore: NavidromeCredentialStoreStub(),
+            client: identifier, reachabilityClient: reachability ?? identifier
+        )
+        store.homeServerURL = home
+        store.remoteServerURL = remote
+        store.username = "listener"
+        store.password = "password"
+        await store.verifyAndSave()
+        XCTAssertNil(store.errorMessage)
+        return store
+    }
+
+    @MainActor
+    func testOnlyLocalConnectionBecomesUnavailableInsteadOfUsingStaleEndpoint() async throws {
+        let identifier = NavidromeIdentifierStub(resultsByHost: ["server.local": .success(endpointIdentity)])
+        let store = try await savedStore(home: "http://server.local:4533", identifier: identifier)
+        XCTAssertEqual(store.endpointState, .local)
+        XCTAssertTrue(store.canUseRenderer)
+        XCTAssertEqual(try store.rendererCredentials().profile.baseURL.host, "server.local")
+
+        await identifier.setResult(.failure(NavidromeConnectionError.invalidResponse), for: "server.local")
+        await store.networkDidChange()
+        XCTAssertEqual(store.endpointState, .unavailable)
+        XCTAssertNil(store.activeEndpointURL)
+        XCTAssertFalse(store.canUseRenderer)
+        XCTAssertThrowsError(try store.rendererCredentials())
+        do {
+            try await store.requirePlaybackConnection()
+            XCTFail("An unreachable saved address must not authorize playback")
+        } catch {
+            XCTAssertEqual(error as? NavidromeConnectionStoreError, .serverUnavailable)
+        }
+    }
+
+    @MainActor
+    func testOnlyRemoteConnectionNeverProvidesRendererCredentials() async throws {
+        let identifier = NavidromeIdentifierStub(resultsByHost: ["music.example.com": .success(endpointIdentity)])
+        let store = try await savedStore(remote: "https://music.example.com", identifier: identifier)
+        XCTAssertEqual(store.endpointState, .remote)
+        XCTAssertEqual(store.activeEndpointURL?.host, "music.example.com")
+        try await store.requirePlaybackConnection()
+        XCTAssertFalse(store.canUseRenderer)
+        XCTAssertThrowsError(try store.rendererCredentials()) { error in
+            XCTAssertEqual(error as? NavidromeConnectionStoreError, .localConnectionRequired)
+        }
+    }
+
+    @MainActor
+    func testPlaybackReusesVerifiedRouteWithoutProbingBetweenTracks() async throws {
+        let identifier = NavidromeIdentifierStub(resultsByHost: ["music.example.com": .success(endpointIdentity)])
+        let store = try await savedStore(remote: "https://music.example.com", identifier: identifier)
+        let initialCalls = await identifier.requestedHosts.count
+        try await store.requirePlaybackConnection()
+        try await store.requirePlaybackConnection()
+        let playbackCalls = await identifier.requestedHosts.count
+        XCTAssertEqual(playbackCalls, initialCalls)
+        await store.refreshReachableEndpoint()
+        let foregroundCalls = await identifier.requestedHosts.count
+        XCTAssertEqual(foregroundCalls, initialCalls + 1)
+    }
+
+    @MainActor
+    func testRestoredLocalHTTPSAddressStaysLocalAndRequiresFreshVerification() async throws {
+        let suite = "NavidromeRestoreTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let credentials = NavidromeCredentialStoreStub()
+        let identifier = NavidromeIdentifierStub(resultsByHost: ["server.local": .success(endpointIdentity)])
+        let original = NavidromeConnectionStore(
+            defaults: defaults, credentialStore: credentials,
+            client: identifier, reachabilityClient: identifier
+        )
+        original.homeServerURL = "https://server.local:4533"
+        original.username = "listener"
+        original.password = "password"
+        await original.verifyAndSave()
+
+        let restored = NavidromeConnectionStore(
+            defaults: defaults, credentialStore: credentials,
+            client: identifier, reachabilityClient: identifier
+        )
+        XCTAssertEqual(restored.homeBaseURL?.absoluteString, "https://server.local:4533")
+        XCTAssertNil(restored.remoteBaseURL, "A local HTTPS URL must not become a remote address on restart")
+        XCTAssertEqual(restored.endpointState, .checking)
+        XCTAssertFalse(restored.canUseRenderer)
+        XCTAssertThrowsError(try restored.rendererCredentials())
+        await restored.refreshReachableEndpoint()
+        XCTAssertEqual(restored.endpointState, .local)
+        XCTAssertTrue(restored.canUseRenderer)
+    }
+
+    @MainActor
+    func testBothAddressesPreferLocalFallBackToRemoteAndReturnToLocal() async throws {
+        let identifier = NavidromeIdentifierStub(resultsByHost: [
+            "server.local": .success(endpointIdentity), "music.example.com": .success(endpointIdentity)
+        ])
+        let store = try await savedStore(
+            home: "http://server.local:4533", remote: "https://music.example.com", identifier: identifier
+        )
+        XCTAssertEqual(store.endpointState, .local)
+        await identifier.setResult(.failure(NavidromeConnectionError.invalidResponse), for: "server.local")
+        await store.networkDidChange()
+        XCTAssertEqual(store.endpointState, .remote)
+        XCTAssertEqual(try store.catalogCredentials().profile.baseURL.host, "music.example.com")
+        XCTAssertThrowsError(try store.rendererCredentials())
+
+        await identifier.setResult(.success(endpointIdentity), for: "server.local")
+        await store.networkDidChange()
+        XCTAssertEqual(store.endpointState, .local)
+        XCTAssertEqual(try store.rendererCredentials().profile.baseURL.host, "server.local")
+    }
+
+    @MainActor
+    func testLateReachabilityResponseCannotRestoreRemovedServer() async throws {
+        let identifier = NavidromeIdentifierStub(resultsByHost: ["server.local": .success(endpointIdentity)])
+        let paused = PausedNavidromeIdentifier()
+        let store = try await savedStore(
+            home: "http://server.local:4533", identifier: identifier, reachability: paused
+        )
+        let task = Task { await store.networkDidChange() }
+        await paused.waitForRequest()
+        XCTAssertEqual(store.endpointState, .checking)
+        store.removeServer()
+        await paused.complete(with: endpointIdentity)
+        await task.value
+        XCTAssertNil(store.savedProfile)
+        XCTAssertEqual(store.endpointState, .notConfigured)
+        XCTAssertFalse(store.canUseRenderer)
+    }
+
     func testPublicAndMalformedHostsNeverPassLocalHTTPPolicy() throws {
         for host in ["10.0.0.1.example.net", "192.168.1.5.evil.net", "[2001:db8::1]", "192.168.999.1", "2130706433", "0x08080808", "010.0.0.1", "[::ffff:8.8.8.8]"] {
             let url = URL(string: "http://\(host):4533")!
@@ -643,7 +787,12 @@ private actor PausedNavidromeIdentifier: NavidromeIdentifying {
 }
 
 private actor NavidromeIdentifierStub: NavidromeIdentifying {
-    let resultsByHost: [String: Result<NavidromeServerIdentity, Error>]
+    var resultsByHost: [String: Result<NavidromeServerIdentity, Error>]
+    private(set) var requestedHosts: [String] = []
+
+    func setResult(_ result: Result<NavidromeServerIdentity, Error>, for host: String) {
+        resultsByHost[host] = result
+    }
 
     init(resultsByHost: [String: Result<NavidromeServerIdentity, Error>]) {
         self.resultsByHost = resultsByHost
@@ -654,6 +803,7 @@ private actor NavidromeIdentifierStub: NavidromeIdentifying {
         password: String,
         allowsInsecureLocalHTTP: Bool
     ) async throws -> NavidromeServerIdentity {
+        requestedHosts.append(profile.baseURL.host ?? "")
         guard let result = resultsByHost[profile.baseURL.host ?? ""] else {
             throw NavidromeConnectionError.invalidResponse
         }

@@ -8,6 +8,7 @@ struct RendererDiscoveryView: View {
 
     @ObservedObject var browser: UPnPRendererBrowser
     @ObservedObject var controller: PlaybackController
+    @ObservedObject var navidromeConnection: NavidromeConnectionStore
     let activeLibrarySource: LibrarySource?
     @Environment(\.dismiss) private var dismiss
     @State private var rendererAddress = ""
@@ -79,7 +80,7 @@ struct RendererDiscoveryView: View {
         HStack(spacing: 12) {
             outputButton(.systemAudio, title: "System audio")
             outputButton(.upnpRenderer, title: "UPnP renderer")
-                .disabled(activeLibrarySource != .navidrome)
+                .disabled(activeLibrarySource != .navidrome || !navidromeConnection.canUseRenderer)
         }
     }
 
@@ -112,7 +113,7 @@ struct RendererDiscoveryView: View {
     }
 
     private func selectOutputKind(_ kind: OutputKind) {
-        guard kind != .upnpRenderer || activeLibrarySource == .navidrome else {
+        guard kind != .upnpRenderer || (activeLibrarySource == .navidrome && navidromeConnection.canUseRenderer) else {
             return
         }
         guard selectedOutputKind != kind else { return }
@@ -143,11 +144,21 @@ struct RendererDiscoveryView: View {
                 Text("UPnP renderer playback requires a Navidrome source.")
                     .font(.subheadline)
             }
+            if activeLibrarySource == .navidrome && !navidromeConnection.canUseRenderer {
+                Text("UPnP playback requires an active local Navidrome connection. Remote connections support System audio only.")
+                    .font(.subheadline)
+            }
         }
     }
 
     @ViewBuilder
     private var upnpContent: some View {
+        if !navidromeConnection.canUseRenderer {
+            Section {
+                Text("UPnP playback requires an active local Navidrome connection. Choose System audio for remote playback.")
+                    .foregroundStyle(.secondary)
+            }
+        }
         Section("Find and select UPnP renderer") {
             searchHeader(for: .multicast)
             discoveryResult(for: .multicast)
@@ -294,6 +305,7 @@ struct RendererDiscoveryView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .disabled(!navidromeConnection.canUseRenderer)
         .accessibilityLabel(renderer.friendlyName)
         .accessibilityValue(isSelected ? "Selected output" : "Not selected")
     }

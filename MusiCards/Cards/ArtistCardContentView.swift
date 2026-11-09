@@ -52,6 +52,10 @@ struct ArtistCardContentView: View {
         return releaseGroups.filter(isPlayable)
     }
 
+    private var libraryReleaseIDs: [String] {
+        libraryManager.releaseIDs(forArtist: artist?.name ?? artistName)
+    }
+
     var body: some View {
         Group {
             if artistError != nil && !MusiCardsAppModel.hasUsableArtistHeader(
@@ -179,6 +183,9 @@ struct ArtistCardContentView: View {
                     .padding(.top, 0)
             }
         }
+        .task(id: libraryReleaseIDs) {
+            await libraryManager.prepareReleaseMetadata(for: libraryReleaseIDs)
+        }
 #if os(iOS)
         .sheet(isPresented: $isShowingWikipedia) {
             if let url = wikipediaPresentationURL {
@@ -269,12 +276,7 @@ struct ArtistCardContentView: View {
     }
 
     private func isPlayable(_ group: MBReleaseGroupSummary) -> Bool {
-        let artistName = artist?.name ?? self.artistName
-        guard !artistName.isEmpty else { return false }
-        return libraryManager.containsReleaseGroup(
-            title: group.title,
-            artistName: artistName
-        )
+        libraryManager.containsReleaseGroup(id: group.id)
     }
 
     private func displayExcerpt(for text: String, limit: Int = 150) -> String {

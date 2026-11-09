@@ -626,6 +626,9 @@ final class SearchViewModel: ObservableObject {
             else { return }
 
             let sorted = playableReleasesFirst(sortedVersions(results))
+            libraryManager.rememberReleaseGroup(
+                id: releaseGroupID, releaseIDs: results.map(\.id)
+            )
 
             if promotedRows.isEmpty {
                 releaseResults = []
@@ -693,6 +696,9 @@ final class SearchViewModel: ObservableObject {
             else { return }
 
             let sorted = playableReleasesFirst(sortedVersions(results))
+            libraryManager.rememberReleaseGroup(
+                id: groupID, releaseIDs: results.map(\.id)
+            )
             versionsOffset += results.count
             hasMoreVersions = hasMore
 
@@ -743,6 +749,10 @@ final class SearchViewModel: ObservableObject {
                 matches
                     .map(\.id)
                     .filter { candidateIDs.contains($0) }
+            )
+            guard !Task.isCancelled else { return [] }
+            libraryManager.rememberReleaseGroup(
+                id: releaseGroupID, releaseIDs: Array(validatedIDs)
             )
             return candidates
                 .filter { validatedIDs.contains($0.releaseID) }
@@ -975,7 +985,10 @@ final class SearchViewModel: ObservableObject {
             guard !name.isEmpty else { return nil }
             let key = name.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
             guard seen.insert(key).inserted else { return nil }
-            return SearchArtistRow(id: "library-artist-\(key)", name: name, lifeSpan: "")
+            return SearchArtistRow(
+                id: "library-artist-\(key)", name: name, lifeSpan: "",
+                librarySearchTerm: query
+            )
         }
         if searchBehavior == .scoped {
             publishMergedArtistResults()

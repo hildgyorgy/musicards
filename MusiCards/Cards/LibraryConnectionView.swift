@@ -68,6 +68,11 @@ struct LibraryConnectionView: View {
                 activeLibrarySource = selectedSource
             }
         }
+        .task {
+            if navidromeIsConnected {
+                await navidromeConnection.refreshReachableEndpoint()
+            }
+        }
         .onChange(of: navidromeIsConnected) { oldValue, newValue in
             guard oldValue && !newValue else { return }
             activeLibrarySource = LibrarySourceSelectionPolicy
@@ -246,9 +251,14 @@ struct LibraryConnectionView: View {
 
     @ViewBuilder
     private var navidromeContent: some View {
-        Section("Navidrome server") {
+        Section {
             VStack(alignment: .leading, spacing: 6) {
-                Text("Local network address")
+                navidromeAddressHeading(
+                    "Local network address",
+                    isActive: navidromeConnection.endpointState == .local
+                        && navidromeConnection.homeServerURL.trimmingCharacters(in: .whitespacesAndNewlines)
+                            == navidromeConnection.homeBaseURL?.absoluteString
+                )
                 TextField(
                     "",
                     text: $navidromeConnection.homeServerURL,
@@ -268,7 +278,12 @@ struct LibraryConnectionView: View {
             }
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("Remote address")
+                navidromeAddressHeading(
+                    "Remote address",
+                    isActive: navidromeConnection.endpointState == .remote
+                        && navidromeConnection.remoteServerURL.trimmingCharacters(in: .whitespacesAndNewlines)
+                            == navidromeConnection.remoteBaseURL?.absoluteString
+                )
                 TextField(
                     "",
                     text: $navidromeConnection.remoteServerURL,
@@ -286,6 +301,8 @@ struct LibraryConnectionView: View {
                     #endif
                     .focused($focusedNavidromeField, equals: .remoteAddress)
             }
+        } header: {
+            Text("Navidrome server")
         }
 
         Section {
@@ -314,10 +331,18 @@ struct LibraryConnectionView: View {
 
         Section {
             if isSavedNavidromeConnectionCurrent {
-                Text("Connected")
-                    .foregroundStyle(.blue)
+                if navidromeConnection.endpointState == .unavailable {
+                    Button("Reconnect") {
+                        Task { await navidromeConnection.refreshReachableEndpoint() }
+                    }
                     .frame(maxWidth: .infinity)
                     .alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
+                } else {
+                    Text(navidromeConnection.endpointState == .checking ? "Checking connection…" : "Connected")
+                        .foregroundStyle(.blue)
+                        .frame(maxWidth: .infinity)
+                        .alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
+                }
             } else if navidromeConnection.isConnecting {
                 Text("Connecting…")
                     .foregroundStyle(.blue)
@@ -360,9 +385,22 @@ struct LibraryConnectionView: View {
                 }
                 Text("Navidrome provides the music catalog and MusicBrainz IDs, so this source does not need \(Text("library.json").bold()). Tag your files with MusicBrainz Picard and let Navidrome scan them.")
                 Text("For playback on \(Text("THIS DEVICE").bold()), enter at least one address.")
-                Text("For playback on a \(Text("UPNP RENDERER").bold()), it must be able to reach the Navidrome server. A \(Text("LOCAL").bold()) network address is recommended.")
+                Text("For playback on a \(Text("UPNP RENDERER").bold()), an active \(Text("LOCAL").bold()) Navidrome connection is required. With a remote connection, choose System audio.")
             }
             .font(.subheadline)
+        }
+    }
+
+    private func navidromeAddressHeading(_ title: String, isActive: Bool) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(title)
+            Spacer(minLength: 8)
+            if isActive {
+                Text("ACTIVE")
+                    .font(.subheadline)
+                    .foregroundStyle(.blue)
+                    .accessibilityLabel("Active connection")
+            }
         }
     }
 

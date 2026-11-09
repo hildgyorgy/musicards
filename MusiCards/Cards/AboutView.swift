@@ -72,13 +72,13 @@ struct AboutView: View {
 
                     Link("MusicBrainz Picard", destination: AboutLinks.picard)
 
-                    Text("For Navidrome, no \(Text("library.json").font(.system(.body, design: .monospaced))) is needed: Navidrome provides the catalog and MusicBrainz IDs from your tagged files. Let it scan your music, then enter a reachable server address and your account details in SOURCE. A local network address is recommended for UPnP playback.")
+                    Text("For Navidrome, no \(Text("library.json").font(.system(.body, design: .monospaced))) is needed: Navidrome provides the catalog and MusicBrainz IDs from your tagged files. Let it scan your music, then enter your server addresses and account details in SOURCE. MusiCards prefers the local address when reachable and otherwise uses the remote address. SOURCE shows the active connection.")
                 }
 
                 helpSection("Choose audio output") {
                     Text("Open OUTPUT on the home screen. System audio follows the output chosen on your device, including speakers, headphones, AirPlay, Bluetooth and connected DACs.")
 
-                    Text("You can also search for and select a UPnP renderer on your network. UPnP playback currently works with Navidrome tracks only; the renderer must be able to reach your Navidrome server.")
+                    Text("You can also search for and select a UPnP renderer on your network. UPnP playback requires an active local Navidrome connection, and the renderer must be able to reach that server. With a remote connection, choose System audio.")
 
                     Text("A blue play symbol marks a release or track available from the active music source.")
                 }

@@ -10,4 +10,5 @@ struct DeckCard<ID: Hashable>: Identifiable {
     let cardLabel: String
     let title: String
     let subtitle: String
+    var scrollsHeaderInCompactLayout = false
 }

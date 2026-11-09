@@ -27,6 +27,7 @@ final class OutputRoutingPlaybackEngine: PlaybackEngine {
     private let systemEngine: PlaybackEngine
     private let rendererEngine: UPnPPlaybackEngine
     private let selection: () -> Selection
+    private let validatePlayback: () async throws -> Void
     private var activeRoute: Route?
     private var preparedItem: PlaybackQueueItem?
     private var signalMeteringRequested = false
@@ -39,11 +40,13 @@ final class OutputRoutingPlaybackEngine: PlaybackEngine {
     init(
         systemEngine: PlaybackEngine,
         rendererEngine: UPnPPlaybackEngine,
-        selection: @escaping () -> Selection
+        selection: @escaping () -> Selection,
+        validatePlayback: @escaping () async throws -> Void = {}
     ) {
         self.systemEngine = systemEngine
         self.rendererEngine = rendererEngine
         self.selection = selection
+        self.validatePlayback = validatePlayback
 
         systemEngine.eventHandler = { [weak self] event in
             guard let self, self.activeRoute == .system else { return }
@@ -56,6 +59,7 @@ final class OutputRoutingPlaybackEngine: PlaybackEngine {
     }
 
     func prepare(_ item: PlaybackQueueItem) async throws {
+        try await validatePlayback()
         preparedItem = item
         switch selection() {
         case .system:
@@ -82,6 +86,7 @@ final class OutputRoutingPlaybackEngine: PlaybackEngine {
     }
 
     func play() async throws {
+        try await validatePlayback()
         let desiredRoute = try desiredRoute()
         if activeRoute != desiredRoute {
             guard let preparedItem else {

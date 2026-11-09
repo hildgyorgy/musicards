@@ -4,6 +4,26 @@ import XCTest
 
 final class PlaybackControllerTests: XCTestCase {
     @MainActor
+    func testEndpointChangeWaitsForExplicitPlayAndRepreparesAtCurrentPosition() async throws {
+        let engine = PlaybackEngineSpy()
+        let controller = PlaybackController(engine: engine)
+        let remote = try remoteAsset(id: "song", suffix: "m4a", contentType: "audio/mp4").asset
+        await controller.replaceQueue(with: [PlaybackQueueItem(
+            id: "item-1", track: item(1).track, source: .remoteAudio(remote)
+        )])
+        await controller.play()
+        engine.emit(.positionChanged(30))
+        controller.navidromeEndpointDidChange()
+        XCTAssertEqual(engine.playCount, 1, "A network change must not start playback")
+        XCTAssertEqual(engine.preparedIDs.count, 1)
+        engine.emit(.positionChanged(42))
+        await controller.pause()
+        await controller.play()
+        XCTAssertEqual(engine.preparedIDs, ["item-1", "item-1"])
+        XCTAssertEqual(engine.seekPositions, [42], "Resume at the latest position, not the network-change time")
+    }
+
+    @MainActor
     func testSignalMeterRunsOnlyWhileAtLeastOneViewRequestsIt() {
         let engine = PlaybackEngineSpy()
         let controller = PlaybackController(engine: engine)

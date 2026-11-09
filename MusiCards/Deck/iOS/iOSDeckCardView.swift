@@ -55,6 +55,7 @@ struct DeckCardView<ID: Hashable, CollapsedHeaderContent: View, HeaderContent: V
     }
 
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.compactDeckLayout) private var compactDeckLayout
 
     var cardBackground: Color {
         colorScheme == .dark
@@ -145,13 +146,24 @@ struct DeckCardView<ID: Hashable, CollapsedHeaderContent: View, HeaderContent: V
             topBarView
 
             if !isShowingCollapsedHeader {
-                Spacer().frame(height: DeckStyle.headerTopSpacing)
+                if compactDeckLayout && card.scrollsHeaderInCompactLayout {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: DeckStyle.contentTopSpacing) {
+                            header
+                            content
+                                .environment(\.deckScrollsWholeCard, true)
+                        }
+                        .padding(.top, DeckStyle.headerTopSpacing)
+                    }
+                } else {
+                    Spacer().frame(height: DeckStyle.headerTopSpacing)
 
-                header
+                    header
 
-                Spacer().frame(height: DeckStyle.contentTopSpacing)
+                    Spacer().frame(height: DeckStyle.contentTopSpacing)
 
-                content
+                    content
+                }
             }
         }
         .padding(.horizontal, DeckStyle.contentHorizontalPadding)

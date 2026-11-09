@@ -5,6 +5,20 @@ import XCTest
 
 final class LibraryManagerTests: XCTestCase {
     @MainActor
+    func testVerifiedGroupMembershipFollowsOwnershipAcrossSources() {
+        let local = LibraryProviderSpy(source: .local)
+        let navidrome = LibraryProviderSpy(source: .navidrome)
+        navidrome.releaseIDs = ["owned-release"]
+        let manager = LibraryManager(localProvider: local, navidromeProvider: navidrome)
+        manager.rememberReleaseGroup(id: "group", releaseIDs: ["owned-release"])
+        XCTAssertFalse(manager.containsReleaseGroup(id: "group"))
+        manager.setActiveSource(.navidrome)
+        XCTAssertTrue(manager.containsReleaseGroup(id: "group"))
+        manager.setActiveSource(.local)
+        XCTAssertFalse(manager.containsReleaseGroup(id: "group"))
+    }
+
+    @MainActor
     func testAvailabilityQueriesDelegateToProvider() {
         let provider = LibraryProviderSpy()
         provider.releaseIDs = ["release"]

@@ -12,45 +12,51 @@ struct ReleaseCardContentView: View {
     let onShowVersions: () -> Void
 #if os(iOS)
     @Environment(\.deckContentBottomInset) private var deckContentBottomInset
+    @Environment(\.deckScrollsWholeCard) private var deckScrollsWholeCard
 #endif
 
     var body: some View {
         if let release {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        metaRow(
-                            "Date",
-                            MBTextFormatter.displayDate(from: release.date)
-                        )
-                        metaRow("Country", release.country ?? "")
-                        metaRow("Label", labelText(from: release))
-                        metaRow("Cat. no.", catalogNumberText(from: release))
-                        metaRow("Barcode", release.barcode ?? "")
-                        metaRow("Notes", noteText(from: release))
-                        Button(action: {
-                            onShowVersions()
-                        }) {
-                            Text("Other versions →")
-                                .font(.body)
-                                .foregroundStyle(.blue)
-                        }
-                        .buttonStyle(.plain)
-                        .padding(.top, 4)
-                        .padding(.leading, 92)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.bottom, 28)
-#if os(iOS)
-                    Color.clear
-                        .frame(height: deckContentBottomInset)
-#endif
-                }
+            #if os(iOS)
+            if deckScrollsWholeCard {
+                releaseMetadata(release)
+            } else {
+                ScrollView { releaseMetadata(release) }
             }
+            #else
+            ScrollView { releaseMetadata(release) }
+            #endif
         } else {
             EmptyStateView.release
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding(.top, 0)
+        }
+    }
+
+    private func releaseMetadata(_ release: MBRelease) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 3) {
+                metaRow("Date", MBTextFormatter.displayDate(from: release.date))
+                metaRow("Country", release.country ?? "")
+                metaRow("Label", labelText(from: release))
+                metaRow("Cat. no.", catalogNumberText(from: release))
+                metaRow("Barcode", release.barcode ?? "")
+                metaRow("Notes", noteText(from: release))
+                Button(action: onShowVersions) {
+                    Text("Other versions →")
+                        .font(.body)
+                        .foregroundStyle(.blue)
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 4)
+                .padding(.leading, 92)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.bottom, 28)
+#if os(iOS)
+            Color.clear
+                .frame(height: deckContentBottomInset)
+#endif
         }
     }
 

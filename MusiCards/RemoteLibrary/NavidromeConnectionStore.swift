@@ -2,6 +2,10 @@ import Combine
 import Foundation
 import OSLog
 
+nonisolated enum NavidromeEndpointState: Equatable, Sendable {
+    case notConfigured, checking, local, remote, unavailable
+}
+
 @MainActor
 final class NavidromeConnectionStore: ObservableObject {
     nonisolated private static let logger = Logger(
@@ -23,6 +27,16 @@ final class NavidromeConnectionStore: ObservableObject {
     @Published private(set) var statusMessage: String?
     @Published private(set) var errorMessage: String?
     @Published private(set) var hasStoredPassword = false
+    @Published private(set) var endpointState: NavidromeEndpointState = .notConfigured
+
+    var canUseRenderer: Bool { endpointState == .local && homeBaseURL != nil }
+
+    var activeEndpointURL: URL? {
+        switch endpointState {
+        case .local, .remote: savedProfile?.baseURL
+        default: nil
+        }
+    }
 
     private struct PersistedConnection: Codable {
         let profile: NavidromeServerProfile
@@ -84,6 +98,9 @@ final class NavidromeConnectionStore: ObservableObject {
     private let rendererStorageKey = "NavidromeRendererConnection.v1"
     private var pendingVerificationID: UUID?
     private var pendingVerificationTask: Task<Void, Never>?
+    private var reachabilityTask: Task<Void, Never>?
+    private var reachabilityGeneration: UInt64 = 0
+    private var lastReachabilityCheck: Date?
 
     init(
         defaults: UserDefaults = .standard,
@@ -238,6 +255,7 @@ final class NavidromeConnectionStore: ObservableObject {
             )
             defaults.removeObject(forKey: rendererStorageKey)
 
+            invalidateReachability()
             savedProfile = profile
             identity = verifiedIdentity
             homeBaseURL = verifiedHomeURL
@@ -248,6 +266,8 @@ final class NavidromeConnectionStore: ObservableObject {
             username = profile.username
             password = ""
             hasStoredPassword = true
+            endpointState = activeURL == verifiedHomeURL ? .local : .remote
+            lastReachabilityCheck = Date()
             statusMessage = verifiedEndpoints.count == configuredAddresses.count
                 ? "Navidrome connection verified and saved."
                 : "Navidrome connection saved. The other address could not be verified from this network."
@@ -263,6 +283,7 @@ final class NavidromeConnectionStore: ObservableObject {
 
     func removeServer() {
         cancelPendingVerification()
+        invalidateReachability()
         do {
             if let profileID = savedProfile?.id {
                 try credentialStore.deletePassword(for: profileID)
@@ -283,14 +304,18 @@ final class NavidromeConnectionStore: ObservableObject {
         guard let password = try credentialStore.password(for: profile.id) else {
             throw NavidromeConnectionStoreError.passwordRequired
         }
+        guard endpointState != .unavailable else {
+            throw NavidromeConnectionStoreError.serverUnavailable
+        }
         return NavidromeCatalogCredentials(profile: profile, password: password)
     }
 
-    /// UPnP renderers must receive an address reachable from the home network.
-    /// If no separate HOME address exists, the normal active address is reused.
+    /// Never substitute the app's remote/VPN address for a local renderer URL.
     func rendererCredentials() throws -> NavidromeCatalogCredentials {
         let credentials = try catalogCredentials()
-        guard let homeBaseURL else { return credentials }
+        guard canUseRenderer, let homeBaseURL else {
+            throw NavidromeConnectionStoreError.localConnectionRequired
+        }
         return NavidromeCatalogCredentials(
             profile: makeProfile(
                 id: credentials.profile.id,
@@ -305,13 +330,66 @@ final class NavidromeConnectionStore: ObservableObject {
     /// Prefer HOME while it is reachable, otherwise use REMOTE. This is called
     /// when the app becomes active, so moving between home Wi-Fi and the road
     /// does not require changing the saved source.
-    func refreshReachableEndpoint() async {
+    func refreshReachableEndpoint(force: Bool = true) async {
+        if let reachabilityTask {
+            await reachabilityTask.value
+            return
+        }
+        // Playback reuses the verified route until a network change or a
+        // foreground/SOURCE refresh invalidates it. Probing a failed home
+        // address before every remote track would introduce audible gaps.
+        if !force, endpointState == .local || endpointState == .remote { return }
+        if !force, let lastReachabilityCheck {
+            let age = Date().timeIntervalSince(lastReachabilityCheck)
+            if age >= 0 && age < 5 { return }
+        }
+        let generation = reachabilityGeneration
+        let task = Task<Void, Never> { [weak self] in
+            guard let self else { return }
+            await self.checkReachableEndpoint(generation: generation)
+        }
+        reachabilityTask = task
+        await task.value
+        if generation == reachabilityGeneration { reachabilityTask = nil }
+    }
+
+    func networkDidChange() async {
+        invalidateReachability()
+        await refreshReachableEndpoint()
+    }
+
+    func requirePlaybackConnection() async throws {
+        repeat {
+            await refreshReachableEndpoint(force: false)
+            try Task.checkCancellation()
+        } while endpointState == .checking && reachabilityTask != nil
+        guard endpointState == .local || endpointState == .remote else {
+            throw NavidromeConnectionStoreError.serverUnavailable
+        }
+    }
+
+    private func invalidateReachability() {
+        reachabilityGeneration &+= 1
+        reachabilityTask?.cancel()
+        reachabilityTask = nil
+        lastReachabilityCheck = nil
+        endpointState = savedProfile == nil ? .notConfigured : .checking
+    }
+
+    private func checkReachableEndpoint(generation: UInt64) async {
         guard let currentProfile = savedProfile,
               let identity,
               let connectionPassword = try? credentialStore.password(
                   for: currentProfile.id
               ) else {
+            endpointState = savedProfile == nil ? .notConfigured : .unavailable
             return
+        }
+
+        // A routine recheck does not temporarily revoke a working renderer
+        // session. Network changes explicitly invalidate the previous result.
+        if endpointState != .local && endpointState != .remote {
+            endpointState = .checking
         }
 
         for address in [homeBaseURL, remoteBaseURL].compactMap({ $0 }) {
@@ -327,25 +405,34 @@ final class NavidromeConnectionStore: ObservableObject {
                     password: connectionPassword,
                     allowsInsecureLocalHTTP: address.scheme?.lowercased() == "http"
                 )
-                guard candidate.baseURL != currentProfile.baseURL else { return }
-                try persist(
-                    profile: candidate,
-                    identity: identity,
-                    homeBaseURL: homeBaseURL,
-                    remoteBaseURL: remoteBaseURL
-                )
-                savedProfile = candidate
+                guard !Task.isCancelled, generation == reachabilityGeneration,
+                      savedProfile?.id == currentProfile.id else { return }
+                if candidate.baseURL != currentProfile.baseURL {
+                    try persist(
+                        profile: candidate,
+                        identity: identity,
+                        homeBaseURL: homeBaseURL,
+                        remoteBaseURL: remoteBaseURL
+                    )
+                    savedProfile = candidate
+                }
+                endpointState = address == homeBaseURL ? .local : .remote
+                lastReachabilityCheck = Date()
                 Self.logger.info(
                     "Selected reachable Navidrome endpoint host=\(address.host ?? "unknown", privacy: .private)"
                 )
                 return
             } catch {
+                guard !Task.isCancelled, generation == reachabilityGeneration else { return }
                 Self.logger.debug(
                     "Navidrome endpoint is not reachable host=\(address.host ?? "unknown", privacy: .private) error=\(error.localizedDescription, privacy: .private)"
                 )
                 continue
             }
         }
+        guard !Task.isCancelled, generation == reachabilityGeneration else { return }
+        endpointState = .unavailable
+        lastReachabilityCheck = Date()
     }
 
     private func validatedHomeAddress(_ value: String) throws -> URL? {
@@ -408,12 +495,14 @@ final class NavidromeConnectionStore: ObservableObject {
             let legacyRendererURL = loadLegacyRendererConnection(
                 for: connection.profile.id
             )
+            let hasLegacySingleAddress = connection.homeBaseURL == nil
+                && connection.remoteBaseURL == nil
             let migratedHomeURL = connection.homeBaseURL
                 ?? legacyRendererURL
-                ?? (connection.profile.baseURL.scheme?.lowercased() == "http"
+                ?? (hasLegacySingleAddress && connection.profile.baseURL.scheme?.lowercased() == "http"
                     ? connection.profile.baseURL : nil)
             let migratedRemoteURL = connection.remoteBaseURL
-                ?? (connection.profile.baseURL.scheme?.lowercased() == "https"
+                ?? (hasLegacySingleAddress && connection.profile.baseURL.scheme?.lowercased() == "https"
                     ? connection.profile.baseURL : nil)
 
             let activeURL = migratedHomeURL
@@ -437,6 +526,7 @@ final class NavidromeConnectionStore: ObservableObject {
             hasStoredPassword = try credentialStore.password(
                 for: activeProfile.id
             ) != nil
+            endpointState = .checking
 
             if connection.homeBaseURL == nil
                 || connection.remoteBaseURL == nil
@@ -478,6 +568,7 @@ final class NavidromeConnectionStore: ObservableObject {
         remoteBaseURL = nil
         isConnecting = false
         hasStoredPassword = false
+        endpointState = .notConfigured
         errorMessage = nil
     }
 }
@@ -489,6 +580,8 @@ nonisolated enum NavidromeConnectionStoreError: LocalizedError, Equatable, Senda
     case serverNotConfigured
     case addressRequired
     case addressesDoNotMatch
+    case localConnectionRequired
+    case serverUnavailable
 
     var errorDescription: String? {
         switch self {
@@ -500,6 +593,10 @@ nonisolated enum NavidromeConnectionStoreError: LocalizedError, Equatable, Senda
             "Enter at least one Navidrome address."
         case .addressesDoNotMatch:
             "The Home and Remote addresses do not identify the same Navidrome server."
+        case .localConnectionRequired:
+            "UPnP playback requires an active local Navidrome connection. Choose System audio for remote playback."
+        case .serverUnavailable:
+            "Neither Navidrome address is reachable. Check your network or VPN connection and try again."
         }
     }
 }

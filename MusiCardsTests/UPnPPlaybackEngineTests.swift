@@ -4,6 +4,42 @@ import XCTest
 
 final class UPnPPlaybackEngineTests: XCTestCase {
     @MainActor
+    func testFailedConnectionPreflightCannotResumePreparedSystemAudio() async throws {
+        let system = MeteringSystemEngine()
+        var available = true
+        let routing = OutputRoutingPlaybackEngine(
+            systemEngine: system, rendererEngine: makeEngine(client: TransportSpy()),
+            selection: { .system },
+            validatePlayback: {
+                if !available { throw NavidromeConnectionStoreError.serverUnavailable }
+            }
+        )
+        try await routing.prepare(makeItem("first"))
+        available = false
+        do {
+            try await routing.play()
+            XCTFail("A prepared item must not bypass the connection check")
+        } catch {
+            XCTAssertEqual(error as? NavidromeConnectionStoreError, .serverUnavailable)
+        }
+        XCTAssertEqual(system.playCount, 0)
+    }
+
+    @MainActor
+    func testUnavailableRendererNeverFallsBackToSystemAudio() async throws {
+        let system = MeteringSystemEngine()
+        let routing = OutputRoutingPlaybackEngine(
+            systemEngine: system, rendererEngine: makeEngine(client: TransportSpy()),
+            selection: { .unavailable(name: "AVM") }
+        )
+        do {
+            try await routing.prepare(makeItem("first"))
+            XCTFail("The user must explicitly select System audio")
+        } catch {}
+        XCTAssertEqual(system.prepareCount, 0)
+        XCTAssertEqual(system.playCount, 0)
+    }
+    @MainActor
     func testMeterRequestFollowsOnlyTheActiveSystemRoute() async throws {
         let system = MeteringSystemEngine()
         var selection: OutputRoutingPlaybackEngine.Selection = .system
@@ -308,8 +344,10 @@ private final class MeteringSystemEngine: PlaybackEngine {
     var eventHandler: ((PlaybackEngineEvent) -> Void)?
     var canSeek: Bool { true }
     private(set) var meteringEnabled = false
-    func prepare(_ item: PlaybackQueueItem) async throws {}
-    func play() async throws {}
+    private(set) var prepareCount = 0
+    private(set) var playCount = 0
+    func prepare(_ item: PlaybackQueueItem) async throws { prepareCount += 1 }
+    func play() async throws { playCount += 1 }
     func pause() async {}
     func stop() async {}
     func seek(to position: TimeInterval) async throws {}

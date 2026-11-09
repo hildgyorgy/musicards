@@ -17,6 +17,10 @@ struct ReleaseHeaderView: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var hoveredService: String?
     @Environment(\.openURL) private var openURL
+    #if os(iOS)
+    @Environment(\.compactDeckLayout) private var compactDeckLayout
+    @Environment(\.deckVisibleContentHeight) private var visibleContentHeight
+    #endif
     
     var body: some View {
         VStack(alignment: .leading, spacing: AppStyle.headerSpacing) {
@@ -25,6 +29,10 @@ struct ReleaseHeaderView: View {
                 Image(uiImage: coverImage)
                     .resizable()
                     .aspectRatio(1, contentMode: .fit)
+                    .frame(
+                        width: compactDeckLayout ? min(200, visibleContentHeight * 0.45) : nil,
+                        height: compactDeckLayout ? min(200, visibleContentHeight * 0.45) : nil
+                    )
                     .cornerRadius(12)
                     .shadow(
                         color: colorScheme == .dark
@@ -33,7 +41,8 @@ struct ReleaseHeaderView: View {
                         radius: 12,
                         y: 6
                     )
-                    .padding(.top, -36)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, compactDeckLayout ? 0 : -36)
 #else
                 Image(nsImage: coverImage)
                     .resizable()
