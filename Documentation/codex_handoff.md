@@ -6,6 +6,36 @@ media URLs, private server addresses or signing material here.
 
 ## Current checkpoint — 2026-11-10
 
+- Removed automatic Search-card onboarding nudge from the shared iOS/iPadOS
+  deck, including its task, sleeps, offset state and onAppear trigger. View
+  recreation after rotation/reactivation must not restart automatic motion.
+  User-initiated tap/pan animations remain unchanged.
+
+- Immediate Navidrome catalog refresh fixed: the connection store publishes a
+  catalog-connection revision only after verified credentials/profile/endpoint
+  updates are complete, after endpoint changes, and after full removal. The
+  provider invalidates and automatically reloads configured snapshots, with a
+  generation guard against queued refreshes surviving disconnect/replacement.
+  A successful same-profile/password-only re-verification also triggers refresh.
+  Previously savedProfile observation only invalidated the cache, leaving a
+  first connection's catalog unknown until another lifecycle refresh/restart.
+  Regression coverage exercises initial unconfigured failure → verify → ready
+  summary/availability through LibraryManager, password-only re-verification,
+  and disconnect clearing the catalog. No real credentials were used in tests.
+  Full Tools/verify.sh passed afterward: 262 main-app tests, iOS build and
+  62 Sync tests. Physical first-connect confirmation remains for the user.
+
+- SOURCE keyboard regression fixed: the iOS root GeometryReader now ignores
+  the keyboard bottom safe area, so keyboard appearance cannot alter the
+  orientation/size branch and destroy DeckBackgroundView's sheet state. SOURCE
+  retains its native form/keyboard avoidance in its separate presentation.
+  Reproduced before the fix on the iPad Air simulator by focusing the local
+  address and showing the software keyboard (SOURCE disappeared). Afterward,
+  a Release simulator build kept the sheet open in portrait and landscape;
+  local address typing/deletion and remote/username/password focus were checked.
+  No credentials or connection changes were saved. Physical iPad confirmation
+  of the reported case remains for the user.
+
 - Latest local commit: **ea30c09** (`iphone duo`). The following iPad redesign
   is pending in the working tree; no commit or push was made for it.
 - iPad at available sizes of at least 700x520 now uses the shared

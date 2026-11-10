@@ -87,11 +87,18 @@ final class NavidromeLibraryProvider: ObservableObject, LibraryProvider {
         self.pageSize = min(max(pageSize, 1), 500)
         self.foregroundRefreshInterval = max(foregroundRefreshInterval, 0)
         self.now = now
-        connectionObservation = connectionStore.$savedProfile
-            .removeDuplicates()
+        connectionObservation = connectionStore.$catalogConnectionRevision
             .dropFirst()
-            .sink { @MainActor [weak self] _ in
-                self?.invalidateCatalog()
+            .sink { @MainActor [weak self, weak connectionStore] _ in
+                guard let self else { return }
+                self.invalidateCatalog()
+                let generation = self.catalogGeneration
+                Task { @MainActor [weak self, weak connectionStore] in
+                    guard let self, let connectionStore,
+                          generation == self.catalogGeneration,
+                          connectionStore.isConfigured else { return }
+                    await self.refreshCatalog()
+                }
             }
     }
 

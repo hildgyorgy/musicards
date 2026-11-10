@@ -80,10 +80,6 @@ struct DeckView<ID: Hashable, BackgroundContent: View, CollapsedHeaderContent: V
     @State private var dragCardIndex: Int? = nil
     @State private var dragOffset: CGFloat = 0
     
-    @State private var nudgeOffset: CGFloat = 0
-    @State private var hasNudged: Bool = false
-    @State private var nudgeTask: Task<Void, Never>? = nil
-
     init(
         cards: [DeckCard<ID>],
         viewportSafeAreaTop: CGFloat,
@@ -168,10 +164,7 @@ struct DeckView<ID: Hashable, BackgroundContent: View, CollapsedHeaderContent: V
                         safeAreaTop: deckSafeAreaTop
                     )
 
-                    let cardTop =
-                        y
-                        + interactiveOffset(for: index)
-                        + nudgeOffset(for: index)
+                    let cardTop = y + interactiveOffset(for: index)
 
                     let cardBottom = DeckLayout.cardBottom(
                         containerHeight: deckContainerHeight
@@ -200,9 +193,6 @@ struct DeckView<ID: Hashable, BackgroundContent: View, CollapsedHeaderContent: V
                         onPanBegan: {
                             dragCardIndex = index
                             dragOffset = 0
-                            nudgeOffset = 0
-                            nudgeTask?.cancel()
-                            nudgeTask = nil
                         },
                         onPanChanged: { dy in
                             guard dragCardIndex == index else { return }
@@ -288,9 +278,6 @@ struct DeckView<ID: Hashable, BackgroundContent: View, CollapsedHeaderContent: V
                     .zIndex(DeckLayout.zIndex(for: index))
                 }
             }
-            .onAppear {
-                scheduleInitialNudge()
-            }
             .frame(
                 width: proxy.size.width,
                 height: proxy.size.height,
@@ -347,51 +334,6 @@ struct DeckView<ID: Hashable, BackgroundContent: View, CollapsedHeaderContent: V
             return min(0, dragOffset)
         } else {
             return 0
-        }
-    }
-    
-    private func nudgeOffset(for index: Int) -> CGFloat {
-        guard index == cards.first?.slotIndex else { return 0 }
-        guard dragCardIndex == nil else { return 0 }
-        return nudgeOffset
-    }
-
-    private func scheduleInitialNudge() {
-        guard !hasNudged else { return }
-        hasNudged = true
-
-        nudgeTask = Task {
-            try? await Task.sleep(nanoseconds: 800_000_000)
-            guard !Task.isCancelled else { return }
-            guard dragCardIndex == nil else { return }
-
-            await runNudgeSequence()
-        }
-    }
-
-    @MainActor
-    private func runNudgeSequence() async {
-        let repetitions = 2
-
-        for _ in 0..<repetitions {
-            if Task.isCancelled { return }
-            if dragCardIndex != nil { return }
-
-            // move up
-            withAnimation(.easeOut(duration: 0.6)) {
-                nudgeOffset = -30
-            }
-
-            try? await Task.sleep(nanoseconds: 300_000_000)
-
-            if Task.isCancelled { return }
-
-            // move back
-            withAnimation(.easeIn(duration: 0.35)) {
-                nudgeOffset = 0
-            }
-
-            try? await Task.sleep(nanoseconds: 400_000_000) // 0.4s pause between the two repetitions
         }
     }
 }

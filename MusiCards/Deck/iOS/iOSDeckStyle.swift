@@ -79,10 +79,9 @@ enum DeckStyle {
     static let strokeDark: Color = Color(UIColor.opaqueSeparator)
     static let strokeWidth: CGFloat = 1
 
-    // Dark-mode glass edge: a restrained outline with a brighter top rim.
+    // Dark-mode neon tube: a uniform sharp core with a soft outer glow.
     static let glassEdgeBlue: Color = .blue
-    static let activeGlassEdgeStrength: Double = 0.55
-    static let activeTopEdgeStrength: Double = 0.92
+    static let activeGlassEdgeStrength: Double = 0.92
     static let activeGlassGlowStrength: Double = 0.38
     static let activeGlassGlowRadius: CGFloat = 8
     static let neonCoreWidth: CGFloat = 0.7

@@ -461,6 +461,10 @@ struct ContentView: View {
                 GeometryReader { viewportProxy in
                     iosPresentation(in: viewportProxy)
                 }
+                // Keyboard avoidance belongs to the presented forms/search
+                // content. It must not change the deck's layout branch and
+                // destroy the view that owns an open SOURCE/OUTPUT sheet.
+                .ignoresSafeArea(.keyboard, edges: .bottom)
             #endif
 
             #if os(iOS)

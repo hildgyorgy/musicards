@@ -99,40 +99,16 @@ struct DeckCardView<ID: Hashable, CollapsedHeaderContent: View, HeaderContent: V
         )
         .overlay {
             if colorScheme == .dark && isActive {
-                ZStack {
-                    cardShape
-                        .stroke(
-                            DeckStyle.glassEdgeBlue.opacity(
-                                DeckStyle.activeGlassEdgeStrength
-                            ),
-                            lineWidth: DeckStyle.neonCoreWidth
-                        )
-                        .shadow(
-                            color: DeckStyle.glassEdgeBlue.opacity(0.28),
-                            radius: 5
-                        )
-
-                    cardShape
-                        .stroke(
-                            DeckStyle.glassEdgeBlue.opacity(
-                                DeckStyle.activeTopEdgeStrength
-                            ),
-                            lineWidth: DeckStyle.neonCoreWidth
-                        )
-                        .mask(alignment: .top) {
-                            Color.white
-                                .frame(
-                                    height: DeckStyle.topCornerRadius
-                                        + DeckStyle.neonCoreWidth
-                                )
-                        }
-                        .shadow(
-                            color: DeckStyle.glassEdgeBlue.opacity(
-                                DeckStyle.activeGlassGlowStrength
-                            ),
-                            radius: DeckStyle.activeGlassGlowRadius
-                        )
-                }
+                // One continuous neon tube: the same core and glow around every edge.
+                cardShape
+                    .stroke(
+                        DeckStyle.glassEdgeBlue.opacity(DeckStyle.activeGlassEdgeStrength),
+                        lineWidth: DeckStyle.neonCoreWidth
+                    )
+                    .shadow(
+                        color: DeckStyle.glassEdgeBlue.opacity(DeckStyle.activeGlassGlowStrength),
+                        radius: DeckStyle.activeGlassGlowRadius
+                    )
                 .allowsHitTesting(false)
             }
         }

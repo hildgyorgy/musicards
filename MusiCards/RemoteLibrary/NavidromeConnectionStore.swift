@@ -28,6 +28,9 @@ final class NavidromeConnectionStore: ObservableObject {
     @Published private(set) var errorMessage: String?
     @Published private(set) var hasStoredPassword = false
     @Published private(set) var endpointState: NavidromeEndpointState = .notConfigured
+    /// Changes only after the profile, credentials and endpoint form a complete
+    /// snapshot (or have all been removed), never during partial @Published updates.
+    @Published private(set) var catalogConnectionRevision = 0
 
     var canUseRenderer: Bool { endpointState == .local && homeBaseURL != nil }
 
@@ -271,6 +274,7 @@ final class NavidromeConnectionStore: ObservableObject {
             statusMessage = verifiedEndpoints.count == configuredAddresses.count
                 ? "Navidrome connection verified and saved."
                 : "Navidrome connection saved. The other address could not be verified from this network."
+            catalogConnectionRevision += 1
         } catch {
             guard pendingVerificationID == verificationID,
                   !Task.isCancelled else { return }
@@ -418,6 +422,9 @@ final class NavidromeConnectionStore: ObservableObject {
                 }
                 endpointState = address == homeBaseURL ? .local : .remote
                 lastReachabilityCheck = Date()
+                if candidate.baseURL != currentProfile.baseURL {
+                    catalogConnectionRevision += 1
+                }
                 Self.logger.info(
                     "Selected reachable Navidrome endpoint host=\(address.host ?? "unknown", privacy: .private)"
                 )
@@ -570,6 +577,7 @@ final class NavidromeConnectionStore: ObservableObject {
         hasStoredPassword = false
         endpointState = .notConfigured
         errorMessage = nil
+        catalogConnectionRevision += 1
     }
 }
 

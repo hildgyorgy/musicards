@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import XCTest
 @testable import MusiCards
@@ -6,6 +7,64 @@ final class NavidromeConnectionTests: XCTestCase {
     private let endpointIdentity = NavidromeServerIdentity(
         serverVersion: "0.58.0", protocolVersion: "1.16.1"
     )
+
+    @MainActor
+    func testVerifiedConnectionLoadsCatalogWithoutRestartAndReverificationReloadsIt() async throws {
+        let suite = "NavidromeCatalogConnectionTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let identifier = NavidromeIdentifierStub(resultsByHost: [
+            "music.example.com": .success(endpointIdentity)
+        ])
+        let store = NavidromeConnectionStore(
+            defaults: defaults, credentialStore: NavidromeCredentialStoreStub(),
+            client: identifier, reachabilityClient: identifier
+        )
+        let client = ConnectionCatalogClientStub()
+        let provider = NavidromeLibraryProvider(connectionStore: store, client: client)
+        let manager = LibraryManager(provider: provider)
+
+        // Selecting Navidrome before credentials exist used to leave this failed
+        // snapshot in place until the app's next launch/foreground refresh.
+        await provider.refreshCatalog()
+        guard case .failed = provider.catalogState else {
+            return XCTFail("Expected initial unconfigured catalog failure")
+        }
+        store.remoteServerURL = "https://music.example.com"
+        store.username = "listener"
+        store.password = "first-password"
+
+        let firstLoad = expectation(description: "catalog loaded immediately after connect")
+        var observation = provider.$catalogState.dropFirst().sink { state in
+            if state == .ready { firstLoad.fulfill() }
+        }
+        await store.verifyAndSave()
+        await fulfillment(of: [firstLoad], timeout: 2)
+        observation.cancel()
+        let firstProfile = store.savedProfile
+        XCTAssertEqual(manager.catalogSummary.identifiedAlbumCount, 1)
+        XCTAssertEqual(manager.catalogSummary.totalAlbumCount, 2)
+        XCTAssertTrue(manager.containsRelease(ConnectionCatalogClientStub.releaseID))
+
+        // A password-only verification keeps the same profile; a profile-only
+        // observation cannot detect this successful connection update.
+        let secondLoad = expectation(description: "catalog reloaded with updated credentials")
+        observation = provider.$catalogState.dropFirst().sink { state in
+            if state == .ready { secondLoad.fulfill() }
+        }
+        store.password = "second-password"
+        await store.verifyAndSave()
+        await fulfillment(of: [secondLoad], timeout: 2)
+        observation.cancel()
+        XCTAssertEqual(store.savedProfile, firstProfile)
+        let passwords = await client.passwords
+        XCTAssertEqual(passwords, ["first-password", "second-password"])
+
+        store.removeServer()
+        XCTAssertEqual(provider.catalogState, .unknown)
+        XCTAssertNil(manager.catalogSummary.totalAlbumCount)
+        XCTAssertFalse(manager.containsRelease(ConnectionCatalogClientStub.releaseID))
+    }
 
     @MainActor
     private func savedStore(
@@ -826,5 +885,27 @@ private final class NavidromeCredentialStoreStub:
 
     func deletePassword(for profileID: UUID) throws {
         lock.withLock { _ = passwords.removeValue(forKey: profileID) }
+    }
+}
+
+private actor ConnectionCatalogClientStub: OpenSubsonicCatalogClientProtocol {
+    static let releaseID = "189002e7-3285-4e2e-92a3-7f6c30d407a2"
+    private(set) var passwords: [String] = []
+
+    func albumListPage(profile: NavidromeServerProfile, password: String,
+                       offset: Int, size: Int) async throws -> [OpenSubsonicAlbum] {
+        passwords.append(password)
+        return [
+            OpenSubsonicAlbum(id: "tagged", name: "Tagged", musicBrainzID: Self.releaseID),
+            OpenSubsonicAlbum(id: "untagged", name: "Untagged", musicBrainzID: nil)
+        ]
+    }
+    func album(profile: NavidromeServerProfile, password: String,
+               id: String) async throws -> OpenSubsonicAlbum {
+        throw NavidromeConnectionError.invalidResponse
+    }
+    func song(profile: NavidromeServerProfile, password: String,
+              id: String) async throws -> OpenSubsonicSong {
+        throw NavidromeConnectionError.invalidResponse
     }
 }
