@@ -1,6 +1,7 @@
 import XCTest
 @testable import MusiCards
 
+@MainActor
 final class SearchErrorSemanticsTests: XCTestCase {
     func testConnectivityPresentationUsesConnectionGuidance() {
         let view = ErrorStateView.searchRetry(

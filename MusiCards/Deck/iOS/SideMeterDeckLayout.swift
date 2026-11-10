@@ -1,11 +1,8 @@
-#if os(iOS) && DEBUG
+#if os(iOS)
 import SwiftUI
 
-/// Opt-in development experiment; Release builds keep the shipping deck.
-enum SideMeterDeckPreview {
-    static var isEnabled: Bool {
-        ProcessInfo.processInfo.environment["MUSICARDS_SIDE_METER_PREVIEW"] == "1"
-    }
+/// Detects a phone layout with a dedicated system rail or folding display.
+enum SideMeterDeviceLayout {
 
     static func supportsSideRail(in viewport: GeometryProxy) -> Bool {
         if viewport.safeAreaInsets.trailing >= 48 { return true }
@@ -25,44 +22,53 @@ struct SideMeterDeckLayout<Content: View>: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let isOpen = systemInsets.trailing < 48
-            let topInset: CGFloat = isOpen ? DeckStyle.horizontalInset : 12
+            let isTablet = UIDevice.current.userInterfaceIdiom == .pad
+            let isOpen = !isTablet && systemInsets.trailing < 48
+            let topInset: CGFloat = isTablet ? 32 : (isOpen ? 8 : 12)
+            let leftInset = isTablet ? max(systemInsets.leading, min(60, proxy.size.width * 0.065)) : systemInsets.leading
             // The rail reuses the system's side inset below its reserved
             // regions, instead of reserving another strip inside the safe area.
-            let railWidth = max(48, systemInsets.trailing, proxy.size.width * 0.16)
-            let deckWidth = max(0, proxy.size.width - systemInsets.leading - railWidth)
-            let width = systemInsets.leading + deckWidth + railWidth
+            let railWidth = max(isTablet ? 100 : 48, systemInsets.trailing, proxy.size.width * 0.16)
+            let deckWidth = max(0, proxy.size.width - leftInset - railWidth)
+            let width = leftInset + deckWidth + railWidth
             let leading = (proxy.size.width - width) / 2
-            let rail = CGRect(x: leading + systemInsets.leading + deckWidth,
+            let rail = CGRect(x: leading + leftInset + deckWidth,
                               y: 0, width: railWidth, height: proxy.size.height)
-            let reservedBottom = occlusions(in: proxy)
-                .filter { $0.intersects(rail) }
+            let reservedRegions = occlusions(in: proxy).filter { $0.intersects(rail) }
+            let reservedBottom = reservedRegions
+                .filter { $0.midY < proxy.size.height / 2 }
                 .map(\.maxY).max() ?? 0
             let meterTop = max(reservedBottom + 20, DeckStyle.peek * 4 + DeckStyle.cardLabelHitHeight + 36)
-            let meterBottom = max(meterTop, proxy.size.height - 32)
+            // iPad's bottom-right resize handle also occupies the rail. It
+            // limits the bottom, rather than pushing the meter below the screen.
+            let reservedTop = reservedRegions
+                .filter { $0.midY >= proxy.size.height / 2 }
+                .map(\.minY).min() ?? proxy.size.height
+            let meterBottom = max(meterTop, min(proxy.size.height - 32, reservedTop - 20))
             let cardFrame = CGRect(
-                x: leading + systemInsets.leading + DeckStyle.horizontalInset,
+                x: leading + leftInset + 8,
                 y: topInset,
-                width: max(0, deckWidth - DeckStyle.horizontalInset * 2),
+                width: max(0, deckWidth - 16),
                 height: max(0, proxy.size.height - topInset - DeckStyle.cardBottomInset)
             )
             HStack(spacing: 0) {
                 content()
                     .padding(.top, topInset)
+                    .padding(.bottom, isTablet ? 24 : 0)
                     .environment(\.deckCornerRadiusOverride,
                                  isOpen ? cornerRadius(in: proxy, cardFrame: cardFrame) : nil)
                     .frame(width: deckWidth)
                 VStack(spacing: 0) {
                     if meterBottom > meterTop {
-                        SideSignalMeter(controller: controller)
-                            .frame(width: 18, height: meterBottom - meterTop)
+                        SideSignalMeter(controller: controller, showsChannelLabels: isTablet)
+                            .frame(width: isTablet ? 70 : 18, height: meterBottom - meterTop)
                             .padding(.top, meterTop)
                     }
                     Spacer(minLength: 0)
                 }
                 .frame(width: railWidth, height: proxy.size.height, alignment: .top)
             }
-            .padding(.leading, systemInsets.leading)
+            .padding(.leading, leftInset)
             .frame(width: width, height: proxy.size.height)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .environment(\.usesSideSignalMeter, true)
@@ -80,7 +86,12 @@ struct SideMeterDeckLayout<Content: View>: View {
 
     private func occlusions(in proxy: GeometryProxy) -> [CGRect] {
         if #available(iOS 27.1, *) {
-            return proxy.reservedRegions(kind: .occlusion).map(\.frame)
+            return proxy.reservedRegions(kind: .occlusion)
+                .filter { $0.isActive }
+                .map(\.frame)
+                // A container-sized bounding frame cannot locate a small
+                // control within it. Only localized obstructions bound the rail.
+                .filter { $0.height < proxy.size.height / 2 }
         }
         return []
     }
@@ -88,6 +99,7 @@ struct SideMeterDeckLayout<Content: View>: View {
 
 private struct SideSignalMeter: View {
     @ObservedObject var controller: PlaybackController
+    var showsChannelLabels = false
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var observerID = UUID()
@@ -99,12 +111,25 @@ private struct SideSignalMeter: View {
             Color.clear
             if !reduceMotion, controller.externalOutputDisplayName == nil,
                let levels = controller.signalLevels {
-                PlaybackSignalMeter(
-                    left: PlaybackSignalLevels.displayFraction(levels.left),
-                    right: PlaybackSignalLevels.displayFraction(levels.right),
-                    axis: .vertical
-                )
-                .animation(.linear(duration: 0.1), value: levels)
+                VStack(spacing: 10) {
+                    PlaybackSignalMeter(
+                        left: PlaybackSignalLevels.displayFraction(levels.left),
+                        right: PlaybackSignalLevels.displayFraction(levels.right),
+                        axis: .vertical
+                    )
+                    .frame(width: showsChannelLabels ? 28 : 18)
+                    .frame(maxHeight: .infinity)
+                    .animation(.linear(duration: 0.1), value: levels)
+                    if showsChannelLabels {
+                        HStack {
+                            Text("L")
+                            Spacer()
+                            Text("R")
+                        }
+                        .font(.caption)
+                        .foregroundStyle(Color.accentColor)
+                    }
+                }
             }
         }
         .allowsHitTesting(false)

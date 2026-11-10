@@ -4,9 +4,46 @@ Living handoff for continuing on another Mac. Git and the user's latest
 instructions take precedence. Never commit passwords, tokens, authenticated
 media URLs, private server addresses or signing material here.
 
-## Current checkpoint — 2026-11-09
+## Current checkpoint — 2026-11-10
 
-- Branch: main; latest committed application checkpoint: **7cb3185**
+- Latest local commit: **ea30c09** (`iphone duo`). The following iPad redesign
+  is pending in the working tree; no commit or push was made for it.
+- iPad at available sizes of at least 700x520 now uses the shared
+  `SideMeterDeckLayout.swift` in Debug and Release, without the Duo debug flag.
+  Portrait: wide left deck, full-content-width Release cover and whole-card
+  scrolling, right-side real stereo meter with L/R labels. Landscape: existing
+  home/settings on the left, deck and meter in the right half. The deck's left
+  edge starts beyond the window centerline by its normal outer/inner margin.
+  Smaller windows retain the former single-deck fallback.
+  Ordinary iPhone presentation stays unchanged; Duo is now enabled in Release too.
+- Landscape home/settings spacing is expanded on both iPad and Duo, through
+  the existing `showsExplorePrompt == false` panel mode. Other home views keep
+  their spacing. Side-meter decks allow 24 pt around their outer clipping bounds
+  for the shadow halo; individual card content remains clipped to its shape.
+  This avoids cutting off shadows at the 8 pt inner deck margin. Visually checked
+  in landscape on the iPad Air simulator; no test audio was started for this pass.
+- The shared side layout replaces iPad's former 100 pt internal deck margins
+  with 8 pt internal margins and explicit outer margins. iPad adds 32 pt top
+  space and 24 pt bottom space. Only localized active system occlusion bounds
+  constrain the meter; bottom obstructions constrain its bottom, not its top.
+- Visually checked on the iPad Air 11-inch (M4) simulator using real Navidrome
+  playback in portrait and landscape, including rotation during playback and
+  live L/R meters. Playback was paused afterward. Comprehensive Stage Manager,
+  Split View, iPad mini and 13-inch interactive checks remain outstanding.
+- Validation for this redesign: iPad simulator Debug build, generic iOS Release
+  build and macOS arm64 Debug build all succeeded; `git diff --check` passed.
+- Production promotion: removed the Duo flag and Debug branches, renamed the
+  orientation delegate, and unified tablet/foldable selection in ContentView.
+  Scheme Run is Release without LLDB. Full Tools/verify.sh passed: 261 main-app
+  tests, generic iOS build and 62 Sync tests. SearchErrorSemanticsTests now has
+  @MainActor to match the UI value construction; its targeted rerun passed.
+  A signed Release simulator build was launched without flags and visually
+  checked on Duo closed/open portrait and open landscape. Archive/Organizer
+  signing validation and a fresh physical-device/AVM smoke test remain separate.
+  Conventional iPhone 18 Pro was also launched from the same Release simulator
+  product with no flag; the original full-width home/deck presentation remains.
+
+- Historical release-cleanup checkpoint: main, **7cb3185**
   (`server settings refine`). The user subsequently removed the source-export
   archive in **d9bb868** (`Delete musicards.zip`). Playback safety changes are
   already committed in **84d52c7** (`polish`); they are not pending work.
@@ -61,58 +98,43 @@ Start with `git status --short --branch` and `git log -5 --oneline`.
   Real SwiftUI/UIKit release views were rendered on an iPad simulator at
   1180x820, 1133x744 and 820x1180 with a synthetic cover. The temporary rendering
   harness was removed. This was not a full interactive iPad/Stage Manager test.
-  The user found landscape much improved; a separate iPad redesign is deferred.
+  The user found landscape much improved. Superseded at larger window sizes by
+  the November 10 shared iPad/Duo design above.
 
 ### Next session — office AVM check before 2.2 submission
 
-Separate optional Duo experiment: Debug builds can enable
-`MUSICARDS_SIDE_METER_PREVIEW=1` in the Run environment. ContentView then uses
-SideMeterDeckLayout only in portrait phone viewports with a substantial trailing
-system safe-area strip (at least 48 pt) or a fold division reported by
-reservedRegions (including inactive divisions on the open display), plus
-sufficient width and height. The flag
-alone must not change ordinary iPhone or iPad layouts. This presents a narrow deck
-and a vertical stereo dot meter alongside every card, including the collapsed
-Player, so playback remains visible while browsing. The deck starts 12 pt lower
-and extends into the bottom safe area with its normal 8 pt bottom margin.
-Open portrait Duo additionally extends above the top safe area, keeping an
-8 pt top inset. Its card corner radius uses the public iOS 27
-GeometryProxy.concentricCornerRadii(in:) result for the inset card frame
-(top-leading radius applied consistently to all four card corners), falling
-back to the existing deck radii if the system supplies no result. Closed Duo
-keeps its previous 12 pt top offset and corner treatment.
-Open landscape Duo uses a shared full-window background, the existing iOS
-home/settings view on the left (without TO EXPLORE), and a closed-phone-sized
-deck plus 84 pt meter rail on the right (at most 466 pt combined). The right
-deck omits its duplicate home view. ContentView reuses iosHome and iosDeck;
-SOURCE/OUTPUT sheets use the existing controls and connection models.
-A Debug-only UIApplicationDelegate permits all orientations only when the
-preview flag is enabled and UIKit reports a fold division on the window.
-Ordinary phone orientation masks and Release builds are unchanged.
-Landscape was inspected on the open Duo simulator with real playback and a
-live meter; playback was paused afterward. The prototype remains opt-in.
-In this side-meter layout the Release cover fills the content width, while
-the entire header and metadata still scroll together; the compact iPad cover
-limit remains in place outside the experiment.
-The rail uses at least 16% of the available width on the larger open display;
-the deck fills the remaining width. The rail reuses
-the system's trailing safe-area strip, below the occlusion regions reported by
-GeometryProxy.reservedRegions on iOS 27.1+, rather than shrinking the deck by
-another strip inside the safe area. The same
-PlaybackSignalMeter renders both orientations using existing measured RMS;
-native-only metering, observer leases and Reduce Motion are retained. The
-horizontal meter is hidden while the side display is used. Release builds
-do not enable this presentation. The revised layout was inspected on the Duo
-simulator's outer display with real Navidrome playback and a live side meter;
-playback was paused after the check. The open portrait display was also checked
-with real playback: side rail, full-width cover and live vertical meter. It uses
-the same whole-card release ScrollView; automated scrolling gestures were not
-conclusive. Comprehensive folding-transition testing remains outstanding.
-The meter has a stable transparent container before the first RMS value, so its
-onAppear acquires a metering lease without first opening the expanded Player.
-An earlier static synthetic-data fixture was removed; no sample levels remain
-in the app. Use the project's normal simulator signing when installing test
-builds so the existing saved connection can still access its Keychain entry.
+The side-meter presentation is now production code shared by Debug and Release.
+The former Duo environment flag and preview-only delegate were removed. Run uses
+Release without LLDB again. `SideMeterDeviceLayout` selects phone side layouts
+from the system rail/fold geometry; conventional phones keep the original deck.
+`DeviceOrientationDelegate` allows all orientations on iPads and on windows with
+an iOS 27.1+ fold division (including inactive divisions), keeping conventional
+phones portrait-only. No private device names or display APIs are used.
+
+The implementation is shared by iPad and Duo in SideMeterDeckLayout.swift:
+- Portrait has a deck and a right-side stereo meter. iPad has explicit outer
+  margins and L/R labels. Release cover fills content width; header and metadata
+  scroll together. Open portrait Duo uses an 8 pt top inset and public system
+  concentric corner radii; closed Duo keeps its 12 pt inset.
+- Landscape uses one full-window background, the existing home/settings on the
+  left, and the deck/meter on the right. iPad reserves the right half plus normal
+  deck margins; Duo keeps its phone-sized deck. Left settings spacing is expanded.
+  The right deck omits a duplicate home view. Smaller iPad windows fall back to
+  the former single-deck layout.
+- The meter uses existing measured PCM RMS, observer leases and Reduce Motion;
+  it has no fabricated renderer data and no extra audio/UI timer. A stable empty
+  container allows metering to start before the first sample or Player opening.
+  Localized active system occlusions constrain the top/bottom separately;
+  container-sized bounding frames cannot locate an obstruction and are ignored.
+- Card shadows have 24 pt of additional outer clipping room in side layouts;
+  individual card content is still clipped to its rounded shape.
+
+Prior Debug simulator checks covered closed/open portrait Duo and open landscape
+Duo with real Navidrome playback. iPad Air 11-inch simulator checks covered both
+orientations and rotation during playback with live L/R meters. These do not
+constitute physical hardware or comprehensive Stage Manager certification.
+No synthetic fixture/sample levels remain in app code. Keep normal simulator
+signing when installing builds so existing connections retain Keychain access.
 
 Use the normal Release run without LLDB for listening. Do not put real server
 addresses, credentials, authenticated stream URLs or SOAP bodies in this log.

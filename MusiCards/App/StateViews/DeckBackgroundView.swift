@@ -191,7 +191,7 @@ struct DeckBackgroundView: View {
     #if os(iOS)
     private func iosHome(verticalDeckInset: CGFloat) -> some View {
         VStack(spacing: 0) {
-            VStack(spacing: compactDeckLayout ? 8 : 16) {
+            VStack(spacing: !showsExplorePrompt ? 24 : (compactDeckLayout ? 8 : 16)) {
                 Text("MusiCards")
                     .font(.largeTitle.weight(.bold))
                     .foregroundStyle(.primary)
@@ -209,7 +209,7 @@ struct DeckBackgroundView: View {
                         isShowingAbout = true
                     }
 
-                VStack(spacing: compactDeckLayout ? 8 : 14) {
+                VStack(spacing: !showsExplorePrompt ? 16 : (compactDeckLayout ? 8 : 14)) {
                     homePrompt("PLAYBACK SETUP")
 
                     Button {
@@ -242,7 +242,7 @@ struct DeckBackgroundView: View {
                     if let report = compatibilityReport {
                         homePrompt(report)
                             .multilineTextAlignment(.center)
-                            .padding(.top, compactDeckLayout ? 12 : 28)
+                            .padding(.top, !showsExplorePrompt ? 32 : (compactDeckLayout ? 12 : 28))
                     }
 
                     if let message = connectionMessage {

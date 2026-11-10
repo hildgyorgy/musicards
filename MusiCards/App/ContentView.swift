@@ -357,57 +357,60 @@ struct ContentView: View {
         )
     }
 
+    private func sideMeterLandscape() -> some View {
+        GeometryReader { fullViewport in
+            let isTablet = UIDevice.current.userInterfaceIdiom == .pad
+            let playerWidth = isTablet
+                ? fullViewport.size.width * 0.5
+                : min(466, fullViewport.size.width * 0.52)
+            HStack(spacing: 0) {
+                ScrollView {
+                    iosHome(showsExplorePrompt: false)
+                        .frame(height: fullViewport.size.height)
+                }
+                .environment(\.compactDeckLayout, true)
+                .frame(maxWidth: .infinity)
+
+                SideMeterDeckLayout(
+                    controller: appModel.playbackController,
+                    systemInsets: EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 84)
+                ) {
+                    iosDeck(safeAreaTop: 0, safeAreaBottom: 0, showsHome: false)
+                }
+                .frame(width: playerWidth)
+            }
+        }
+        .ignoresSafeArea(.container)
+        .background(boxBackground.ignoresSafeArea())
+    }
+
     @ViewBuilder
     private func iosPresentation(in viewport: GeometryProxy) -> some View {
-        #if DEBUG
-        if SideMeterDeckPreview.isEnabled,
-           UIDevice.current.userInterfaceIdiom == .phone,
-           SideMeterDeckPreview.supportsSideRail(in: viewport),
-           viewport.size.width > viewport.size.height,
-           viewport.size.height >= 520 {
-            GeometryReader { fullViewport in
-                let playerWidth = min(466, fullViewport.size.width * 0.52)
-                HStack(spacing: 0) {
-                    ScrollView {
-                        iosHome(showsExplorePrompt: false)
-                            .frame(height: fullViewport.size.height)
-                    }
-                    .environment(\.compactDeckLayout, true)
-                    .frame(maxWidth: .infinity)
+        let isTablet = UIDevice.current.userInterfaceIdiom == .pad
+        let supportsSideLayout = isTablet
+            ? viewport.size.width >= 700
+            : UIDevice.current.userInterfaceIdiom == .phone
+                && viewport.size.width >= 350
+                && SideMeterDeviceLayout.supportsSideRail(in: viewport)
 
-                    SideMeterDeckLayout(
-                        controller: appModel.playbackController,
-                        systemInsets: EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 84)
-                    ) {
-                        iosDeck(safeAreaTop: 0, safeAreaBottom: 0, showsHome: false)
-                    }
-                    .frame(width: playerWidth)
+        if supportsSideLayout, viewport.size.height >= 520 {
+            if viewport.size.width > viewport.size.height {
+                sideMeterLandscape()
+            } else {
+                SideMeterDeckLayout(
+                    controller: appModel.playbackController,
+                    systemInsets: viewport.safeAreaInsets
+                ) {
+                    iosDeck(safeAreaTop: 0, safeAreaBottom: 0)
                 }
+                .ignoresSafeArea(.container, edges: isTablet || viewport.safeAreaInsets.trailing >= 48
+                    ? [.horizontal, .bottom] : .all)
+                .background(boxBackground.ignoresSafeArea())
             }
-            .ignoresSafeArea(.container)
-            .background(boxBackground.ignoresSafeArea())
-        } else if SideMeterDeckPreview.isEnabled,
-           UIDevice.current.userInterfaceIdiom == .phone,
-           SideMeterDeckPreview.supportsSideRail(in: viewport),
-           viewport.size.height > viewport.size.width,
-           viewport.size.width >= 350, viewport.size.height >= 520 {
-            SideMeterDeckLayout(
-                controller: appModel.playbackController,
-                systemInsets: viewport.safeAreaInsets
-            ) {
-                iosDeck(safeAreaTop: 0, safeAreaBottom: 0)
-            }
-            .ignoresSafeArea(.container, edges: viewport.safeAreaInsets.trailing >= 48
-                ? [.horizontal, .bottom] : .all)
-            .background(boxBackground.ignoresSafeArea())
         } else {
             iosDeck(safeAreaTop: viewport.safeAreaInsets.top, safeAreaBottom: viewport.safeAreaInsets.bottom)
                 .ignoresSafeArea()
         }
-        #else
-        iosDeck(safeAreaTop: viewport.safeAreaInsets.top, safeAreaBottom: viewport.safeAreaInsets.bottom)
-            .ignoresSafeArea()
-        #endif
     }
     #endif
 

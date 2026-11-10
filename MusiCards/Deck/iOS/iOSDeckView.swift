@@ -110,7 +110,7 @@ struct DeckView<ID: Hashable, BackgroundContent: View, CollapsedHeaderContent: V
         GeometryReader { proxy in
             let phoneCardWidth = max(
                 0,
-                proxy.size.width - DeckStyle.horizontalInset * 2
+                proxy.size.width - (usesSideSignalMeter ? 8 : DeckStyle.horizontalInset) * 2
             )
 
             let padAvailableWidth = max(
@@ -122,13 +122,13 @@ struct DeckView<ID: Hashable, BackgroundContent: View, CollapsedHeaderContent: V
             )
 
             let cardWidth =
-                UIDevice.current.userInterfaceIdiom == .pad
+                UIDevice.current.userInterfaceIdiom == .pad && !usesSideSignalMeter
                 ? min(padAvailableWidth, DeckStyle.maximumPadCardWidth, proxy.size.height * 0.64)
                 : phoneCardWidth
             let isCompact = usesSideSignalMeter || (UIDevice.current.userInterfaceIdiom == .pad
                 && (proxy.size.width > proxy.size.height || proxy.size.height < 850))
 
-            let verticalDeckInset = DeckStyle.verticalDeckInset(
+            let verticalDeckInset = usesSideSignalMeter ? 0 : DeckStyle.verticalDeckInset(
                 viewportSize: proxy.size
             )
             let deckContainerHeight = max(
@@ -296,7 +296,9 @@ struct DeckView<ID: Hashable, BackgroundContent: View, CollapsedHeaderContent: V
                 height: proxy.size.height,
                 alignment: .topLeading
             )
-            .clipped()
+            // Side-by-side decks have room outside their layout frame for
+            // the card shadows. Keep clipping content, but preserve the halo.
+            .clipShape(Rectangle().inset(by: usesSideSignalMeter ? -24 : 0))
         }
     }
 
