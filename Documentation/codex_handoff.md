@@ -6,6 +6,18 @@ media URLs, private server addresses or signing material here.
 
 ## Current checkpoint — 2026-11-10
 
+- 2026-11-11: Portrait iPad/Duo home now shares landscape's spacious setup
+  spacing: 24-point name/logo/setup group gaps, 16-point setup item gaps and
+  32-point extra spacing before album statistics. Uses the existing side-meter
+  environment; conventional iPhone home retains its existing spacing.
+
+- Dark-mode active card outline now uses one uniform 0.7-point blue core
+  (opacity 0.92) and a soft blue shadow (opacity 0.38, radius 8) around the
+  whole perimeter. Removed the separate masked top-rim stroke and its extra
+  glow, which made the top corners appear heavier than the vertical edges.
+  Applies to the shared iOS/iPadOS/Duo card view. Generic iOS Release build
+  succeeded; visual approval on device remains with the user.
+
 - Removed automatic Search-card onboarding nudge from the shared iOS/iPadOS
   deck, including its task, sleeps, offset state and onAppear trigger. View
   recreation after rotation/reactivation must not restart automatic motion.

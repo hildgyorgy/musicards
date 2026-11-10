@@ -26,6 +26,7 @@ struct DeckBackgroundView: View {
     @Environment(\.colorScheme) private var colorScheme
     #if os(iOS)
     @Environment(\.compactDeckLayout) private var compactDeckLayout
+    @Environment(\.usesSideSignalMeter) private var usesSideSignalMeter
     #endif
     @State private var isShowingAbout = false
     @State private var isHoveringLogo = false
@@ -189,9 +190,14 @@ struct DeckBackgroundView: View {
     }
 
     #if os(iOS)
+    // Give the tablet/Duo home the same breathing room in both orientations.
+    private var usesSpaciousHomeLayout: Bool {
+        !showsExplorePrompt || usesSideSignalMeter
+    }
+
     private func iosHome(verticalDeckInset: CGFloat) -> some View {
         VStack(spacing: 0) {
-            VStack(spacing: !showsExplorePrompt ? 24 : (compactDeckLayout ? 8 : 16)) {
+            VStack(spacing: usesSpaciousHomeLayout ? 24 : (compactDeckLayout ? 8 : 16)) {
                 Text("MusiCards")
                     .font(.largeTitle.weight(.bold))
                     .foregroundStyle(.primary)
@@ -209,7 +215,7 @@ struct DeckBackgroundView: View {
                         isShowingAbout = true
                     }
 
-                VStack(spacing: !showsExplorePrompt ? 16 : (compactDeckLayout ? 8 : 14)) {
+                VStack(spacing: usesSpaciousHomeLayout ? 16 : (compactDeckLayout ? 8 : 14)) {
                     homePrompt("PLAYBACK SETUP")
 
                     Button {
@@ -242,7 +248,7 @@ struct DeckBackgroundView: View {
                     if let report = compatibilityReport {
                         homePrompt(report)
                             .multilineTextAlignment(.center)
-                            .padding(.top, !showsExplorePrompt ? 32 : (compactDeckLayout ? 12 : 28))
+                            .padding(.top, usesSpaciousHomeLayout ? 32 : (compactDeckLayout ? 12 : 28))
                     }
 
                     if let message = connectionMessage {
