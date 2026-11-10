@@ -56,6 +56,8 @@ struct DeckCardView<ID: Hashable, CollapsedHeaderContent: View, HeaderContent: V
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.compactDeckLayout) private var compactDeckLayout
+    @Environment(\.usesSideSignalMeter) private var usesSideSignalMeter
+    @Environment(\.deckCornerRadiusOverride) private var cornerRadiusOverride
 
     var cardBackground: Color {
         colorScheme == .dark
@@ -71,10 +73,10 @@ struct DeckCardView<ID: Hashable, CollapsedHeaderContent: View, HeaderContent: V
 
     private var cardShape: UnevenRoundedRectangle {
         UnevenRoundedRectangle(
-            topLeadingRadius: DeckStyle.topCornerRadius,
-            bottomLeadingRadius: bottomCornerRadius,
-            bottomTrailingRadius: bottomCornerRadius,
-            topTrailingRadius: DeckStyle.topCornerRadius,
+            topLeadingRadius: cornerRadiusOverride ?? DeckStyle.topCornerRadius,
+            bottomLeadingRadius: cornerRadiusOverride ?? bottomCornerRadius,
+            bottomTrailingRadius: cornerRadiusOverride ?? bottomCornerRadius,
+            topTrailingRadius: cornerRadiusOverride ?? DeckStyle.topCornerRadius,
             style: .continuous
         )
     }
@@ -153,8 +155,11 @@ struct DeckCardView<ID: Hashable, CollapsedHeaderContent: View, HeaderContent: V
                             content
                                 .environment(\.deckScrollsWholeCard, true)
                         }
-                        .padding(.top, DeckStyle.headerTopSpacing)
+                        .padding(.top, usesSideSignalMeter ? 0 : DeckStyle.headerTopSpacing)
                     }
+                    // Match the regular phone cover position while keeping the
+                    // scroll viewport below the card label (56 + 20 - 36 = 40).
+                    .padding(.top, usesSideSignalMeter ? -16 : 0)
                 } else {
                     Spacer().frame(height: DeckStyle.headerTopSpacing)
 

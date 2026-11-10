@@ -320,6 +320,97 @@ struct ContentView: View {
         }
     }
 
+    #if os(iOS)
+    private func iosHome(showsExplorePrompt: Bool = true) -> some View {
+        DeckBackgroundView(
+            localLibrary: appModel.localLibrary,
+            libraryManager: appModel.libraryManager,
+            navidromeConnection: appModel.navidromeConnection,
+            playbackController: appModel.playbackController,
+            rendererBrowser: appModel.rendererBrowser,
+            activeLibrarySource: $appModel.activeLibrarySource,
+            onSelectMusicFolder: { appModel.selectMusicFolder($0) },
+            onCreateOrUpdateLibraryIndex: { appModel.createOrUpdateLibraryIndex($0) },
+            onDisconnectLibrary: { appModel.disconnectMusicLibrary() },
+            showsExplorePrompt: showsExplorePrompt
+        )
+    }
+
+    private func iosDeck(safeAreaTop: CGFloat, safeAreaBottom: CGFloat, showsHome: Bool = true) -> some View {
+        DeckView(
+            cards: cards,
+            viewportSafeAreaTop: safeAreaTop,
+            viewportSafeAreaBottom: safeAreaBottom,
+            selection: $appModel.deckSelection,
+            showsCollapsedHeader: { card in
+                card.id == .player && appModel.hasCurrentPlaybackItem
+            },
+            collapsedHeaderProvider: { card in collapsedHeaderContent(card) },
+            headerProvider: { card in headerContent(card) },
+            contentProvider: { card in cardContent(card) },
+            background: {
+                ZStack {
+                    boxBackground
+                    if showsHome { iosHome() }
+                }
+            }
+        )
+    }
+
+    @ViewBuilder
+    private func iosPresentation(in viewport: GeometryProxy) -> some View {
+        #if DEBUG
+        if SideMeterDeckPreview.isEnabled,
+           UIDevice.current.userInterfaceIdiom == .phone,
+           SideMeterDeckPreview.supportsSideRail(in: viewport),
+           viewport.size.width > viewport.size.height,
+           viewport.size.height >= 520 {
+            GeometryReader { fullViewport in
+                let playerWidth = min(466, fullViewport.size.width * 0.52)
+                HStack(spacing: 0) {
+                    ScrollView {
+                        iosHome(showsExplorePrompt: false)
+                            .frame(height: fullViewport.size.height)
+                    }
+                    .environment(\.compactDeckLayout, true)
+                    .frame(maxWidth: .infinity)
+
+                    SideMeterDeckLayout(
+                        controller: appModel.playbackController,
+                        systemInsets: EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 84)
+                    ) {
+                        iosDeck(safeAreaTop: 0, safeAreaBottom: 0, showsHome: false)
+                    }
+                    .frame(width: playerWidth)
+                }
+            }
+            .ignoresSafeArea(.container)
+            .background(boxBackground.ignoresSafeArea())
+        } else if SideMeterDeckPreview.isEnabled,
+           UIDevice.current.userInterfaceIdiom == .phone,
+           SideMeterDeckPreview.supportsSideRail(in: viewport),
+           viewport.size.height > viewport.size.width,
+           viewport.size.width >= 350, viewport.size.height >= 520 {
+            SideMeterDeckLayout(
+                controller: appModel.playbackController,
+                systemInsets: viewport.safeAreaInsets
+            ) {
+                iosDeck(safeAreaTop: 0, safeAreaBottom: 0)
+            }
+            .ignoresSafeArea(.container, edges: viewport.safeAreaInsets.trailing >= 48
+                ? [.horizontal, .bottom] : .all)
+            .background(boxBackground.ignoresSafeArea())
+        } else {
+            iosDeck(safeAreaTop: viewport.safeAreaInsets.top, safeAreaBottom: viewport.safeAreaInsets.bottom)
+                .ignoresSafeArea()
+        }
+        #else
+        iosDeck(safeAreaTop: viewport.safeAreaInsets.top, safeAreaBottom: viewport.safeAreaInsets.bottom)
+            .ignoresSafeArea()
+        #endif
+    }
+    #endif
+
     var body: some View {
         ZStack {
             #if os(macOS)
@@ -365,47 +456,7 @@ struct ContentView: View {
 
             #else
                 GeometryReader { viewportProxy in
-                    DeckView(
-                        cards: cards,
-                        viewportSafeAreaTop: viewportProxy.safeAreaInsets.top,
-                        viewportSafeAreaBottom: viewportProxy.safeAreaInsets.bottom,
-                        selection: $appModel.deckSelection,
-                        showsCollapsedHeader: { card in
-                            card.id == .player && appModel.hasCurrentPlaybackItem
-                        },
-                        collapsedHeaderProvider: { card in
-                            collapsedHeaderContent(card)
-                        },
-                        headerProvider: { card in
-                            headerContent(card)
-                        },
-                        contentProvider: { card in
-                            cardContent(card)
-                        },
-                        background: {
-                            ZStack {
-                                boxBackground
-                                DeckBackgroundView(
-                                    localLibrary: appModel.localLibrary,
-                                    libraryManager: appModel.libraryManager,
-                                    navidromeConnection: appModel.navidromeConnection,
-                                    playbackController: appModel.playbackController,
-                                    rendererBrowser: appModel.rendererBrowser,
-                                    activeLibrarySource: $appModel.activeLibrarySource,
-                                    onSelectMusicFolder: { url in
-                                        appModel.selectMusicFolder(url)
-                                    },
-                                    onCreateOrUpdateLibraryIndex: { url in
-                                        appModel.createOrUpdateLibraryIndex(url)
-                                    },
-                                    onDisconnectLibrary: {
-                                        appModel.disconnectMusicLibrary()
-                                    }
-                                )
-                            }
-                        }
-                    )
-                    .ignoresSafeArea()
+                    iosPresentation(in: viewportProxy)
                 }
             #endif
 

@@ -3,3 +3,6 @@ DerivedData/
 xcuserdata/
 *.xcuserstate
 .DS_Store
+
+# Local source export for external code reviews, not an application asset.
+/musicards.zip

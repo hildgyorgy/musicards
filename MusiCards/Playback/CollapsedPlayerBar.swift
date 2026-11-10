@@ -18,6 +18,7 @@ struct CollapsedPlayerBar: View {
     @State private var scrubPosition: TimeInterval = 0
     @State private var isScrubbing = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.usesSideSignalMeter) private var usesSideSignalMeter
 
     init(
         controller: PlaybackController,
@@ -105,7 +106,7 @@ struct CollapsedPlayerBar: View {
                         .accessibilityLabel(
                             "Output: \(controller.outputDisplayName)"
                         )
-                } else if !isPlaceholder && !showsOutputStatus && !reduceMotion,
+                } else if !isPlaceholder && !showsOutputStatus && !reduceMotion && !usesSideSignalMeter,
                           controller.externalOutputDisplayName == nil,
                           let levels = controller.signalLevels {
                     PlaybackSignalMeter(
@@ -282,39 +283,6 @@ struct CollapsedPlayerBar: View {
     private let idleSeekHeight: CGFloat = 3
     private let activeSeekHeight: CGFloat = 7
     #endif
-}
-
-/// Two quiet, decorative RMS rows. This view has no timer or audio ownership.
-private struct PlaybackSignalMeter: View, Animatable {
-    var left: Double
-    var right: Double
-
-    var animatableData: AnimatablePair<Double, Double> {
-        get { AnimatablePair(left, right) }
-        set { left = newValue.first; right = newValue.second }
-    }
-
-    var body: some View {
-        Canvas { context, size in
-            let count = 32
-            let step = min(6, size.width / CGFloat(count))
-            let diameter = min(2.3, step * 0.6)
-            for (row, level) in [left, right].enumerated() {
-                for dot in 0..<count {
-                    let lit = level > Double(dot) / Double(count)
-                    let color = lit
-                        ? (dot >= count - 3 ? Color.red : Color.accentColor)
-                        : Color.secondary.opacity(0.12)
-                    let rect = CGRect(
-                        x: CGFloat(dot) * step,
-                        y: CGFloat(row) * 5,
-                        width: diameter, height: diameter
-                    )
-                    context.fill(Path(ellipseIn: rect), with: .color(color))
-                }
-            }
-        }
-    }
 }
 
 #if os(macOS)

@@ -13,6 +13,10 @@ private struct CompactDeckLayoutKey: EnvironmentKey {
     static let defaultValue = false
 }
 
+private struct DeckCornerRadiusOverrideKey: EnvironmentKey {
+    static let defaultValue: CGFloat? = nil
+}
+
 private struct DeckVisibleContentHeightKey: EnvironmentKey {
     static let defaultValue: CGFloat = 0
 }
@@ -22,6 +26,10 @@ private struct DeckScrollsWholeCardKey: EnvironmentKey {
 }
 
 extension EnvironmentValues {
+    var deckCornerRadiusOverride: CGFloat? {
+        get { self[DeckCornerRadiusOverrideKey.self] }
+        set { self[DeckCornerRadiusOverrideKey.self] = newValue }
+    }
     var compactDeckLayout: Bool {
         get { self[CompactDeckLayoutKey.self] }
         set { self[CompactDeckLayoutKey.self] = newValue }
@@ -48,6 +56,7 @@ struct DeckView<ID: Hashable, BackgroundContent: View, CollapsedHeaderContent: V
     let viewportSafeAreaTop: CGFloat
     let viewportSafeAreaBottom: CGFloat
     @Binding var selection: DeckSelection<ID>
+    @Environment(\.usesSideSignalMeter) private var usesSideSignalMeter
 
     private var activeSlotIndex: Int {
         selection.activeSlotIndex
@@ -116,8 +125,8 @@ struct DeckView<ID: Hashable, BackgroundContent: View, CollapsedHeaderContent: V
                 UIDevice.current.userInterfaceIdiom == .pad
                 ? min(padAvailableWidth, DeckStyle.maximumPadCardWidth, proxy.size.height * 0.64)
                 : phoneCardWidth
-            let isCompact = UIDevice.current.userInterfaceIdiom == .pad
-                && (proxy.size.width > proxy.size.height || proxy.size.height < 850)
+            let isCompact = usesSideSignalMeter || (UIDevice.current.userInterfaceIdiom == .pad
+                && (proxy.size.width > proxy.size.height || proxy.size.height < 850))
 
             let verticalDeckInset = DeckStyle.verticalDeckInset(
                 viewportSize: proxy.size

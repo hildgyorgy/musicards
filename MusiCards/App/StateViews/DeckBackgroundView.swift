@@ -21,6 +21,7 @@ struct DeckBackgroundView: View {
     let onDisconnectLibrary: (() -> Void)?
     let onShowAbout: (() -> Void)?
     let onShowLibraryConnection: (() -> Void)?
+    let showsExplorePrompt: Bool
 
     @Environment(\.colorScheme) private var colorScheme
     #if os(iOS)
@@ -43,7 +44,8 @@ struct DeckBackgroundView: View {
         onCreateOrUpdateLibraryIndex: ((URL) -> Void)? = nil,
         onDisconnectLibrary: (() -> Void)? = nil,
         onShowAbout: (() -> Void)? = nil,
-        onShowLibraryConnection: (() -> Void)? = nil
+        onShowLibraryConnection: (() -> Void)? = nil,
+        showsExplorePrompt: Bool = true
     ) {
         self.localLibrary = localLibrary
         self.libraryManager = libraryManager
@@ -56,6 +58,7 @@ struct DeckBackgroundView: View {
         self.onDisconnectLibrary = onDisconnectLibrary
         self.onShowAbout = onShowAbout
         self.onShowLibraryConnection = onShowLibraryConnection
+        self.showsExplorePrompt = showsExplorePrompt
     }
 
     var body: some View {
@@ -256,11 +259,13 @@ struct DeckBackgroundView: View {
 
             Spacer(minLength: 24)
 
-            homePrompt("TO EXPLORE:")
-                .padding(
-                    .bottom,
-                    explorePromptBottomInset + verticalDeckInset
-                )
+            if showsExplorePrompt {
+                homePrompt("TO EXPLORE:")
+                    .padding(
+                        .bottom,
+                        explorePromptBottomInset + verticalDeckInset
+                    )
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .sheet(isPresented: $isShowingAbout) {

@@ -4,22 +4,137 @@ Living handoff for continuing on another Mac. Git and the user's latest
 instructions take precedence. Never commit passwords, tokens, authenticated
 media URLs, private server addresses or signing material here.
 
-## Current checkpoint — 2026-11-06
+## Current checkpoint — 2026-11-09
 
-- Branch: main; last committed checkpoint: cba4d7c (ui). It includes the original
-  VU/UI update; 673e02a (refine) includes the earlier five review fixes.
-- At session start main matched the local origin/main reference. No fetch was
-  performed; this does not assert the live remote state.
+- Branch: main; latest committed application checkpoint: **7cb3185**
+  (`server settings refine`). The user subsequently removed the source-export
+  archive in **d9bb868** (`Delete musicards.zip`). Playback safety changes are
+  already committed in **84d52c7** (`polish`); they are not pending work.
+- The working tree was clean before this small release cleanup. The cleanup
+  updates this handoff, removes macOS-only plist noise and adds a narrow ignore
+  rule for future root-level `musicards.zip` exports. Read Git for its eventual
+  commit. No fetch was performed; this does not assert the live remote/push state.
 - Main project: **2.2, build 11**. The user submitted 2.1; current App Store
   availability has not been rechecked. Project version does not prove publication.
-- The iPad landscape override was removed intentionally and is committed.
-  **Portrait-only iPad is intentional; preserve this change.**
+- **iPad now intentionally supports all four orientations.** This supersedes
+  the November 6 portrait-only decision. Do not restore that restriction or add
+  UIRequiresFullScreen. iPhone keeps its existing portrait orientations.
+- The full `Tools/verify.sh` passed on the committed November 9 application:
+  **261 main-app macOS tests, generic iOS device build and 62 Sync tests**.
+  Organizer archive/signing validation and a physical AVM retest remain pending.
 - Shared scheme Run uses Release without LLDB intentionally. The user did not
   reproduce crackles outside Xcode. Audio System Trace showed deadline misses
   with debugger involvement; the exact mechanism was not proven. Temporary
   traces/exports were deleted at the user's request.
 
 Start with `git status --short --branch` and `git log -5 --oneline`.
+
+### November 9 application changes — committed in 7cb3185
+
+- Navidrome has explicit not-configured/checking/local/remote/unavailable states.
+  Prefer a reachable local address, otherwise remote. A saved profile alone
+  does not authorize renderer playback. Startup, foregrounding, SOURCE opening
+  and NWPathMonitor network changes recheck reachability; concurrent checks
+  share work and late/cancelled responses cannot restore old state.
+- Playback reuses a verified endpoint between network/foreground checks instead
+  of probing a failed local address before every remote track. On an endpoint
+  change, the next explicit Play rebuilds the remote preparation and preserves
+  the current seek position when supported. No automatic speaker fallback.
+- **UPnP requires an active verified local Navidrome connection.** Remote-only
+  setup supports system audio only. The renderer never receives the remote URL
+  as fallback. Loss of local connectivity pauses active renderer playback;
+  explicitly choose System audio to play on the controlling device instead.
+  This is a deliberate product policy, not a claim that HTTPS is unsafe.
+- SOURCE shows blue **ACTIVE** beside the actual local or remote address's
+  heading. No active badge is shown while checking, unavailable or when that
+  address has unsaved edits. Reconnect is available after failed reachability.
+- A combined library artist credit resolves the searched credited artist using
+  MusicBrainz release credits/artist IDs, never comma splitting or the first
+  fuzzy artist result. The user confirmed the Steve Khan example works.
+- Discography arrows use verified Release-to-Release-group MBID membership,
+  not album-title equality. Metadata requests cover the selected artist's owned
+  candidates in batches of 25, share the MusicBrainz rate limiter, and cache
+  successful results in memory. Ownership always follows the active provider.
+- iPad landscape/short windows keep a centered deck whose width is also bounded
+  by viewport height. Compact Release artwork is height-limited, and its header
+  and metadata scroll together. Home spacing is smaller in compact layouts.
+  Real SwiftUI/UIKit release views were rendered on an iPad simulator at
+  1180x820, 1133x744 and 820x1180 with a synthetic cover. The temporary rendering
+  harness was removed. This was not a full interactive iPad/Stage Manager test.
+  The user found landscape much improved; a separate iPad redesign is deferred.
+
+### Next session — office AVM check before 2.2 submission
+
+Separate optional Duo experiment: Debug builds can enable
+`MUSICARDS_SIDE_METER_PREVIEW=1` in the Run environment. ContentView then uses
+SideMeterDeckLayout only in portrait phone viewports with a substantial trailing
+system safe-area strip (at least 48 pt) or a fold division reported by
+reservedRegions (including inactive divisions on the open display), plus
+sufficient width and height. The flag
+alone must not change ordinary iPhone or iPad layouts. This presents a narrow deck
+and a vertical stereo dot meter alongside every card, including the collapsed
+Player, so playback remains visible while browsing. The deck starts 12 pt lower
+and extends into the bottom safe area with its normal 8 pt bottom margin.
+Open portrait Duo additionally extends above the top safe area, keeping an
+8 pt top inset. Its card corner radius uses the public iOS 27
+GeometryProxy.concentricCornerRadii(in:) result for the inset card frame
+(top-leading radius applied consistently to all four card corners), falling
+back to the existing deck radii if the system supplies no result. Closed Duo
+keeps its previous 12 pt top offset and corner treatment.
+Open landscape Duo uses a shared full-window background, the existing iOS
+home/settings view on the left (without TO EXPLORE), and a closed-phone-sized
+deck plus 84 pt meter rail on the right (at most 466 pt combined). The right
+deck omits its duplicate home view. ContentView reuses iosHome and iosDeck;
+SOURCE/OUTPUT sheets use the existing controls and connection models.
+A Debug-only UIApplicationDelegate permits all orientations only when the
+preview flag is enabled and UIKit reports a fold division on the window.
+Ordinary phone orientation masks and Release builds are unchanged.
+Landscape was inspected on the open Duo simulator with real playback and a
+live meter; playback was paused afterward. The prototype remains opt-in.
+In this side-meter layout the Release cover fills the content width, while
+the entire header and metadata still scroll together; the compact iPad cover
+limit remains in place outside the experiment.
+The rail uses at least 16% of the available width on the larger open display;
+the deck fills the remaining width. The rail reuses
+the system's trailing safe-area strip, below the occlusion regions reported by
+GeometryProxy.reservedRegions on iOS 27.1+, rather than shrinking the deck by
+another strip inside the safe area. The same
+PlaybackSignalMeter renders both orientations using existing measured RMS;
+native-only metering, observer leases and Reduce Motion are retained. The
+horizontal meter is hidden while the side display is used. Release builds
+do not enable this presentation. The revised layout was inspected on the Duo
+simulator's outer display with real Navidrome playback and a live side meter;
+playback was paused after the check. The open portrait display was also checked
+with real playback: side rail, full-width cover and live vertical meter. It uses
+the same whole-card release ScrollView; automated scrolling gestures were not
+conclusive. Comprehensive folding-transition testing remains outstanding.
+The meter has a stable transparent container before the first RMS value, so its
+onAppear acquires a metering lease without first opening the expanded Player.
+An earlier static synthetic-data fixture was removed; no sample levels remain
+in the app. Use the project's normal simulator signing when installing test
+builds so the existing saved connection can still access its Keychain entry.
+
+Use the normal Release run without LLDB for listening. Do not put real server
+addresses, credentials, authenticated stream URLs or SOAP bodies in this log.
+
+1. On the office LAN, open SOURCE: the local address should show ACTIVE with
+   local-only or dual-address setup. Select the AVM in OUTPUT and start an album.
+2. Check Play/Pause/resume, seek, volume/mute, previous/next and natural track
+   transitions. Confirm the displayed track/output follows the actual playback.
+3. Lock the iPhone and let several tracks finish. Earlier AVM/Macast successes
+   predate November 9 endpoint changes and do not certify the new build.
+4. With remote-only setup, verify remote ACTIVE and System audio playback;
+   UPnP selection/playback must be unavailable. With both addresses, test
+   local -> remote -> local as network/VPN reachability changes. A lost AVM
+   connection must not start playback on the phone/Mac speakers automatically.
+5. If neither address is reachable, neither address gets ACTIVE. Reconnect
+   should recover after connectivity returns. Test a restart away from the LAN.
+6. If possible, check iPad landscape and reduced window sizes for reachable
+   controls/content. Visual perfection is deferred; inaccessible controls are not.
+
+After these checks, confirm build 11 is unused for App Store version 2.2 (raise
+it if already uploaded), archive Release, and validate signing/provisioning in
+Organizer. The unsigned verification script cannot perform Store validation.
 
 ### Player UI update — 2026-11-06
 
@@ -38,7 +153,7 @@ display scale and pause/renderer/queue transitions. This update is in cba4d7c.
 The full `Tools/verify.sh` run passed on 2026-11-06: main macOS tests, generic
 iOS device build and all 62 Sync tests.
 
-### Playback safety and testability update — 2026-11-06 (uncommitted)
+### Playback safety and testability update — 2026-11-06 (committed in 84d52c7)
 
 - FLAC bridge initialization requires all callbacks and a live context, rejects
   repeat initialization before changing callback/context pointers, and leaves
@@ -74,7 +189,7 @@ iOS device build and all 62 Sync tests.
   This removes real Cover Art Archive traffic from the barcode pagination test,
   which had exceeded its one-second polling allowance in a full run.
 
-Verification: complete Tools/verify.sh passed (main macOS suite, generic iOS
+Historical verification: complete Tools/verify.sh passed (main macOS suite, generic iOS
 device build, 62 Sync tests). All 23 targeted core/renderer/FLAC tests passed
 with Address Sanitizer, including the final per-session feeder identity.
 All 36 focused core/renderer/controller tests also passed with Thread Sanitizer;
@@ -97,8 +212,9 @@ VU visibility/background transitions; no physical AVM was used in this session.
   connection work; sheet dismissal alone does not.
 - Navidrome supplies catalog and MBIDs without library.json. SOURCE holds one
   account with optional local-network and remote HTTPS addresses, at least one
-  required. Prefer reachable local, otherwise remote; renderers receive local
-  when present. One unverified endpoint can be retained if the other verifies.
+  required. Prefer reachable local, otherwise remote; renderers require an
+  active verified local connection, with no remote fallback. One unverified
+  endpoint can be retained if the other verifies.
 - System audio follows OS-selected speakers, USB DAC, Bluetooth or AirPlay.
   Route display is reactive. Names use normal case consistently; expanded
   source/output metadata use one line each. Never fabricate output bit depth.
@@ -147,20 +263,18 @@ Regression tests cover disguised/public hosts, renderer stream validation,
 hostile device/service URLs, same-host different ports, real loopback redirects,
 Pause/Play/Stop during suspended seek, superseded seeks, concurrent C reset/render
 and early renderer Stop. Existing natural-end/SetNext tests must remain green.
-These five fixes are committed; the later safety changes above remain uncommitted.
+These five fixes and the later playback safety changes above are committed.
 
 ## Verification
 
 Run `./Tools/verify.sh`: whitespace, main macOS tests, generic iOS device build
 without signing, then Sync macOS tests. It does not run iOS tests or validate
-Store provisioning. The complete script passed on 2026-11-02 after the review
-fixes: 229 main-app macOS tests, the generic iOS device build and 62 Sync tests.
-After the final numeric-host hardening, Navidrome/discovery tests and the iOS
-build passed again. The seven final audio callback/transport-coordination tests
-also passed, including the additional Pause-during-replay regression.
-
-Xcode warns that the installed CoreSimulator service is older than its framework.
-macOS tests and generic iOS device builds work; do not claim simulator validation.
+Store provisioning. The latest full run on 2026-11-09 passed all 261 main-app
+macOS tests, the generic iOS device build and all 62 Sync tests. The earlier
+November 6 sanitizer results are historical; sanitizers were not rerun for the
+November 9 UI/endpoint changes. iPad simulator build/render validation worked
+on November 9; do not confuse the limited size fixtures with a full interactive
+landscape, Split View or Stage Manager test.
 
 Manual follow-up: seek → Pause, paused seek → Play, rapid seeks, output switching,
 early renderer Stop and normal track transitions on physical Apple devices and

@@ -19,7 +19,14 @@ struct ReleaseHeaderView: View {
     @Environment(\.openURL) private var openURL
     #if os(iOS)
     @Environment(\.compactDeckLayout) private var compactDeckLayout
+    @Environment(\.usesSideSignalMeter) private var usesSideSignalMeter
     @Environment(\.deckVisibleContentHeight) private var visibleContentHeight
+
+    private var compactCoverSize: CGFloat? {
+        compactDeckLayout && !usesSideSignalMeter
+            ? min(200, visibleContentHeight * 0.45)
+            : nil
+    }
     #endif
     
     var body: some View {
@@ -30,8 +37,8 @@ struct ReleaseHeaderView: View {
                     .resizable()
                     .aspectRatio(1, contentMode: .fit)
                     .frame(
-                        width: compactDeckLayout ? min(200, visibleContentHeight * 0.45) : nil,
-                        height: compactDeckLayout ? min(200, visibleContentHeight * 0.45) : nil
+                        width: compactCoverSize,
+                        height: compactCoverSize
                     )
                     .cornerRadius(12)
                     .shadow(
