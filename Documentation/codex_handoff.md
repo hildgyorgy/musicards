@@ -4,19 +4,29 @@ Living handoff for continuing on another Mac. Git and the user's latest
 instructions take precedence. Never commit passwords, tokens, authenticated
 media URLs, private server addresses or signing material here.
 
-## Current checkpoint — 2026-11-10
+## Current checkpoint — 2026-11-11
 
-- 2026-11-11: Portrait iPad/Duo home now shares landscape's spacious setup
+- Machine-switch checkpoint: branch `main`, latest app/UI commit **15bfd20**
+  (`ui`), preceded by **0a2064b** (`ui polish`) and **877184b**
+  (`iphone duo  & ipad ui polish`). Working tree was clean before this handoff
+  refresh. HEAD matched the locally recorded origin/main (0 ahead / 0 behind);
+  no fetch was performed, so this does not independently verify the live remote.
+  This handoff refresh still needs committing/pushing before switching Macs.
+  On the other Mac, pull and inspect Git before editing; continue from this
+  checkpoint rather than repeating the completed UI fixes.
+
+- Portrait iPad/Duo home now shares landscape's spacious setup
   spacing: 24-point name/logo/setup group gaps, 16-point setup item gaps and
   32-point extra spacing before album statistics. Uses the existing side-meter
-  environment; conventional iPhone home retains its existing spacing.
+  environment; conventional iPhone home retains its existing spacing. Generic
+  iOS Release build succeeded after this final spacing change.
 
 - Dark-mode active card outline now uses one uniform 0.7-point blue core
   (opacity 0.92) and a soft blue shadow (opacity 0.38, radius 8) around the
   whole perimeter. Removed the separate masked top-rim stroke and its extra
   glow, which made the top corners appear heavier than the vertical edges.
   Applies to the shared iOS/iPadOS/Duo card view. Generic iOS Release build
-  succeeded; visual approval on device remains with the user.
+  succeeded; the user visually approved the neon effect ("Nagyon szép!").
 
 - Removed automatic Search-card onboarding nudge from the shared iOS/iPadOS
   deck, including its task, sleeps, offset state and onAppear trigger. View
@@ -35,7 +45,7 @@ media URLs, private server addresses or signing material here.
   summary/availability through LibraryManager, password-only re-verification,
   and disconnect clearing the catalog. No real credentials were used in tests.
   Full Tools/verify.sh passed afterward: 262 main-app tests, iOS build and
-  62 Sync tests. Physical first-connect confirmation remains for the user.
+  62 Sync tests. User confirmed the catalog refresh fix ("Perfekt").
 
 - SOURCE keyboard regression fixed: the iOS root GeometryReader now ignores
   the keyboard bottom safe area, so keyboard appearance cannot alter the
@@ -45,11 +55,11 @@ media URLs, private server addresses or signing material here.
   address and showing the software keyboard (SOURCE disappeared). Afterward,
   a Release simulator build kept the sheet open in portrait and landscape;
   local address typing/deletion and remote/username/password focus were checked.
-  No credentials or connection changes were saved. Physical iPad confirmation
-  of the reported case remains for the user.
+  No credentials or connection changes were saved. User confirmed this fix
+  ("Szupi!") and later confirmed removal of the automatic nudge ("Works!!!").
 
-- Latest local commit: **ea30c09** (`iphone duo`). The following iPad redesign
-  is pending in the working tree; no commit or push was made for it.
+- The iPad/Duo production redesign below is committed in **877184b**, with
+  subsequent fixes/UI polish included through **15bfd20**.
 - iPad at available sizes of at least 700x520 now uses the shared
   `SideMeterDeckLayout.swift` in Debug and Release, without the Duo debug flag.
   Portrait: wide left deck, full-content-width Release cover and whole-card
@@ -59,8 +69,8 @@ media URLs, private server addresses or signing material here.
   Smaller windows retain the former single-deck fallback.
   Ordinary iPhone presentation stays unchanged; Duo is now enabled in Release too.
 - Landscape home/settings spacing is expanded on both iPad and Duo, through
-  the existing `showsExplorePrompt == false` panel mode. Other home views keep
-  their spacing. Side-meter decks allow 24 pt around their outer clipping bounds
+  the existing `showsExplorePrompt == false` panel mode. Portrait side-meter
+  home views now share that spacing as described above. Side-meter decks allow 24 pt around their outer clipping bounds
   for the shadow halo; individual card content remains clipped to its shape.
   This avoids cutting off shadows at the 8 pt inner deck margin. Visually checked
   in landscape on the iPad Air simulator; no test audio was started for this pass.
