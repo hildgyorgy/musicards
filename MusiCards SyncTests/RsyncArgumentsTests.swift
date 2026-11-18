@@ -14,6 +14,8 @@ final class RsyncArgumentsTests: XCTestCase {
         XCTAssertTrue(arguments.contains("--delete-excluded"))
         XCTAssertTrue(arguments.contains("--iconv=UTF-8-MAC,UTF-8"))
         XCTAssertTrue(arguments.contains("--secluded-args"))
+        XCTAssertTrue(arguments.contains("--8-bit-output"))
+        XCTAssertEqual(Array(arguments.suffix(3)).first, "--")
         XCTAssertTrue(arguments.contains("--timeout=30"))
         XCTAssertTrue(
             arguments.contains(where: {

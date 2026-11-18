@@ -115,7 +115,7 @@ actor OpenSubsonicClient: NavidromeIdentifying {
     private func response<Response: Decodable>(
         for request: URLRequest
     ) async throws -> Response {
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await session.data(for: request, delegate: NavidromeRedirectPolicy())
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NavidromeConnectionError.invalidResponse

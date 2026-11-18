@@ -7,6 +7,7 @@ nonisolated final class RsyncOutputState: @unchecked Sendable {
     private var completeOutput = ""
     private var recentOutput = ""
     private var pendingText = ""
+    private var pendingBytes = Data()
     private var ignoresLeadingLineFeed = false
 
     init(capturesCompleteOutput: Bool = true) {
@@ -14,9 +15,27 @@ nonisolated final class RsyncOutputState: @unchecked Sendable {
     }
 
     func append(_ chunk: String) -> [String] {
+        append(Data(chunk.utf8))
+    }
+
+    func append(_ data: Data) -> [String] {
         lock.lock()
         defer { lock.unlock() }
 
+        // CR/LF bytes cannot occur inside a UTF-8 scalar. Keep any unfinished
+        // line as bytes so a pipe read splitting ő/ű (or emoji) remains lossless.
+        pendingBytes.append(data)
+        guard let separator = pendingBytes.lastIndex(where: { $0 == 10 || $0 == 13 }) else {
+            return []
+        }
+        let end = pendingBytes.index(after: separator)
+        let chunk = String(decoding: pendingBytes[..<end], as: UTF8.self)
+        pendingBytes.removeSubrange(..<end)
+        return appendDecoded(chunk)
+    }
+
+    // Called only while holding lock.
+    private func appendDecoded(_ chunk: String) -> [String] {
         if capturesCompleteOutput {
             completeOutput += chunk
         }
@@ -67,6 +86,11 @@ nonisolated final class RsyncOutputState: @unchecked Sendable {
     ) {
         lock.lock()
         defer { lock.unlock() }
+
+        if !pendingBytes.isEmpty {
+            _ = appendDecoded(String(decoding: pendingBytes, as: UTF8.self))
+            pendingBytes.removeAll()
+        }
 
         let finalLine = pendingText.isEmpty
             ? nil
@@ -333,6 +357,7 @@ nonisolated final class SyncEngine {
     ) throws -> String {
 
         try validateRemoteConfiguration(configuration)
+        try SyncConfigurationValidator().validate(configuration)
 
         guard
             let rsyncExecutableURL,
@@ -389,15 +414,11 @@ nonisolated final class SyncEngine {
             let data = handle.availableData
 
             guard !data.isEmpty else {
+                handle.readabilityHandler = nil
                 return
             }
 
-            let chunk = String(
-                decoding: data,
-                as: UTF8.self
-            )
-
-            let lines = outputState.append(chunk)
+            let lines = outputState.append(data)
 
             if !lines.isEmpty {
                 onOutput(lines)
@@ -428,9 +449,7 @@ nonisolated final class SyncEngine {
             pipeReadLock.unlock()
 
             if !remainingData.isEmpty {
-                let remainingChunk = String(decoding: remainingData, as: UTF8.self)
-
-                let remainingLines = outputState.append(remainingChunk)
+                let remainingLines = outputState.append(remainingData)
                 if !remainingLines.isEmpty {
                     onOutput(remainingLines)
                 }
@@ -542,6 +561,7 @@ nonisolated final class SyncEngine {
         var arguments: [String] = [
             "-av",
             "--itemize-changes",
+            "--8-bit-output",
             "--delete",
             "--delete-excluded",
             "--iconv=UTF-8-MAC,UTF-8",
@@ -580,6 +600,7 @@ nonisolated final class SyncEngine {
             arguments.append("--outbuf=L")
         }
 
+        arguments.append("--")
         arguments.append(configuration.sourcePath)
         arguments.append(
             try configuration.destination.validatedRemoteDestination()
@@ -596,6 +617,7 @@ nonisolated final class SyncEngine {
             "-a",
             "--delete",
             "--itemize-changes",
+            "--8-bit-output",
             "--iconv=UTF-8-MAC,UTF-8",
             "--secluded-args",
             "--include=/\(LocalLibraryManifestLoader.fileName)",
@@ -618,6 +640,7 @@ nonisolated final class SyncEngine {
         let sourcePath = emptySourcePath.hasSuffix("/")
             ? emptySourcePath
             : emptySourcePath + "/"
+        arguments.append("--")
         arguments.append(sourcePath)
         arguments.append(try configuration.destination.validatedRemoteDestination())
         return arguments
@@ -629,6 +652,7 @@ nonisolated final class SyncEngine {
         var arguments: [String] = [
             "-a",
             "--itemize-changes",
+            "--8-bit-output",
             "--iconv=UTF-8-MAC,UTF-8",
             "--secluded-args",
             "--out-format=%i|%n|%b",
@@ -650,6 +674,7 @@ nonisolated final class SyncEngine {
             fileURLWithPath: configuration.sourcePath,
             isDirectory: true
         ).appendingPathComponent(LocalLibraryManifestLoader.fileName)
+        arguments.append("--")
         arguments.append(sourceURL.path)
         arguments.append(try configuration.destination.validatedRemoteDestination())
         return arguments

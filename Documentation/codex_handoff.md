@@ -4,6 +4,38 @@ Living handoff for continuing on another Mac. Git and the user's latest
 instructions take precedence. Never commit passwords, tokens, authenticated
 media URLs, private server addresses or signing material here.
 
+## Targeted review fixes — 2026-11-18 (working tree)
+
+- Reviewed Claude's release review against current code; implemented only the
+  agreed small fixes. No audio transport rewrite, Keychain migration, SSH pairing
+  redesign, commit, version bump or upload was performed.
+- Authenticated OpenSubsonic API and HTTP range requests now use a per-task
+  NavidromeRedirectPolicy: same scheme/host/effective port only, no embedded URL
+  credentials. HTTPS downgrade and cross-origin redirects are rejected. CAA and
+  other unrelated sessions are unchanged. Loopback tests exercise real 307/308
+  responses through both API and range-loader production paths.
+- Sync retains incomplete output lines as bytes until CR/LF or EOF, preserving
+  UTF-8 scalars split between pipe reads. Tests cover every split boundary and
+  one-byte reads, CRLF, unterminated lines and recent-only output. EOF disables
+  the pipe readability handler. All three rsync argument builders use literal
+  8-bit output and an explicit option terminator before source/destination.
+- Sync rejects filesystem/container roots, user home roots and system trees;
+  local symlinks are resolved, remote dot components normalized without using
+  this Mac's symlinks. Dedicated music folders and external volume destinations
+  remain allowed. Validation also runs immediately before starting rsync.
+  This is a conservative path guard, not remote symlink verification or a
+  preview-bound deletion budget; those remain separate work.
+- Verification passed: **264 main-app macOS tests**, generic unsigned iOS build,
+  **69 Sync tests** including a real bundled-rsync preview/copy of a Hungarian
+  accented filename into a disposable destination. No physical Navidrome/AVM
+  smoke test or signing/archive validation was performed in this pass. Existing
+  test compiler warnings are unchanged.
+- Additional pre-existing limitation discovered by the new copy fixture: this
+  Mac's UTF-8-MAC -> UTF-8 iconv rejects a musical emoji in a filename (also
+  reproduced directly with /usr/bin/iconv). The existing rsync --iconv setting
+  was retained; Hungarian accented names copy successfully. Decoder tests
+  include emoji, but actual emoji filename transfer needs a separate solution.
+
 ## Release cleanup — 2026-11-18 (working tree)
 
 - Cleanup was performed on top of `73d041c`. Existing edits to the expanded

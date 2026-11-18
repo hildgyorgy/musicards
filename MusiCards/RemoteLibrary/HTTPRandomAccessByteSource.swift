@@ -69,7 +69,7 @@ nonisolated final class URLSessionHTTPRangeLoader: HTTPRangeLoading,
         )
         request.cachePolicy = .reloadIgnoringLocalCacheData
 
-        let (bytes, response) = try await session.bytes(for: request)
+        let (bytes, response) = try await session.bytes(for: request, delegate: NavidromeRedirectPolicy())
         defer { bytes.task.cancel() }
         guard let response = response as? HTTPURLResponse else {
             throw HTTPRandomAccessByteSourceError.invalidHTTPResponse

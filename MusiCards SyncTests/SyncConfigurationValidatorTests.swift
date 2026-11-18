@@ -6,6 +6,49 @@ final class SyncConfigurationValidatorTests: XCTestCase {
         directoryExists: { _ in true }
     )
 
+    func testRejectsDangerousRemoteDestinationsAfterNormalization() {
+        for path in ["/", "//", "/srv/music/../..", "/home", "/home/music/", "/Users/listener",
+                     "/root", "/etc", "/etc/ssh", "/usr/local", "/var/lib", "/Volumes", "/mnt"] {
+            var config = configuration(source: "/Volumes/Music", destination: "/unused")
+            config.destination = remoteDestination()
+            config.destination.path = path
+            XCTAssertThrowsError(try validator.validate(config), path) { error in
+                XCTAssertEqual(error as? SyncConfigurationValidator.ValidationError, .unsafeDestinationPath, path)
+            }
+        }
+    }
+
+    func testAllowsDedicatedRemoteMusicFolders() {
+        for path in ["/srv/music/", "/home/music/library/", "/Users/listener/Music/",
+                     "/mnt/music/", "/media/ssd/", "/var/lib/navidrome/music/", "/opt/music/"] {
+            var config = configuration(source: "/Volumes/Music", destination: "/unused")
+            config.destination = remoteDestination()
+            config.destination.path = path
+            XCTAssertNoThrow(try validator.validate(config), path)
+        }
+    }
+
+    func testRejectsLocalHomeAndSystemFoldersWithExternalSource() {
+        for path in [FileManager.default.homeDirectoryForCurrentUser.path, "/Users", "/Applications", "/Library"] {
+            XCTAssertThrowsError(try validator.validate(configuration(
+                source: "/Volumes/Music", destination: path
+            ))) { error in
+                XCTAssertEqual(error as? SyncConfigurationValidator.ValidationError, .unsafeDestinationPath)
+            }
+        }
+    }
+
+    func testRejectsSymlinkToProtectedLocalFolder() throws {
+        let link = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: FileManager.default.homeDirectoryForCurrentUser)
+        defer { try? FileManager.default.removeItem(at: link) }
+        XCTAssertThrowsError(try validator.validate(configuration(
+            source: "/Volumes/Music", destination: link.path
+        ))) { error in
+            XCTAssertEqual(error as? SyncConfigurationValidator.ValidationError, .unsafeDestinationPath)
+        }
+    }
+
     func testAllowsSeparateLocalFolders() throws {
         XCTAssertNoThrow(
             try validator.validate(

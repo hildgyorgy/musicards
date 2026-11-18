@@ -12,6 +12,7 @@ nonisolated struct SyncConfigurationValidator: Sendable {
         case invalidRemoteUsername
         case invalidRemoteHostname
         case invalidSSHKeyPath
+        case unsafeDestinationPath
 
         var errorDescription: String? {
             switch self {
@@ -33,6 +34,8 @@ nonisolated struct SyncConfigurationValidator: Sendable {
                 return "Remote username contains unsupported characters."
             case .invalidRemoteHostname:
                 return "Remote hostname is invalid. Use a DNS name, .local name, or IPv4 address."
+            case .unsafeDestinationPath:
+                return "Choose a dedicated music destination, not a system folder or user home folder. Synchronization deletes destination files that are absent from the source."
             case .invalidSSHKeyPath:
                 return "SSH private-key path is invalid."
             }
@@ -70,6 +73,7 @@ nonisolated struct SyncConfigurationValidator: Sendable {
             guard destination.path.hasPrefix("/") else {
                 throw ValidationError.invalidRemotePath
             }
+            try validateDestinationSafety(destination.path, isRemote: true)
             do {
                 try SSHInvocation.validate(username: user, hostname: host)
                 _ = try SSHInvocation.rsyncRemoteShell(
@@ -111,10 +115,49 @@ nonisolated struct SyncConfigurationValidator: Sendable {
             throw ValidationError.sourceInsideDestination
         }
 
+        try validateDestinationSafety(configuration.destination.path, isRemote: false)
+
         guard isLocalDestinationAvailable(configuration.destination) else {
             throw ValidationError.localDestinationUnavailable(
                 configuration.destination.path
             )
+        }
+    }
+
+    private func validateDestinationSafety(_ path: String, isRemote: Bool) throws {
+        // Remote paths belong to another filesystem: normalize dot components,
+        // but never resolve them against symlinks on this Mac.
+        let components = isRemote
+            ? URL(fileURLWithPath: path).standardizedFileURL.pathComponents
+            : canonicalPathComponents(path)
+        let normalized = components.map { $0.lowercased() }
+        let topLevel = normalized.dropFirst().first ?? ""
+        let systemTrees: Set<String> = [
+            "system", "library", "applications", "bin", "sbin", "etc", "usr",
+            "dev", "proc", "sys", "run", "boot"
+        ]
+        let containerRoots: Set<String> = [
+            "users", "home", "root", "volumes", "mnt", "media", "srv", "var", "private", "opt"
+        ]
+        let isHome = normalized.count == 3 && ["users", "home"].contains(topLevel)
+        let isLocalHome = !isRemote && componentsEqual(
+            components, canonicalPathComponents(FileManager.default.homeDirectoryForCurrentUser.path)
+        )
+        // macOS resolves /var and /etc under /private. Apply the same
+        // checks to both spellings, while allowing dedicated data subfolders.
+        let systemComponents = topLevel == "private"
+            ? ["/"] + Array(normalized.dropFirst(2)) : normalized
+        let systemRoot = systemComponents.dropFirst().first ?? ""
+        let isSystemVar = systemRoot == "var" && (
+            systemComponents.count == 2 ||
+            (systemComponents.count >= 3 && ["log", "run", "db"].contains(systemComponents[2])) ||
+            (systemComponents.count == 3 && systemComponents[2] == "lib")
+        )
+        let isPrivateSystemTree = topLevel == "private" && systemTrees.contains(systemRoot)
+        if normalized.count <= 1 || systemTrees.contains(topLevel) ||
+            (normalized.count == 2 && containerRoots.contains(topLevel)) ||
+            isHome || isLocalHome || isSystemVar || isPrivateSystemTree {
+            throw ValidationError.unsafeDestinationPath
         }
     }
 
