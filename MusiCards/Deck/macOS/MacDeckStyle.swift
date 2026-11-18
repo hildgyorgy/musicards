@@ -39,11 +39,6 @@ enum DeckStyle {
     static let glassMidStrength: Double = 0.03
     static let glassBottomStrength: Double = 0.22
 
-    static let glassInnerWashColor: Color = .white
-    static let glassInnerWashStrength: Double = 0.08
-
-    static let innerSurfaceStrength: Double = 0.05
-
     // MARK: - Borders
 
     static let strokeWidth: CGFloat = 1
@@ -51,12 +46,10 @@ enum DeckStyle {
     static let outerStrokeStrength: Double = 0.20
 
     static let strokeColor: Color = Color.primary.opacity(separatorStrength)
-    static let outerStrokeColor: Color = Color.white.opacity(outerStrokeStrength)
 
     // MARK: - Surfaces
 
     static let cardBackgroundColor: Color = .clear
-    static let contentBackgroundColor: Color = Color.white.opacity(innerSurfaceStrength)
 
     // MARK: - Card label
 
@@ -66,20 +59,9 @@ enum DeckStyle {
     static let cardLabelColor: Color = .secondary
     static let cardLabelHitHeight: CGFloat = collapsedCardHeight
 
-    // MARK: - Expanded content typography
-
-    static let titleFontSize: CGFloat = 40
-    static let titleFontWeight: Font.Weight = .bold
-    static let titleColor: Color = .primary
-
-    static let subtitleFontSize: CGFloat = 20
-    static let subtitleFontWeight: Font.Weight = .regular
-    static let subtitleColor: Color = .blue
-
     // MARK: - Expanded content layout
 
     static let headerTopSpacing: CGFloat = 20
-    static let headerSpacing: CGFloat = 8
     static let contentTopSpacing: CGFloat = 24
     static let contentHorizontalPadding: CGFloat = 32
 
@@ -93,12 +75,7 @@ enum DeckStyle {
     static let lightCardBackgroundColor = Color(.windowBackgroundColor).opacity(0.95)
     static let cardLabelFont = Font.system(size: 11, weight: .semibold)
     
-    static let boxBackgroundDark = Color.black.opacity(0.25)
-    static let boxBackgroundLight = Color.white.opacity(0.25)
     static let strokeDark = Color.white.opacity(0.15)
     static let strokeLight = Color.black.opacity(0.1)
-    
-    static let primaryHeaderFont: Font = .title2
-    static let secondaryHeaderFont: Font = .title3
 }
 #endif

@@ -10,28 +10,6 @@ final class UPnPRendererBrowser: ObservableObject {
         case manualAddress
 
         var id: String { rawValue }
-
-        var title: String {
-            switch self {
-            case .multicast: "MULTICAST SSDP"
-            case .subnetSweep: "DEEP SEARCH"
-            case .rememberedAddress: "STORED ADDRESS"
-            case .manualAddress: "MANUAL ADDRESS"
-            }
-        }
-
-        var explanation: String {
-            switch self {
-            case .multicast:
-                "to 239.255.255.250"
-            case .rememberedAddress:
-                "previous address"
-            case .subnetSweep:
-                "the local /24 subnet"
-            case .manualAddress:
-                "renderer IP"
-            }
-        }
     }
 
     enum DiscoveryStageState: Equatable {
@@ -49,17 +27,9 @@ final class UPnPRendererBrowser: ObservableObject {
     }
 
     @Published private(set) var stageStates: [DiscoveryMethod: DiscoveryStageState]
-    @Published private(set) var snapshots: [String: AVTransportSnapshot] = [:]
-    @Published private(set) var statusErrors: [String: String] = [:]
-    @Published private(set) var checkingRendererIDs: Set<String> = []
     @Published private(set) var hasStartedAutomaticDiscovery = false
     @Published private(set) var selectedRenderer: UPnPRendererDescriptor?
     @Published private(set) var selectedRendererDisplayName: String?
-    @Published private(set) var draftRendererID: String?
-
-    var isSearching: Bool {
-        stageStates.values.contains { $0.isSearching }
-    }
 
     var hasSelectedRendererPreference: Bool {
         selectedRendererID != nil
@@ -77,7 +47,6 @@ final class UPnPRendererBrowser: ObservableObject {
     private let selectedRendererIDKey = "UPnPSelectedRendererID"
     private let selectedRendererNameKey = "UPnPSelectedRendererName"
     private var selectedRendererID: String?
-    private var draftRenderer: UPnPRendererDescriptor?
 
     init(
         discoveryService: UPnPRendererDiscoveryService = .init(),
@@ -105,57 +74,25 @@ final class UPnPRendererBrowser: ObservableObject {
         stageStates[method] ?? .waiting
     }
 
-    func beginRendererSelection() {
-        draftRendererID = selectedRendererID
-        draftRenderer = selectedRenderer
-    }
-
-    func isDraftSelected(_ renderer: UPnPRendererDescriptor) -> Bool {
-        draftRendererID == renderer.id
-    }
-
-    func toggleDraftSelection(of renderer: UPnPRendererDescriptor) {
-        if isDraftSelected(renderer) {
-            draftRendererID = nil
-            draftRenderer = nil
-        } else {
-            draftRendererID = renderer.id
-            draftRenderer = renderer
-        }
-    }
-
-    func clearDraftRendererSelection() {
-        draftRendererID = nil
-        draftRenderer = nil
-    }
-
     func isSelected(_ renderer: UPnPRendererDescriptor) -> Bool {
         selectedRendererID == renderer.id
     }
 
-    /// Both platforms commit a tapped renderer immediately; the draft state is an internal staging step.
+    /// Both platforms commit a tapped renderer immediately.
     func selectImmediately(_ renderer: UPnPRendererDescriptor) {
-        draftRendererID = renderer.id
-        draftRenderer = renderer
-        commitRendererSelection()
+        commitSelection(renderer)
     }
 
     func selectSystemAudioImmediately() {
-        clearDraftRendererSelection()
-        commitRendererSelection()
+        commitSelection(nil)
     }
 
-    func commitRendererSelection() {
-        let didChangeSelection = selectedRendererID != draftRendererID
-        let didRefreshRenderer = selectedRenderer != draftRenderer
-        selectedRendererID = draftRendererID
-        if let draftRenderer {
-            selectedRenderer = draftRenderer
-            selectedRendererDisplayName = draftRenderer.friendlyName
-        } else if draftRendererID == nil {
-            selectedRenderer = nil
-            selectedRendererDisplayName = nil
-        }
+    private func commitSelection(_ renderer: UPnPRendererDescriptor?) {
+        let didChangeSelection = selectedRendererID != renderer?.id
+        let didRefreshRenderer = selectedRenderer != renderer
+        selectedRendererID = renderer?.id
+        selectedRenderer = renderer
+        selectedRendererDisplayName = renderer?.friendlyName
 
         if let selectedRendererID,
            let selectedRendererDisplayName {
@@ -176,15 +113,9 @@ final class UPnPRendererBrowser: ObservableObject {
         }
     }
 
-    func cancelRendererSelection() {
-        draftRendererID = selectedRendererID
-        draftRenderer = selectedRenderer
-    }
-
     func refresh() {
         beginNewSearch()
         hasStartedAutomaticDiscovery = true
-        statusErrors = [:]
         for method in [
             DiscoveryMethod.multicast,
             .rememberedAddress
@@ -414,33 +345,10 @@ final class UPnPRendererBrowser: ObservableObject {
         let didResolveRenderer = selectedRenderer != renderer
         selectedRenderer = renderer
         selectedRendererDisplayName = renderer.friendlyName
-        if draftRendererID == renderer.id {
-            draftRenderer = renderer
-        }
         userDefaults.set(renderer.friendlyName, forKey: selectedRendererNameKey)
         if didResolveRenderer {
             selectedRendererResolvedHandler?()
         }
     }
 
-    func checkStatus(of renderer: UPnPRendererDescriptor) {
-        guard !checkingRendererIDs.contains(renderer.id) else { return }
-        checkingRendererIDs.insert(renderer.id)
-        statusErrors[renderer.id] = nil
-
-        Task { [weak self] in
-            defer { self?.checkingRendererIDs.remove(renderer.id) }
-            do {
-                let snapshot = try await AVTransportClient(
-                    service: renderer.avTransport
-                ).snapshot()
-                guard !Task.isCancelled else { return }
-                self?.snapshots[renderer.id] = snapshot
-            } catch is CancellationError {
-                return
-            } catch {
-                self?.statusErrors[renderer.id] = error.localizedDescription
-            }
-        }
-    }
 }

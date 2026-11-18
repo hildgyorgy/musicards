@@ -199,11 +199,6 @@ final class PlaybackController: ObservableObject {
         return true
     }
 
-    func clearQueue() async {
-        await replaceQueue(with: [])
-        engine.restoreOutputConfiguration()
-    }
-
     func play() async {
         guard status != .loading, let currentItem else { return }
         if needsNavidromePreparation {

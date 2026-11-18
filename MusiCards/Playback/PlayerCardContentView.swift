@@ -241,6 +241,9 @@ struct PlayerCardContentView: View {
     }
 
     private var outputTitle: String {
+        if let rendererName = controller.externalOutputDisplayName {
+            return "UPnP • \(rendererName.uppercased())"
+        }
         return [
             controller.outputDisplayName,
             controller.outputSampleRateText

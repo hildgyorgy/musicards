@@ -4,7 +4,48 @@ Living handoff for continuing on another Mac. Git and the user's latest
 instructions take precedence. Never commit passwords, tokens, authenticated
 media URLs, private server addresses or signing material here.
 
-## Current checkpoint — 2026-11-11
+## Release cleanup — 2026-11-18 (working tree)
+
+- Cleanup was performed on top of `73d041c`. Existing edits to the expanded
+  player's UPnP prefix and workspace formatting were preserved. No commit,
+  push, version bump or App Store upload was performed.
+- Removed 609 redundant tracked files (6,499,781 bytes). This includes the 590
+  files of the extracted rsync 3.5.0 tree, verified byte-for-byte against the
+  retained source archive before removal, plus 19 loose/duplicate asset files.
+  Removed files were moved to Trash. The rsync executable, source archive,
+  checksum, build script, provenance and license texts remain unchanged.
+  The build script already extracts the archive into a temporary directory;
+  it does not depend on the removed tree.
+- App-icon 1x/2x slots now share the same byte-identical PNG where possible.
+  All 30 referenced image filenames across both apps were validated. The
+  six loose SVGs in the main asset catalog and seven loose Sync icon PNGs
+  were not asset entries; their live imagesets/appicon entries remain.
+- Renderer selection now commits directly. Removed the obsolete draft/OK/Cancel
+  API, unused discovery descriptions and old CHECK TRANSPORT panel state/code.
+  The regression test now checks the production immediate-selection flow,
+  exclusive selection, callback count, persistence and return to System audio.
+  Descriptor-refresh/port-change tests and playback polling remain intact.
+- Removed unused search helpers, refresh/queue/seek wrappers, an unused popup
+  divider and obsolete styling values. The active audio operation coordinator,
+  PCM feeder, audio quality diagnostics, endpoint routing, migration support
+  and Sync workflow were preserved. No broad state-model refactor was attempted.
+- Sync sets ALWAYS_SEARCH_USER_PATHS=NO, removing its legacy headermap warning.
+- Full Tools/verify.sh passed: **262 main-app macOS tests**, generic iOS device
+  build and **62 Sync tests**. Both macOS Release builds also passed. Remaining
+  test-compiler warnings concern pre-existing actor annotations in
+  ArtistSectionErrorTests and weak-reference mutability in the lifecycle test;
+  Xcode also emits its usual no-AppIntents metadata notice.
+- Comparable unsigned local macOS Release bundle measurements (sum of regular
+  files, excluding symlink duplicates): MusiCards 13,029,276 -> 13,006,332 bytes
+  (22,944 bytes smaller); Sync remains 3,071,078 bytes. Asset catalog sizes are
+  unchanged: the compiler already omitted/deduplicated the redundant inputs.
+  Repository savings are therefore much larger than shipped-app savings.
+  These are not App Store compressed download sizes or Organizer validation.
+- User confirmed current office AVM playback works. A new physical playback
+  smoke test and Sync Check/Preview/Sync/Verify on a disposable destination,
+  followed by archive/signing review, remain the release follow-up after cleanup.
+
+## Previous checkpoint — 2026-11-11
 
 - Machine-switch checkpoint: branch `main`, latest app/UI commit **15bfd20**
   (`ui`), preceded by **0a2064b** (`ui polish`) and **877184b**

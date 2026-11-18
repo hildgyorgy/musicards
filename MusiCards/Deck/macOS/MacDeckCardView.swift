@@ -42,10 +42,6 @@ struct DeckCardView<ID: Hashable, CollapsedHeaderContent: View, HeaderContent: V
         DeckStyle.cardBackgroundColor
     }
 
-    var contentBackground: Color {
-        DeckStyle.contentBackgroundColor
-    }
-
     var strokeColor: Color {
         DeckStyle.strokeColor
     }

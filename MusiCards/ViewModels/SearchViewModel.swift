@@ -400,10 +400,6 @@ final class SearchViewModel: ObservableObject {
 
     // MARK: - Private search
 
-    private func hasEnoughInput() -> Bool {
-        normalizedSearchQuery.count >= 3
-    }
-
     private var normalizedSearchQuery: String {
         Self.normalizeSearchQuery(searchQuery)
     }
@@ -1137,12 +1133,6 @@ final class SearchViewModel: ObservableObject {
         _ value: String
     ) -> String {
         value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-    }
-
-    private func appendUniqueArtistRows(_ rows: [SearchArtistRow]) {
-        let existing = Set(artistRows.map(\.id))
-        artistRows.append(contentsOf: rows.filter { !existing.contains($0.id) })
-        artistRows = playableArtistsFirst(artistRows)
     }
 
     private func playableReleasesFirst(

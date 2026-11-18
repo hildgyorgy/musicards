@@ -98,7 +98,7 @@ final class UPnPDiscoveryTests: XCTestCase {
     }
 
     @MainActor
-    func testRendererSelectionIsExclusiveAndOnlyCommitsOnConfirmation() {
+    func testImmediateRendererSelectionIsExclusiveAndPersistsAcrossLaunches() {
         let suiteName = "UPnPDiscoveryTests.rendererSelection"
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
@@ -109,18 +109,14 @@ final class UPnPDiscoveryTests: XCTestCase {
         let first = makeRenderer(id: "uuid:first", host: "192.168.1.50")
         let second = makeRenderer(id: "uuid:second", host: "192.168.1.60")
 
-        browser.beginRendererSelection()
-        browser.toggleDraftSelection(of: first)
-        XCTAssertTrue(browser.isDraftSelected(first))
-        XCTAssertFalse(browser.isDraftSelected(second))
-        XCTAssertNil(browser.selectedRenderer)
+        browser.selectImmediately(first)
+        XCTAssertTrue(browser.isSelected(first))
+        XCTAssertFalse(browser.isSelected(second))
 
-        browser.toggleDraftSelection(of: second)
-        XCTAssertFalse(browser.isDraftSelected(first))
-        XCTAssertTrue(browser.isDraftSelected(second))
-
-        browser.commitRendererSelection()
-        XCTAssertEqual(selectionChangeCount, 1)
+        browser.selectImmediately(second)
+        XCTAssertFalse(browser.isSelected(first))
+        XCTAssertTrue(browser.isSelected(second))
+        XCTAssertEqual(selectionChangeCount, 2)
         XCTAssertEqual(browser.selectedRenderer?.id, second.id)
         XCTAssertEqual(browser.selectedRendererDisplayName, second.friendlyName)
         XCTAssertEqual(
@@ -128,25 +124,8 @@ final class UPnPDiscoveryTests: XCTestCase {
             second.id
         )
 
-        browser.beginRendererSelection()
-        browser.commitRendererSelection()
-        XCTAssertEqual(selectionChangeCount, 1)
-
-        browser.beginRendererSelection()
-        browser.clearDraftRendererSelection()
-        browser.cancelRendererSelection()
-        XCTAssertTrue(browser.isDraftSelected(second))
-
-        browser.clearDraftRendererSelection()
-        browser.commitRendererSelection()
+        browser.selectImmediately(second)
         XCTAssertEqual(selectionChangeCount, 2)
-        XCTAssertNil(browser.selectedRenderer)
-        XCTAssertNil(browser.selectedRendererDisplayName)
-        XCTAssertNil(defaults.string(forKey: "UPnPSelectedRendererID"))
-
-        browser.beginRendererSelection()
-        browser.toggleDraftSelection(of: second)
-        browser.commitRendererSelection()
 
         let restoredBrowser = UPnPRendererBrowser(userDefaults: defaults)
         XCTAssertEqual(
@@ -154,9 +133,8 @@ final class UPnPDiscoveryTests: XCTestCase {
             second.friendlyName
         )
 
-        restoredBrowser.beginRendererSelection()
-        restoredBrowser.toggleDraftSelection(of: second)
-        restoredBrowser.commitRendererSelection()
+        XCTAssertTrue(restoredBrowser.isSelected(second))
+        restoredBrowser.selectSystemAudioImmediately()
         XCTAssertNil(restoredBrowser.selectedRendererDisplayName)
         XCTAssertNil(defaults.string(forKey: "UPnPSelectedRendererID"))
     }

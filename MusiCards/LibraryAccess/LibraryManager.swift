@@ -92,10 +92,6 @@ final class LibraryManager: ObservableObject {
         }
     }
 
-    func refreshActiveCatalog() async {
-        await provider.refreshCatalog()
-    }
-
     func refreshActiveCatalogIfNeeded() async {
         await provider.refreshCatalogIfNeeded()
     }

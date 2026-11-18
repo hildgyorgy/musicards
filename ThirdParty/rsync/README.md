@@ -23,9 +23,10 @@ The official rsync 3.5.0 release archive is preserved at
 
 `c7ffd1ef653e99540f661e47cb00b7f9cad1ee6b972399b16f93d672656e0d33`
 
-The extracted upstream source is retained beside the archive for inspection.
-`COPYING` is copied verbatim from that archive. **No source patches were
-applied.**
+The archive is the canonical upstream source. To inspect it, extract it into a
+temporary directory; the build script does this automatically. A redundant
+extracted copy is not kept in the repository. `COPYING` is copied verbatim from
+that archive. **No source patches were applied.**
 
 ## Build procedure
 

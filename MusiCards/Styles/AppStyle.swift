@@ -32,14 +32,7 @@ enum AppStyle {
     // MARK: - Expanded content layout
     
     static let headerSpacing: CGFloat = 6
-    static let headerTopSpacing: CGFloat = 20
-    
-    static let contentTopSpacing: CGFloat = 24
-    static let contentHorizontalPadding: CGFloat = 32
-    
-    static let contentBackgroundLight: Color = Color(UIColor.secondarySystemFill)
-    static let contentBackgroundDark: Color = Color(UIColor.secondarySystemFill)
-    
+
     // MARK: - Expanded content typography
     
     static let primaryHeaderFont: Font = .title2
@@ -55,8 +48,6 @@ enum AppStyle {
     
     // MARK: - Card appearance
     
-    static let cornerRadius: CGFloat = 35
-    
     static let darkCardBackgroundColor = Color(.windowBackgroundColor).opacity(0.8)
     static let lightCardBackgroundColor = Color(.windowBackgroundColor).opacity(0.95)
     
@@ -68,48 +59,13 @@ enum AppStyle {
     
     // MARK: - Expanded content typography
     
-    static let titleFontSize: CGFloat = 40
-    static let titleFontWeight: Font.Weight = .bold
-    static let titleColor: Color = .primary
-
-    static let subtitleFontSize: CGFloat = 20
-    static let subtitleFontWeight: Font.Weight = .regular
-    static let subtitleColor: Color = .blue
-    
     static let primaryHeaderFont: Font = .title2
     static let secondaryHeaderFont: Font = .title3
     
     static let cardLabelFont = Font.system(size: 11, weight: .semibold)
     static let cardLabelTracking: CGFloat = 4
     
-    // MARK: - Expanded content layout
-    
-    static let headerTopSpacing: CGFloat = 20
     static let headerSpacing: CGFloat = 8
     
-    static let contentTopSpacing: CGFloat = 24
-    static let contentHorizontalPadding: CGFloat = 32
-    
     #endif
-}
-
-struct PopupSectionDivider: View {
-    @Environment(\.colorScheme) private var colorScheme
-
-    var body: some View {
-        GeometryReader { geometry in
-            Path { path in
-                path.move(to: CGPoint(x: 0, y: 1))
-                path.addLine(to: CGPoint(x: geometry.size.width, y: 1))
-            }
-            .stroke(
-                colorScheme == .dark
-                    ? Color.white.opacity(0.7)
-                    : Color.black.opacity(0.7),
-                style: StrokeStyle(lineWidth: 1.5, dash: [3, 4])
-            )
-        }
-        .frame(height: 2)
-        .accessibilityHidden(true)
-    }
 }

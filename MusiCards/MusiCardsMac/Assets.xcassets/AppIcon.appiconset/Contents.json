@@ -7,7 +7,7 @@
       "size" : "16x16"
     },
     {
-      "filename" : "MusiCards-macOS-Default-32x32@1x 1.png",
+      "filename" : "MusiCards-macOS-Default-32x32@1x.png",
       "idiom" : "mac",
       "scale" : "2x",
       "size" : "16x16"
@@ -31,7 +31,7 @@
       "size" : "128x128"
     },
     {
-      "filename" : "MusiCards-macOS-Default-256x256@1x 1.png",
+      "filename" : "MusiCards-macOS-Default-256x256@1x.png",
       "idiom" : "mac",
       "scale" : "2x",
       "size" : "128x128"
@@ -43,7 +43,7 @@
       "size" : "256x256"
     },
     {
-      "filename" : "MusiCards-macOS-Default-512x512@1x 1.png",
+      "filename" : "MusiCards-macOS-Default-512x512@1x.png",
       "idiom" : "mac",
       "scale" : "2x",
       "size" : "256x256"

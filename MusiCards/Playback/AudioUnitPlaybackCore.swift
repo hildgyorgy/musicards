@@ -562,15 +562,6 @@ final class AudioUnitPlaybackCore {
         generation == preparationGeneration && self.decodedPCM === decodedPCM
     }
 
-    func seekDecoder(
-        _ decodedPCM: DecodedPCM,
-        to frame: UInt64
-    ) async throws {
-        try await Task.detached(priority: .userInitiated) {
-            try decodedPCM.seek(to: frame)
-        }.value
-    }
-
     static func check(_ status: OSStatus, operation: String) throws {
         guard status == noErr else {
             throw NativePlaybackEngineError(operation, status: status)
