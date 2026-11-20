@@ -37,9 +37,16 @@ nonisolated struct AVTransportPosition: Equatable, Sendable {
     let trackURI: URL?
 }
 
+nonisolated struct AVTransportMediaInfo: Equatable, Sendable {
+    let numberOfTracks: Int?
+    let currentURI: URL?
+    let nextURI: URL?
+}
+
 nonisolated struct AVTransportSnapshot: Equatable, Sendable {
     let transport: AVTransportStatus
     let position: AVTransportPosition
+    var mediaInfo: AVTransportMediaInfo? = nil
 }
 
 nonisolated protocol AVTransportControlling: Sendable {
@@ -50,6 +57,13 @@ nonisolated protocol AVTransportControlling: Sendable {
     func pause() async throws
     func stop() async throws
     func seek(to position: TimeInterval) async throws
+    func mediaInfo() async throws -> AVTransportMediaInfo
+    func setNormalPlayMode() async throws
+}
+
+extension AVTransportControlling {
+    nonisolated func mediaInfo() async throws -> AVTransportMediaInfo { throw RendererPlaylistError.unavailable }
+    nonisolated func setNormalPlayMode() async throws { throw RendererPlaylistError.unavailable }
 }
 
 nonisolated enum AVTransportClientError: LocalizedError, Equatable, Sendable {
@@ -116,6 +130,21 @@ nonisolated struct AVTransportClient: Sendable {
             relativeTime: Self.timeInterval(values["RelTime"]),
             trackURI: values["TrackURI"]?.nilIfEmpty.flatMap(URL.init(string:))
         )
+    }
+
+    func mediaInfo() async throws -> AVTransportMediaInfo {
+        let values = try await call(action: "GetMediaInfo")
+        return AVTransportMediaInfo(
+            numberOfTracks: values["NrTracks"].flatMap(Int.init),
+            currentURI: values["CurrentURI"]?.nilIfEmpty.flatMap(URL.init(string:)),
+            nextURI: values["NextURI"]?.nilIfEmpty.flatMap(URL.init(string:))
+        )
+    }
+
+    func setNormalPlayMode() async throws {
+        _ = try await call(action: "SetPlayMode", arguments: [("NewPlayMode", "NORMAL")])
+        let values = try await call(action: "GetTransportSettings")
+        guard values["PlayMode"]?.uppercased() == "NORMAL" else { throw RendererPlaylistError.notConfirmed }
     }
 
     func setTransportURI(_ uri: URL, metadata: String) async throws {

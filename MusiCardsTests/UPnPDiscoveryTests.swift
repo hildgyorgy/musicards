@@ -50,7 +50,8 @@ final class UPnPDiscoveryTests: XCTestCase {
         _ = try await engine.rendererSnapshot()
 
         let ports = await transport.ports()
-        XCTAssertEqual(ports, [3000, 3000, 4000, 4000])
+        // Adoption snapshots also ask GetMediaInfo to detect renderer-owned playlists.
+        XCTAssertEqual(ports, [3000, 3000, 3000, 4000, 4000, 4000])
     }
 
     @MainActor

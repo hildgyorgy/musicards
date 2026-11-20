@@ -4,6 +4,19 @@ import XCTest
 
 final class PlaybackControllerTests: XCTestCase {
     @MainActor
+    func testRendererAlbumQueueStopsAtReleaseBoundaryAndPreservesSelectedOffset() async throws {
+        let controller = PlaybackController(engine: PlaybackEngineSpy())
+        await controller.replaceQueue(with: [
+            item(1, releaseID: "other"), item(2), item(3), item(4), item(5, releaseID: "next")
+        ], startingAt: 2)
+        let resolved = try await controller.resolvedReleaseQueueForRenderer()
+        let album = try XCTUnwrap(resolved)
+        XCTAssertEqual(album.items.map(\.id), ["item-2", "item-3", "item-4"])
+        XCTAssertEqual(album.selectedIndex, 1)
+        XCTAssertEqual(controller.currentIndex, 2)
+    }
+
+    @MainActor
     func testRendererConnectionWarningPreservesPreparedPlaybackAndClearsOnStop() async {
         let engine = PlaybackEngineSpy()
         let controller = PlaybackController(engine: engine)
@@ -526,7 +539,8 @@ final class PlaybackControllerTests: XCTestCase {
     @MainActor
     private func item(
         _ number: Int,
-        duration: TimeInterval = 180
+        duration: TimeInterval = 180,
+        releaseID: String = "release"
     ) -> PlaybackQueueItem {
         PlaybackQueueItem(
             id: "item-\(number)",
@@ -534,7 +548,7 @@ final class PlaybackControllerTests: XCTestCase {
                 id: "track-\(number)",
                 releaseTrackID: "release-track-\(number)",
                 recordingID: "recording-\(number)",
-                releaseID: "release",
+                releaseID: releaseID,
                 title: "Track \(number)",
                 artist: "Artist",
                 albumTitle: "Album",

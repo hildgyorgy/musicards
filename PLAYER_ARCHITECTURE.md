@@ -4,6 +4,24 @@ This document preserves stable product decisions and the playback contracts.
 See Documentation/codex_handoff.md for the latest tested checkpoint. Dated
 August implementation notes below are historical, not a current task list.
 
+## Autonomous renderer albums — 2026-11-20
+
+Explicit ConnectionManager HTTP DIDL_S support allows a single, ordered playlist
+handoff for the current MusicBrainz release, beginning at the selected playable
+track. A temporary renderer-only IPv4 HTTP listener serves bounded in-memory
+XML. Literal text/xml, completed GET, matching NrTracks/CurrentURI, empty NextURI
+and verified NORMAL mode are required; the listener closes before Play. Streams
+remain direct Navidrome-to-renderer, with no audio proxy or extra server package.
+
+The renderer owns progression after handoff. MusiCards must not replenish NextURI
+for this playlist, including when adopting playback on another device. Polling
+may skip several tracks while an app is suspended; match the actual song to any
+entry in the release queue. STOPPED may reset TrackURI to the first item: preserve
+the last UI item and stop without invoking ordinary controller .finished advance.
+A supported renderer can finish the release while both apps are closed. Other
+renderers and rejected handoffs retain current/next playback; continuous albums
+then require an active controller. Cross-device adoption never replaces playback.
+
 ## Current playback contracts — 2026-11-06
 
 - System audio and UPnP routing are implemented. SOURCE, OUTPUT and help are

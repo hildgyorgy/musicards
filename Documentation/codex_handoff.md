@@ -4,7 +4,63 @@ Living handoff for continuing on another Mac. Git and the user's latest
 instructions take precedence. Never commit passwords, tokens, authenticated
 media URLs, private server addresses or signing material here.
 
-## DIDL_S playlist controller — 2026-11-20 (user-tested, not integrated)
+## Native autonomous UPnP albums — 2026-11-20 (working tree)
+
+- User explicitly requested integration of the physically successful DIDL_S
+  command-line trial into the native app for 2.3. No version/build bump, commit,
+  Store upload or physical AVM command has been performed by this integration.
+- Discovery optionally reads ConnectionManager.GetProtocolInfo. Only explicit
+  HTTP text/xml DIDL_S support enables the new path; other renderers keep the
+  existing controller-managed current/next behavior.
+- PlaybackController resolves the contiguous current MusicBrainz release without
+  changing its selection. A handoff contains the selected playable track through
+  the end of that release, in queue order, including any subsequent media.
+- DIDLPlaylistDocument makes escaped, bounded XML (1 MiB / 1,000 tracks).
+  RendererPlaylistHTTPServer temporarily serves that document from memory on
+  the routed IPv4 interface, using a random path and allowing only the renderer's
+  IP. Exact text/xml and DIDL_S response headers preserve the tested Rygel fix.
+  It expires after 15 seconds and is closed before Play. It serves no music,
+  filesystem content or permanent endpoint. Audio comes directly from Navidrome.
+- Handoff stops old transport, clears NextURI, supplies the playlist, verifies
+  complete GET + exact NrTracks/CurrentURI/empty NextURI, and sets/verifies NORMAL
+  mode. Failures close the listener and return to the old approach with a notice
+  to keep the app open. Cancellation cannot start a stale queue.
+- Once handed off, the app never feeds SetNext for that playlist. Polling tracks
+  any matching queue item even after multiple autonomous transitions. Album EOS
+  or external Stop does not use ordinary .finished auto-advance and does not
+  follow Rygel's reset-to-first URI into an unintended album restart.
+- Adoption inspects GetMediaInfo and suppresses SetNext for renderer-owned
+  playlists, preserving cross-device control without replacing the stream.
+- Tests exercise the real loopback HTTP listener, closure before Play, canceled
+  preparation, failure fallback, selected-track offset, XML escaping/limits,
+  release boundaries, skipped tracks, album stop and playlist adoption.
+- Verification passed: 278 MusiCards macOS tests, 69 Sync tests, generic iOS
+  device build, and all 10 preserved Python controller tests. The macOS Release
+  build also passes. Version remains 2.3/build 12 and macOS remains arm64.
+  Native hardware integration still needs a fresh user test: start an album, quit both apps,
+  observe at least two transitions and end-of-album Stop, reopen on another
+  device. The command-line hardware result alone does not prove native success.
+- PRESERVE Tools/UPnP/navidrome_avm_didl_playlist_probe.command, its Python
+  implementation and offline tests as an independent diagnostic controller.
+
+## Duo home spacing — 2026-11-20 (working tree)
+
+- Only side-rail iPhone/Duo home layouts: top padding 52 -> 32 pt; extra
+  compatibility-report padding 32 -> 8 pt. The home group moves up 20 pt and
+  the playable-album report 44 pt, away from the collapsed card stack.
+- Follow-up from the user's closed-Duo screenshot: the bottom TO EXPLORE
+  prompt still competed for height and compressed the report to one ellipsized
+  line. That prompt is now hidden on Duo only. The report keeps its full vertical
+  size and higher layout priority, preserving its explicit two-line wording.
+  The updated iOS Simulator Release build passed; no library data was fabricated
+  or credentials imported for the visual check.
+- Scope is usesSideSignalMeter + phone idiom, preserving iPad, ordinary iPhone
+  and macOS values. No playback behavior or playlist integration changed.
+- iOS Simulator Release build passed. Installed/launched on the booted Duo;
+  open-display home visually checked. That simulator has no connected library,
+  so the reported-count/closed-display combination still needs the user's check.
+
+## DIDL_S playlist controller — 2026-11-20 (historical experiment)
 
 - User committed the working UPnP recovery checkpoint, confirmed one autonomous
   SetNext transition after quitting, and declined an additional server component.

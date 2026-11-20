@@ -195,6 +195,12 @@ struct DeckBackgroundView: View {
         !showsExplorePrompt || usesSideSignalMeter
     }
 
+    // Side-rail phones use the Duo layout. iPad also has a side meter,
+    // so keep this adjustment restricted to the phone form factor.
+    private var usesDuoHomeLayout: Bool {
+        usesSideSignalMeter && UIDevice.current.userInterfaceIdiom == .phone
+    }
+
     private func iosHome(verticalDeckInset: CGFloat) -> some View {
         VStack(spacing: 0) {
             VStack(spacing: usesSpaciousHomeLayout ? 24 : (compactDeckLayout ? 8 : 16)) {
@@ -248,7 +254,9 @@ struct DeckBackgroundView: View {
                     if let report = compatibilityReport {
                         homePrompt(report)
                             .multilineTextAlignment(.center)
-                            .padding(.top, usesSpaciousHomeLayout ? 32 : (compactDeckLayout ? 12 : 28))
+                            .fixedSize(horizontal: false, vertical: usesDuoHomeLayout)
+                            .layoutPriority(usesDuoHomeLayout ? 1 : 0)
+                            .padding(.top, usesDuoHomeLayout ? 8 : (usesSpaciousHomeLayout ? 32 : (compactDeckLayout ? 12 : 28)))
                     }
 
                     if let message = connectionMessage {
@@ -261,11 +269,11 @@ struct DeckBackgroundView: View {
                     }
                 }
             }
-            .padding(.top, compactDeckLayout ? 52 : 100)
+            .padding(.top, usesDuoHomeLayout ? 32 : (compactDeckLayout ? 52 : 100))
 
             Spacer(minLength: 24)
 
-            if showsExplorePrompt {
+            if showsExplorePrompt && !usesDuoHomeLayout {
                 homePrompt("TO EXPLORE:")
                     .padding(
                         .bottom,

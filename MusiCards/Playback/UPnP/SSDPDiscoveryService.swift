@@ -296,10 +296,17 @@ nonisolated struct UPnPRendererInspector: Sendable {
             }
         }
 
+        var sinkProtocolInfo: String?
+        if let service = preliminary.connectionManager {
+            sinkProtocolInfo = try? await ConnectionManagerClient(
+                service: service,
+                transport: URLSessionUPnPHTTPTransport(session: session)
+            ).sinkProtocolInfo()
+        }
         return try UPnPDeviceDescriptionParser.parse(
             descriptionData,
             descriptionURL: descriptionURL,
-            capabilities: UPnPRendererCapabilities(avTransportActions: actions)
+            capabilities: UPnPRendererCapabilities(avTransportActions: actions, sinkProtocolInfo: sinkProtocolInfo)
         )
     }
 

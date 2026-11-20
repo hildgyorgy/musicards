@@ -89,7 +89,13 @@ final class UPnPPlaybackEngine: PlaybackEngine {
     private var lastPlayingPosition: TimeInterval?
     private var lastPlayingDuration: TimeInterval?
     private var pollGeneration: UInt64 = 0
+    private var ownsRendererPlaylist = false
+    private var playlistEntries: [(item: PlaybackQueueItem, url: URL)] = []
+    private var playlistTrackOffset = 0
+    private var playlistServer: (any RendererPlaylistServing)?
+    private let playlistServerFactory: @Sendable () -> any RendererPlaylistServing
 
+    var releaseQueueProvider: (() async throws -> ReleasePlaybackQueue?)?
     var nextItemProvider: (() async throws -> PlaybackQueueItem?)?
 
     init(
@@ -100,8 +106,10 @@ final class UPnPPlaybackEngine: PlaybackEngine {
         volumeClientFactory: @escaping VolumeClientFactory = { service in
             RenderingControlClient(service: service)
         },
-        pollInterval: Duration = .seconds(1)
+        pollInterval: Duration = .seconds(1),
+        playlistServerFactory: @escaping @Sendable () -> any RendererPlaylistServing = { RendererPlaylistHTTPServer() }
     ) {
+        self.playlistServerFactory = playlistServerFactory
         self.pollInterval = pollInterval
         self.streamURLProvider = streamURLProvider
         self.clientFactory = clientFactory
@@ -110,6 +118,7 @@ final class UPnPPlaybackEngine: PlaybackEngine {
 
     deinit {
         pollTask?.cancel()
+        if let server = playlistServer { Task { _ = await server.finish() } }
     }
 
     func configure(renderer: UPnPRendererDescriptor) {
@@ -123,6 +132,10 @@ final class UPnPPlaybackEngine: PlaybackEngine {
             return
         }
         pollGeneration &+= 1
+        if let server = playlistServer {
+            playlistServer = nil
+            Task { _ = await server.finish() }
+        }
         pollTask?.cancel()
         pollTask = nil
         self.renderer = renderer
@@ -138,6 +151,8 @@ final class UPnPPlaybackEngine: PlaybackEngine {
         currentStreamURL = nil
         stagedNextItem = nil
         stagedNextStreamURL = nil
+        ownsRendererPlaylist = false
+        playlistEntries = []
     }
 
     func prepare(_ item: PlaybackQueueItem) async throws {
@@ -150,6 +165,16 @@ final class UPnPPlaybackEngine: PlaybackEngine {
         }
 
         pollGeneration &+= 1
+        let generation = pollGeneration
+        let previousServer = playlistServer
+        playlistServer = nil
+        _ = await previousServer?.finish()
+        try ensureCurrent(generation)
+        ownsRendererPlaylist = false
+        playlistEntries = []
+        if renderer?.capabilities.supportsDIDLPlaylist == true {
+            eventHandler?(.rendererPlaybackNotice(nil))
+        }
         lastPlayingPosition = nil
         lastPlayingDuration = nil
         pollTask?.cancel()
@@ -160,12 +185,37 @@ final class UPnPPlaybackEngine: PlaybackEngine {
         }
         consecutivePollFailures = 0
         let streamURL = try streamURLProvider.streamURL(for: asset)
-        let metadata = Self.metadata(for: item, streamURL: streamURL, asset: asset)
-        try await client.setTransportURI(streamURL, metadata: metadata)
-        preparedItem = item
-        currentStreamURL = streamURL
-        await stageNextItemIfAvailable()
+        if renderer?.capabilities.supportsDIDLPlaylist == true {
+            do {
+                if let queue = try await releaseQueueProvider?(),
+                   queue.items.indices.contains(queue.selectedIndex),
+                   queue.items[queue.selectedIndex].id == item.id,
+                   queue.items.count - queue.selectedIndex > 1 {
+                    try ensureCurrent(generation)
+                    let remaining = Array(queue.items[queue.selectedIndex...])
+                    try await handoffPlaylist(remaining, client: client, generation: generation)
+                }
+            } catch {
+                if error is CancellationError { throw error }
+                try ensureCurrent(generation)
+                Self.logger.notice("Renderer album handoff unavailable; using controller-managed queue")
+                eventHandler?(.rendererPlaybackNotice(
+                    "Album handoff is unavailable on this renderer. Keep MusiCards open for continuous playback."
+                ))
+            }
+        }
+        try ensureCurrent(generation)
+        if !ownsRendererPlaylist {
+            let metadata = DIDLPlaylistDocument.trackMetadata(for: item, streamURL: streamURL, asset: asset)
+            try await client.setTransportURI(streamURL, metadata: metadata)
+            try ensureCurrent(generation)
+            preparedItem = item
+            currentStreamURL = streamURL
+            await stageNextItemIfAvailable()
+        }
+        try ensureCurrent(generation)
         await publishVolumeStateIfAvailable()
+        try ensureCurrent(generation)
         eventHandler?(
             .prepared(
                 duration: item.track.duration,
@@ -226,6 +276,12 @@ final class UPnPPlaybackEngine: PlaybackEngine {
 
     func stop() async {
         pollGeneration &+= 1
+        let generation = pollGeneration
+        let stoppedClient = client
+        let server = playlistServer
+        playlistServer = nil
+        ownsRendererPlaylist = false
+        playlistEntries = []
         pollTask?.cancel()
         pollTask = nil
         hasObservedPlaying = false
@@ -233,8 +289,9 @@ final class UPnPPlaybackEngine: PlaybackEngine {
             eventHandler?(.rendererConnectionChanged(isReconnecting: false))
         }
         consecutivePollFailures = 0
-        guard let client else { return }
-        try? await client.stop()
+        _ = await server?.finish()
+        guard generation == pollGeneration, !Task.isCancelled else { return }
+        try? await stoppedClient?.stop()
     }
 
     func seek(to position: TimeInterval) async throws {
@@ -281,7 +338,36 @@ final class UPnPPlaybackEngine: PlaybackEngine {
                 eventHandler?(.rendererConnectionChanged(isReconnecting: false))
             }
             let state = snapshot.transport.state.uppercased()
-            if let stagedNextItem,
+            if ownsRendererPlaylist {
+                if ["PLAYING", "TRANSITIONING", "PAUSED_PLAYBACK"].contains(state),
+                   let entry = playlistEntry(for: snapshot.position) {
+                    if entry.item.id != preparedItem?.id {
+                        lastPlayingPosition = nil
+                        lastPlayingDuration = nil
+                    }
+                    preparedItem = entry.item
+                    currentStreamURL = snapshot.position.trackURI ?? entry.url
+                    eventHandler?(.rendererTrackChanged(
+                        itemID: entry.item.id, duration: snapshot.position.duration ?? entry.item.track.duration,
+                        audioFormat: entry.item.track.audioFormat,
+                        position: snapshot.position.relativeTime ?? 0, isPlaying: state != "PAUSED_PLAYBACK"
+                    ))
+                }
+                if state == "STOPPED" || state == "NO_MEDIA_PRESENT" {
+                    // Rygel can reset Track/TrackURI to item 1 at playlist EOS.
+                    // Never rewind the UI or let .finished requeue the album.
+                    if hasObservedPlaying {
+                        hasObservedPlaying = false
+                        if snapshot.transport.status?.uppercased() == "ERROR_OCCURRED" {
+                            eventHandler?(.failed(PlaybackFailure(NativePlaybackEngineError("The renderer reported a playback error."))))
+                        } else {
+                            eventHandler?(.rendererPlaylistStopped)
+                        }
+                    }
+                    return
+                }
+            }
+            if !ownsRendererPlaylist, let stagedNextItem,
                let stagedNextStreamURL,
                Self.sameStream(snapshot.position.trackURI, stagedNextStreamURL),
                !Self.sameStream(currentStreamURL, stagedNextStreamURL) {
@@ -372,6 +458,7 @@ final class UPnPPlaybackEngine: PlaybackEngine {
     }
 
     private func stageNextItemIfAvailable() async {
+        guard !ownsRendererPlaylist else { return }
         guard renderer?.capabilities.supportsSetNext == true,
               let client else {
             stagedNextItem = nil
@@ -392,7 +479,7 @@ final class UPnPPlaybackEngine: PlaybackEngine {
                 return
             }
             let streamURL = try streamURLProvider.streamURL(for: asset)
-            let itemMetadata = Self.metadata(
+            let itemMetadata = DIDLPlaylistDocument.trackMetadata(
                 for: item,
                 streamURL: streamURL,
                 asset: asset
@@ -412,10 +499,71 @@ final class UPnPPlaybackEngine: PlaybackEngine {
         }
     }
 
+    private func ensureCurrent(_ generation: UInt64) throws {
+        guard generation == pollGeneration, !Task.isCancelled else { throw CancellationError() }
+    }
+
+    private func handoffPlaylist(_ items: [PlaybackQueueItem], client: any AVTransportControlling, generation: UInt64) async throws {
+        guard let renderer else { throw RendererPlaylistError.unavailable }
+        let urls = try items.map { item -> URL in
+            guard case .remoteAudio(let asset) = item.source else { throw RendererPlaylistError.invalidQueue }
+            return try streamURLProvider.streamURL(for: asset)
+        }
+        let document = try DIDLPlaylistDocument.make(items: items, urls: urls)
+        let server = playlistServerFactory()
+        playlistServer = server
+        do {
+            let url = try await server.start(document: document, rendererURL: renderer.descriptionURL)
+            try ensureCurrent(generation)
+            try await client.stop()
+            try ensureCurrent(generation)
+            if renderer.capabilities.supportsSetNext {
+                try await client.setNextTransportURI(nil, metadata: "")
+                try ensureCurrent(generation)
+            }
+            try await client.setTransportURI(url, metadata: DIDLPlaylistDocument.metadata(title: items[0].track.albumTitle, url: url))
+            try ensureCurrent(generation)
+            let info = try await client.mediaInfo()
+            try ensureCurrent(generation)
+            let downloaded = await server.finish()
+            if playlistServer === server { playlistServer = nil }
+            try ensureCurrent(generation)
+            guard downloaded else { throw RendererPlaylistError.notDownloaded }
+            guard info.numberOfTracks == items.count, info.currentURI == url, info.nextURI == nil else {
+                throw RendererPlaylistError.notConfirmed
+            }
+            try await client.setNormalPlayMode()
+            try ensureCurrent(generation)
+            playlistEntries = Array(zip(items, urls)).map { (item: $0.0, url: $0.1) }
+            playlistTrackOffset = 0
+            ownsRendererPlaylist = true
+            stagedNextItem = nil
+            stagedNextStreamURL = nil
+            preparedItem = items[0]
+            currentStreamURL = urls[0]
+            Self.logger.notice("Renderer accepted an autonomous album playlist tracks=\(items.count, privacy: .public)")
+        } catch {
+            _ = await server.finish()
+            if playlistServer === server { playlistServer = nil }
+            throw error
+        }
+    }
+
+    private func playlistEntry(for position: AVTransportPosition) -> (item: PlaybackQueueItem, url: URL)? {
+        if let number = position.trackNumber {
+            let index = playlistTrackOffset + number - 1
+            if playlistEntries.indices.contains(index), Self.sameStream(position.trackURI, playlistEntries[index].url) {
+                return playlistEntries[index]
+            }
+        }
+        return playlistEntries.first { Self.sameStream(position.trackURI, $0.url) }
+    }
+
     private static func sameStream(_ lhs: URL?, _ rhs: URL?) -> Bool {
         guard let lhs, let rhs else { return false }
         if lhs == rhs { return true }
-        return navidromeSongID(in: lhs) == navidromeSongID(in: rhs)
+        guard let id = navidromeSongID(in: lhs) else { return false }
+        return id == navidromeSongID(in: rhs)
     }
 
     static func navidromeSongID(in url: URL?) -> String? {
@@ -429,65 +577,7 @@ final class UPnPPlaybackEngine: PlaybackEngine {
         })?.value?.nilIfBlank
     }
 
-    private static func metadata(
-        for item: PlaybackQueueItem,
-        streamURL: URL,
-        asset: RemotePlaybackAsset
-    ) -> String {
-        let track = item.track
-        let declaredMimeType = asset.contentType?
-            .split(separator: ";", maxSplits: 1)
-            .first
-            .map(String.init)
-        let mimeType = declaredMimeType?.nilIfBlank
-            ?? mimeType(for: asset.suffix)
-        let duration = track.duration.map(durationString) ?? ""
-        let durationAttribute = duration.isEmpty
-            ? "" : " duration=\"\(xmlEscaped(duration))\""
-        return """
-        <?xml version="1.0" encoding="UTF-8"?>
-        <DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/">
-          <item id="\(xmlEscaped(asset.providerItemID))" parentID="0" restricted="1">
-            <dc:title>\(xmlEscaped(track.title))</dc:title>
-            <upnp:artist>\(xmlEscaped(track.artist))</upnp:artist>
-            <upnp:album>\(xmlEscaped(track.albumTitle))</upnp:album>
-            <upnp:class>object.item.audioItem.musicTrack</upnp:class>
-            <res protocolInfo="http-get:*:\(xmlEscaped(mimeType)):*"\(durationAttribute)>\(xmlEscaped(streamURL.absoluteString))</res>
-          </item>
-        </DIDL-Lite>
-        """
-    }
 
-    private static func mimeType(for suffix: String?) -> String {
-        switch suffix?.lowercased() {
-        case "flac": "audio/flac"
-        case "m4a", "mp4": "audio/mp4"
-        case "aac": "audio/aac"
-        case "mp3": "audio/mpeg"
-        case "wav": "audio/wav"
-        case "aif", "aiff": "audio/aiff"
-        default: "application/octet-stream"
-        }
-    }
-
-    private static func durationString(_ interval: TimeInterval) -> String {
-        let seconds = max(Int(interval.rounded()), 0)
-        return String(
-            format: "%d:%02d:%02d",
-            seconds / 3_600,
-            (seconds % 3_600) / 60,
-            seconds % 60
-        )
-    }
-
-    private static func xmlEscaped(_ value: String) -> String {
-        value
-            .replacingOccurrences(of: "&", with: "&amp;")
-            .replacingOccurrences(of: "<", with: "&lt;")
-            .replacingOccurrences(of: ">", with: "&gt;")
-            .replacingOccurrences(of: "\"", with: "&quot;")
-            .replacingOccurrences(of: "'", with: "&apos;")
-    }
 }
 
 extension UPnPPlaybackEngine: PlaybackVolumeControlling {
@@ -514,7 +604,10 @@ extension UPnPPlaybackEngine: PlaybackVolumeControlling {
 
 extension UPnPPlaybackEngine: RendererPlaybackSessionControlling {
     func rendererSnapshot() async throws -> AVTransportSnapshot? {
-        try await client?.snapshot()
+        guard let client else { return nil }
+        var snapshot = try await client.snapshot()
+        snapshot.mediaInfo = try? await client.mediaInfo()
+        return snapshot
     }
 
     func adoptRendererSession(
@@ -530,6 +623,10 @@ extension UPnPPlaybackEngine: RendererPlaybackSessionControlling {
             throw UPnPPlaybackError.rendererSessionMismatch
         }
 
+        pollGeneration &+= 1
+        let generation = pollGeneration
+        pollTask?.cancel()
+        pollTask = nil
         preparedItem = item
         currentStreamURL = snapshot.position.trackURI ?? streamURL
         lastPlayingPosition = snapshot.position.relativeTime
@@ -552,8 +649,28 @@ extension UPnPPlaybackEngine: RendererPlaybackSessionControlling {
         default:
             break
         }
+        var media = snapshot.mediaInfo
+        if media == nil { media = try? await client?.mediaInfo() }
+        try ensureCurrent(generation)
+        // A playlist adopted from another controller owns its own end-of-list.
+        // An unknown media response on a playlist-capable renderer must not
+        // receive a speculative SetNext that could extend an existing album.
+        ownsRendererPlaylist = (media?.numberOfTracks ?? 0) > 1 ||
+            (media == nil && renderer?.capabilities.supportsDIDLPlaylist == true)
+        playlistEntries = []
+        if ownsRendererPlaylist, let queue = try await releaseQueueProvider?() {
+            try ensureCurrent(generation)
+            for entry in queue.items {
+                guard case .remoteAudio(let asset) = entry.source else { continue }
+                playlistEntries.append((entry, try streamURLProvider.streamURL(for: asset)))
+            }
+            playlistTrackOffset = max(0, queue.selectedIndex - max(0, (snapshot.position.trackNumber ?? 1) - 1))
+        }
+        try ensureCurrent(generation)
         await stageNextItemIfAvailable()
+        try ensureCurrent(generation)
         await publishVolumeStateIfAvailable()
+        try ensureCurrent(generation)
         startPolling()
     }
 }

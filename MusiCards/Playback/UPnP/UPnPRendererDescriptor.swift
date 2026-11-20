@@ -47,6 +47,24 @@ nonisolated struct UPnPServiceDescriptor: Hashable, Sendable {
 
 nonisolated struct UPnPRendererCapabilities: Hashable, Sendable {
     let avTransportActions: Set<String>
+    let sinkProtocolInfo: String?
+
+    init(avTransportActions: Set<String>, sinkProtocolInfo: String? = nil) {
+        self.avTransportActions = avTransportActions
+        self.sinkProtocolInfo = sinkProtocolInfo
+    }
+
+    var supportsDIDLPlaylist: Bool {
+        (sinkProtocolInfo ?? "").split(separator: ",").contains { entry in
+            let fields = entry.trimmingCharacters(in: .whitespacesAndNewlines)
+                .split(separator: ":", maxSplits: 3, omittingEmptySubsequences: false)
+            guard fields.count == 4, fields[0].lowercased() == "http-get",
+                  fields[2].lowercased() == "text/xml" else { return false }
+            return fields[3].split(separator: ";").contains {
+                $0.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() == "DLNA.ORG_PN=DIDL_S"
+            }
+        }
+    }
 
     static let unknown = UPnPRendererCapabilities(avTransportActions: [])
 

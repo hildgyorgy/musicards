@@ -29,6 +29,7 @@ final class PlaybackController: ObservableObject {
     @Published private(set) var outputVolumeState: PlaybackVolumeState?
     @Published private(set) var outputVolumeErrorMessage: String?
     @Published private(set) var isRendererReconnecting = false
+    @Published private(set) var rendererPlaybackNotice: String?
     @Published private(set) var signalLevels: PlaybackSignalLevels?
 
     private let engine: PlaybackEngine
@@ -322,6 +323,7 @@ final class PlaybackController: ObservableObject {
         signalLevels = nil
         if name == nil {
             isRendererReconnecting = false
+            rendererPlaybackNotice = nil
             outputVolumeState = nil
             outputVolumeErrorMessage = nil
         }
@@ -448,6 +450,25 @@ final class PlaybackController: ObservableObject {
         }
     }
 
+    /// Preserve the queue's MB release boundary, even if future queues contain
+    /// multiple albums. Resolve sources without changing logical playback.
+    func resolvedReleaseQueueForRenderer() async throws -> ReleasePlaybackQueue? {
+        guard let index = currentIndex, let releaseID = currentItem?.track.releaseID else { return nil }
+        let generation = playbackGeneration
+        var lower = index
+        var upper = index + 1
+        while lower > 0 && queue[lower - 1].track.releaseID == releaseID { lower -= 1 }
+        while upper < queue.count && queue[upper].track.releaseID == releaseID { upper += 1 }
+        guard upper - lower <= 1_000 else { throw RendererPlaylistError.tooLarge }
+        let items = Array(queue[lower..<upper])
+        var resolved: [PlaybackQueueItem] = []
+        for item in items {
+            resolved.append(try await resolvedItem(item))
+            guard generation == playbackGeneration, currentIndex == index, !Task.isCancelled else { throw CancellationError() }
+        }
+        return ReleasePlaybackQueue(items: resolved, selectedIndex: index - lower)
+    }
+
     func resolvedNextItemForRenderer() async throws -> PlaybackQueueItem? {
         guard let currentIndex else { return nil }
         let nextIndex = currentIndex + 1
@@ -551,6 +572,20 @@ final class PlaybackController: ObservableObject {
             preparedAudioFormat = audioFormat
             self.position = max(position, 0)
             status = .playing
+        case let .rendererTrackChanged(itemID, duration, audioFormat, position, isPlaying):
+            guard let index = queue.firstIndex(where: { $0.id == itemID }) else { return }
+            currentIndex = index
+            preparedItemID = itemID
+            preparedDuration = duration ?? queue[index].track.duration
+            preparedAudioFormat = audioFormat
+            self.position = max(0, position)
+            status = isPlaying ? .playing : .paused
+        case .rendererPlaylistStopped:
+            // A renderer-owned list must never trigger the app's fallback Next.
+            preparedItemID = nil
+            status = .stopped
+        case .rendererPlaybackNotice(let notice):
+            rendererPlaybackNotice = notice
         case .rendererConnectionChanged(let isReconnecting):
             isRendererReconnecting = isReconnecting
         case let .rendererPlaybackStateConfirmed(itemID, isPlaying):
@@ -621,6 +656,7 @@ final class PlaybackController: ObservableObject {
     private func advancePlaybackGeneration() -> UInt64 {
         signalLevels = nil
         isRendererReconnecting = false
+        rendererPlaybackNotice = nil
         playbackGeneration &+= 1
         return playbackGeneration
     }

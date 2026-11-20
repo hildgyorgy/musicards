@@ -4,6 +4,145 @@ import XCTest
 
 final class UPnPPlaybackEngineTests: XCTestCase {
     @MainActor
+    func testPlaylistXMLEscapesMetadataAndStreamQueryAndRejectsInvalidQueue() throws {
+        let track = makeItem("one", title: "A & B <live> \"quoted\"")
+        let url = URL(string: "http://127.0.0.1/stream?id=one&t=secret")!
+        let data = try DIDLPlaylistDocument.make(items: [track], urls: [url])
+        let xml = try XCTUnwrap(String(data: data, encoding: .utf8))
+        XCTAssertTrue(xml.contains("A &amp; B &lt;live&gt; &quot;quoted&quot;"))
+        XCTAssertTrue(xml.contains("id=one&amp;t=secret"))
+        XCTAssertTrue(xml.contains("duration=\"0:03:00\""))
+        XCTAssertThrowsError(try DIDLPlaylistDocument.make(items: [track], urls: []))
+        XCTAssertThrowsError(try DIDLPlaylistDocument.make(items: Array(repeating: track, count: 1_001), urls: Array(repeating: url, count: 1_001)))
+    }
+
+    @MainActor
+    func testAlbumHandoffClosesListenerBeforePlayAndNeverFeedsSetNext() async throws {
+        let client = TransportSpy()
+        let server = PlaylistServerSpy()
+        let engine = makeEngine(client: client, playlistServer: server)
+        engine.configure(renderer: makeRenderer(supportsSetNext: true, supportsDIDL: true))
+        let items = [makeItem("first"), makeItem("second"), makeItem("third")]
+        engine.releaseQueueProvider = { ReleasePlaybackQueue(items: items, selectedIndex: 0) }
+        await client.configurePlaylist(count: 3, server: server)
+        try await engine.prepare(items[0])
+        try await engine.play()
+        await engine.stop()
+        let document = await server.document
+        XCTAssertTrue(String(decoding: document, as: UTF8.self).contains("<DIDL-Lite"))
+        let commands = await client.commands
+        XCTAssertEqual(commands.filter { $0.kind == "setURI" }.count, 1)
+        XCTAssertEqual(commands.filter { $0.kind == "setNext" }, [.setNext(nil)])
+        let firstURI = commands.compactMap { command -> URL? in
+            if case .setURI(let url, _) = command { return url }; return nil
+        }.first
+        XCTAssertTrue(firstURI?.path.hasPrefix("/musicards-playlist/") == true)
+    }
+
+    @MainActor
+    func testPlaylistPollCanSkipTracksAndEndDoesNotRestartTheQueue() async throws {
+        let client = TransportSpy()
+        let server = PlaylistServerSpy()
+        let engine = makeEngine(client: client, playlistServer: server)
+        engine.configure(renderer: makeRenderer(supportsSetNext: true, supportsDIDL: true))
+        let controller = PlaybackController(engine: engine)
+        let items = [makeItem("first"), makeItem("second"), makeItem("third")]
+        await controller.replaceQueue(with: items)
+        engine.releaseQueueProvider = { ReleasePlaybackQueue(items: items, selectedIndex: 0) }
+        await client.configurePlaylist(count: 3, server: server)
+        await controller.play()
+        await client.setSnapshots([
+            Self.snapshot(state: "PLAYING", songID: "first", position: 10),
+            Self.snapshot(state: "PLAYING", songID: "third", position: 179),
+            // Rygel can reset to track 1 when the whole playlist ends.
+            Self.snapshot(state: "STOPPED", songID: "first", position: 0)
+        ])
+        await engine.pollRenderer()
+        await engine.pollRenderer()
+        XCTAssertEqual(controller.currentItem?.id, "third")
+        XCTAssertEqual(controller.position, 179)
+        await engine.pollRenderer()
+        XCTAssertEqual(controller.currentItem?.id, "third")
+        XCTAssertEqual(controller.status, .stopped)
+        await Task.yield()
+        let commands = await client.commands
+        XCTAssertEqual(commands.filter { $0.kind == "play" }.count, 1)
+        XCTAssertEqual(commands.filter { $0.kind == "setURI" }.count, 1)
+        XCTAssertEqual(commands.filter { $0.kind == "setNext" }, [.setNext(nil)])
+        await controller.stop()
+    }
+
+    @MainActor
+    func testPlaylistBeginsAtSelectedItemAndFallsBackIfNotDownloaded() async throws {
+        for downloaded in [true, false] {
+            let client = TransportSpy()
+            let server = PlaylistServerSpy(downloaded: downloaded)
+            let engine = makeEngine(client: client, playlistServer: server)
+            engine.configure(renderer: makeRenderer(supportsSetNext: true, supportsDIDL: true))
+            let items = [makeItem("first"), makeItem("second"), makeItem("third")]
+            engine.releaseQueueProvider = { ReleasePlaybackQueue(items: items, selectedIndex: 1) }
+            engine.nextItemProvider = { items[2] }
+            await client.configurePlaylist(count: 2, server: server)
+            var notices: [String] = []
+            engine.eventHandler = { if case .rendererPlaybackNotice(let text) = $0, let text { notices.append(text) } }
+            try await engine.prepare(items[1])
+            let document = String(decoding: await server.document, as: UTF8.self)
+            XCTAssertFalse(document.contains("id=first"))
+            XCTAssertTrue(document.contains("id=second"))
+            let commands = await client.commands
+            if downloaded {
+                XCTAssertEqual(commands.filter { $0.kind == "setURI" }.count, 1)
+                XCTAssertTrue(notices.isEmpty)
+            } else {
+                XCTAssertEqual(commands.filter { $0.kind == "setURI" }.count, 2)
+                XCTAssertEqual(notices.count, 1)
+                guard case .setNext(let next) = commands.last else { return XCTFail("Legacy next should remain usable") }
+                XCTAssertEqual(UPnPPlaybackEngine.navidromeSongID(in: next), "third")
+            }
+            await engine.stop()
+        }
+    }
+
+    @MainActor
+    func testAdoptedPlaylistNeverAppendsAnotherNextItem() async throws {
+        let client = TransportSpy()
+        let engine = makeEngine(client: client)
+        engine.configure(renderer: makeRenderer(supportsSetNext: true, supportsDIDL: true))
+        let items = [makeItem("first"), makeItem("second"), makeItem("third")]
+        engine.releaseQueueProvider = { ReleasePlaybackQueue(items: items, selectedIndex: 1) }
+        engine.nextItemProvider = { items[2] }
+        var snapshot = Self.snapshot(state: "PLAYING", songID: "second", position: 42)
+        snapshot.mediaInfo = AVTransportMediaInfo(numberOfTracks: 3,
+            currentURI: URL(string: "http://192.168.1.5/old-playlist.xml"), nextURI: nil)
+        try await engine.adoptRendererSession(item: items[1], snapshot: snapshot)
+        await engine.stop()
+        let commands = await client.commands
+        XCTAssertEqual(commands, [.stop])
+    }
+
+    @MainActor
+    func testStopDuringPlaylistPreparationCancelsListenerWithoutPlaying() async throws {
+        let client = TransportSpy()
+        let server = PlaylistServerSpy(suspendsStart: true)
+        let engine = makeEngine(client: client, playlistServer: server)
+        engine.configure(renderer: makeRenderer(supportsSetNext: true, supportsDIDL: true))
+        let items = [makeItem("first"), makeItem("second")]
+        engine.releaseQueueProvider = { ReleasePlaybackQueue(items: items, selectedIndex: 0) }
+        let preparation = Task { try await engine.prepare(items[0]) }
+        for _ in 0..<100 {
+            if await server.started { break }
+            try await Task.sleep(for: .milliseconds(1))
+        }
+        await engine.stop()
+        do { try await preparation.value; XCTFail("Stale preparation should be cancelled") }
+        catch is CancellationError {} catch { XCTFail("Unexpected error: \(error)") }
+        let finished = await server.finished
+        XCTAssertTrue(finished)
+        let commands = await client.commands
+        XCTAssertFalse(commands.contains(where: { $0.kind == "setURI" || $0.kind == "play" }))
+    }
+
+    @MainActor
     func testFailedConnectionPreflightCannotResumePreparedSystemAudio() async throws {
         let system = MeteringSystemEngine()
         var available = true
@@ -358,18 +497,20 @@ final class UPnPPlaybackEngineTests: XCTestCase {
     }
 
     @MainActor
-    private func makeEngine(client: TransportSpy, pollInterval: Duration = .seconds(1)) -> UPnPPlaybackEngine {
+    private func makeEngine(client: TransportSpy, pollInterval: Duration = .seconds(1), playlistServer: PlaylistServerSpy? = nil) -> UPnPPlaybackEngine {
         UPnPPlaybackEngine(
             streamURLProvider: NavidromeRendererStreamURLProvider(
                 connection: RendererConnectionStub()
             ),
             clientFactory: { _ in client },
-            pollInterval: pollInterval
+            pollInterval: pollInterval,
+            playlistServerFactory: { playlistServer ?? PlaylistServerSpy() }
         )
     }
 
     private func makeRenderer(
-        supportsSetNext: Bool = false
+        supportsSetNext: Bool = false,
+        supportsDIDL: Bool = false
     ) -> UPnPRendererDescriptor {
         let baseURL = URL(string: "http://192.168.1.20:1400")!
         let transport = UPnPServiceDescriptor(
@@ -390,7 +531,8 @@ final class UPnPPlaybackEngineTests: XCTestCase {
             connectionManager: nil,
             capabilities: UPnPRendererCapabilities(
                 avTransportActions: supportsSetNext
-                    ? ["SetNextAVTransportURI"] : []
+                    ? ["SetNextAVTransportURI"] : [],
+                sinkProtocolInfo: supportsDIDL ? "http-get:*:text/xml:DLNA.ORG_PN=DIDL_S" : nil
             )
         )
     }
@@ -505,6 +647,21 @@ private actor TransportSpy: AVTransportControlling {
     private var shouldFailSnapshots = false
     private var snapshotFailuresRemaining = 0
     private var rejectsPlay = false
+    private var playlistCount = 1
+    private var currentURI: URL?
+    private var nextURI: URL?
+    private var playlistServer: PlaylistServerSpy?
+
+    func configurePlaylist(count: Int, server: PlaylistServerSpy) {
+        playlistCount = count
+        playlistServer = server
+    }
+
+    func mediaInfo() async throws -> AVTransportMediaInfo {
+        AVTransportMediaInfo(numberOfTracks: playlistCount, currentURI: currentURI, nextURI: nextURI)
+    }
+
+    func setNormalPlayMode() async throws {}
 
     func failNextSnapshots(_ count: Int) { snapshotFailuresRemaining = count }
     func rejectPlay(_ rejected: Bool = true) { rejectsPlay = rejected }
@@ -530,13 +687,18 @@ private actor TransportSpy: AVTransportControlling {
 
     func setTransportURI(_ uri: URL, metadata: String) async throws {
         commands.append(.setURI(uri, metadata))
+        currentURI = uri
     }
 
     func setNextTransportURI(_ uri: URL?, metadata: String) async throws {
         commands.append(.setNext(uri))
+        nextURI = uri
     }
 
     func play() async throws {
+        if let playlistServer, currentURI?.path.hasPrefix("/musicards-playlist/") == true {
+            guard await playlistServer.finished else { throw RendererPlaylistError.unavailable }
+        }
         commands.append(.play)
         if rejectsPlay { throw AVTransportClientError.soapFault(code: "701", description: nil) }
     }
@@ -544,5 +706,35 @@ private actor TransportSpy: AVTransportControlling {
     func stop() async throws { commands.append(.stop) }
     func seek(to position: TimeInterval) async throws {
         commands.append(.seek(position))
+    }
+}
+
+private actor PlaylistServerSpy: RendererPlaylistServing {
+    private(set) var document = Data()
+    private(set) var finished = false
+    private(set) var started = false
+    private let downloaded: Bool
+    private let suspendsStart: Bool
+    private var continuation: CheckedContinuation<URL, Error>?
+
+    init(downloaded: Bool = true, suspendsStart: Bool = false) {
+        self.downloaded = downloaded
+        self.suspendsStart = suspendsStart
+    }
+
+    func start(document: Data, rendererURL: URL) async throws -> URL {
+        self.document = document
+        started = true
+        if suspendsStart {
+            return try await withCheckedThrowingContinuation { continuation = $0 }
+        }
+        return URL(string: "http://127.0.0.1:49152/musicards-playlist/test/album.xml")!
+    }
+
+    func finish() -> Bool {
+        finished = true
+        continuation?.resume(throwing: CancellationError())
+        continuation = nil
+        return downloaded
     }
 }

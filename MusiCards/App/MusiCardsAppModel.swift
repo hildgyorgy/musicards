@@ -205,6 +205,9 @@ final class MusiCardsAppModel: ObservableObject {
         rendererEngine?.nextItemProvider = { [weak playbackController] in
             try await playbackController?.resolvedNextItemForRenderer()
         }
+        rendererEngine?.releaseQueueProvider = { [weak playbackController] in
+            try await playbackController?.resolvedReleaseQueueForRenderer()
+        }
         let releasePlaybackQueueBuilder = ReleasePlaybackQueueBuilder(
             libraryManager: libraryManager
         )
