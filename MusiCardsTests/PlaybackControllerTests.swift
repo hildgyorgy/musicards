@@ -4,6 +4,28 @@ import XCTest
 
 final class PlaybackControllerTests: XCTestCase {
     @MainActor
+    func testRendererConnectionWarningPreservesPreparedPlaybackAndClearsOnStop() async {
+        let engine = PlaybackEngineSpy()
+        let controller = PlaybackController(engine: engine)
+        await controller.replaceQueue(with: [item(1), item(2)])
+        await controller.play()
+        engine.emit(.positionChanged(42))
+        engine.emit(.rendererConnectionChanged(isReconnecting: true))
+        XCTAssertTrue(controller.isRendererReconnecting)
+        XCTAssertEqual(controller.status, .playing)
+        XCTAssertEqual(controller.position, 42)
+        XCTAssertEqual(controller.currentIndex, 0)
+        engine.emit(.rendererConnectionChanged(isReconnecting: false))
+        XCTAssertFalse(controller.isRendererReconnecting)
+        await controller.pause()
+        await controller.play()
+        XCTAssertEqual(engine.preparedIDs.count, 1)
+        engine.emit(.rendererConnectionChanged(isReconnecting: true))
+        await controller.stop()
+        XCTAssertFalse(controller.isRendererReconnecting)
+    }
+
+    @MainActor
     func testEndpointChangeWaitsForExplicitPlayAndRepreparesAtCurrentPosition() async throws {
         let engine = PlaybackEngineSpy()
         let controller = PlaybackController(engine: engine)

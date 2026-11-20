@@ -426,6 +426,8 @@ enum PlaybackEngineEvent: Equatable {
         audioFormat: PlaybackAudioFormat?,
         position: TimeInterval
     )
+    case rendererConnectionChanged(isReconnecting: Bool)
+    case rendererPlaybackStateConfirmed(itemID: String, isPlaying: Bool)
     case volumeChanged(PlaybackVolumeState)
     case outputConfigurationChanged
     case finished

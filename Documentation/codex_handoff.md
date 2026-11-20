@@ -4,6 +4,41 @@ Living handoff for continuing on another Mac. Git and the user's latest
 instructions take precedence. Never commit passwords, tokens, authenticated
 media URLs, private server addresses or signing material here.
 
+## UPnP control recovery — 2026-11-20 (working tree)
+
+- User reported the App Store app losing track of an AVM that kept playing;
+  macOS screenshot showed a stale play button and a volume-control timeout.
+  Local AVTransport logs confirmed GetPositionInfo timeout (-1001), successful
+  SetAVTransportURI/SetNextAVTransportURI, and later HTTP 500 Play responses.
+  User confirmed AVM independently advanced to the staged next track. We have
+  not identified the underlying cause of the intermittent renderer responses.
+- Fixed a confirmed control-recovery flaw: three failed snapshots used to stop
+  polling permanently and report playback failure. Polling now retries with
+  capped backoff (1–8 seconds between requests), preserving the prepared item
+  and queue. The expanded player shows a separate reconnecting notice. Successful
+  matching-stream snapshots restore the confirmed playing/paused state and can
+  adopt the staged next track, preparing the following item without SetURI/Play.
+- A rejected/timed-out Play is accepted only if a snapshot confirms that the
+  matching stream is actually playing without ERROR_OCCURRED. If verification
+  also fails, the original error remains visible while polling continues; a
+  later matching state can restore the prepared identity without reloading.
+  Wrong-stream/stopped snapshots do not turn a rejected Play into success.
+- Explicit Stop cancels retries. Existing early-Stop and natural-end rules are
+  unchanged. Next-track preparation failures now produce a safe diagnostic
+  code, never SOAP bodies or authenticated URLs.
+- Tools/verify.sh passed: **268 main-app macOS tests**, generic iOS build,
+  **69 Sync tests**. The macOS Release build also passed. New tests exercise
+  timeout recovery through PlaybackController and a three-item queue, rejected
+  Play verification, recovery after failed verification, and Stop during retries.
+- Physical AVM validation of the new build remains pending. No app was launched
+  on the user's renderer, no version/build bump, commit, upload or install into
+  /Applications was performed. The Release app is in the usual DerivedData
+  Build/Products/Release folder for testing outside Xcode.
+- Separate unresolved limitation: on iOS, SetNext holds only one following item;
+  the app must remain scheduled to slide that window across a whole album.
+  App Store background suspension can expose this, while Xcode's debugger can
+  mask it. Do not claim guaranteed whole-album playback with a suspended app.
+
 ## Targeted review fixes — 2026-11-18 (working tree)
 
 - Reviewed Claude's release review against current code; implemented only the

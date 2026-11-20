@@ -114,6 +114,13 @@ struct PlayerCardContentView: View {
                         .padding(.bottom, 6)
                 }
 
+                if controller.isRendererReconnecting {
+                    Text("Reconnecting to renderer… Music may still be playing.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .padding(.bottom, 6)
+                }
+
                 CollapsedPlayerBar(
                     controller: controller,
                     contentInset: 0,

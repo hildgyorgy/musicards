@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 @MainActor
 protocol RendererPlaybackSessionControlling: AnyObject {
@@ -69,6 +70,8 @@ final class UPnPPlaybackEngine: PlaybackEngine {
     var eventHandler: ((PlaybackEngineEvent) -> Void)?
     var canSeek: Bool { renderer?.capabilities.supportsSeek != false }
 
+    private static let logger = Logger(subsystem: "com.hildgyorgy.MusiCards", category: "UPnPPlayback")
+    private let pollInterval: Duration
     private let streamURLProvider: NavidromeRendererStreamURLProvider
     private let clientFactory: ClientFactory
     private let volumeClientFactory: VolumeClientFactory
@@ -96,8 +99,10 @@ final class UPnPPlaybackEngine: PlaybackEngine {
         },
         volumeClientFactory: @escaping VolumeClientFactory = { service in
             RenderingControlClient(service: service)
-        }
+        },
+        pollInterval: Duration = .seconds(1)
     ) {
+        self.pollInterval = pollInterval
         self.streamURLProvider = streamURLProvider
         self.clientFactory = clientFactory
         self.volumeClientFactory = volumeClientFactory
@@ -124,6 +129,10 @@ final class UPnPPlaybackEngine: PlaybackEngine {
         client = clientFactory(renderer.avTransport)
         volumeClient = renderer.renderingControl.map(volumeClientFactory)
         preparedItem = nil
+        if consecutivePollFailures >= 3 {
+            eventHandler?(.rendererConnectionChanged(isReconnecting: false))
+        }
+        consecutivePollFailures = 0
         hasObservedPlaying = false
         volumePollCounter = 0
         currentStreamURL = nil
@@ -146,6 +155,9 @@ final class UPnPPlaybackEngine: PlaybackEngine {
         pollTask?.cancel()
         pollTask = nil
         hasObservedPlaying = false
+        if consecutivePollFailures >= 3 {
+            eventHandler?(.rendererConnectionChanged(isReconnecting: false))
+        }
         consecutivePollFailures = 0
         let streamURL = try streamURLProvider.streamURL(for: asset)
         let metadata = Self.metadata(for: item, streamURL: streamURL, asset: asset)
@@ -168,7 +180,33 @@ final class UPnPPlaybackEngine: PlaybackEngine {
                 renderer?.friendlyName ?? "network renderer"
             )
         }
-        try await client.play()
+        let generation = pollGeneration
+        do {
+            try await client.play()
+        } catch {
+            // A renderer may reject a redundant Play, or start despite the
+            // response timing out. Reconcile with the actual matching stream
+            // before treating the command as failed; never resend SetURI here.
+            let commandError = error
+            guard !(error is CancellationError), !Task.isCancelled else { throw error }
+            let snapshot = try? await client.snapshot()
+            guard generation == pollGeneration, !Task.isCancelled else { throw CancellationError() }
+            if snapshot?.transport.state.uppercased() != "PLAYING" ||
+                snapshot?.transport.status?.uppercased() == "ERROR_OCCURRED" ||
+                !Self.sameStream(snapshot?.position.trackURI, currentStreamURL) {
+                // If even verification timed out, don't claim playback started.
+                // Keep observing so the UI can recover when the renderer answers.
+                if snapshot == nil || (snapshot?.transport.state.uppercased() == "TRANSITIONING" &&
+                    Self.sameStream(snapshot?.position.trackURI, currentStreamURL)) {
+                    consecutivePollFailures = max(consecutivePollFailures, 3)
+                    eventHandler?(.rendererConnectionChanged(isReconnecting: true))
+                    startPolling()
+                }
+                throw commandError
+            }
+            Self.logger.notice("Play response failed; matching renderer stream confirmed playing")
+        }
+        guard generation == pollGeneration, !Task.isCancelled else { return }
         eventHandler?(.started)
         startPolling()
     }
@@ -191,6 +229,10 @@ final class UPnPPlaybackEngine: PlaybackEngine {
         pollTask?.cancel()
         pollTask = nil
         hasObservedPlaying = false
+        if consecutivePollFailures >= 3 {
+            eventHandler?(.rendererConnectionChanged(isReconnecting: false))
+        }
+        consecutivePollFailures = 0
         guard let client else { return }
         try? await client.stop()
     }
@@ -211,7 +253,12 @@ final class UPnPPlaybackEngine: PlaybackEngine {
         pollTask = Task { [weak self] in
             while !Task.isCancelled {
                 do {
-                    try await Task.sleep(for: .seconds(1))
+                    guard let self else { return }
+                    // Transient control failures must not abandon a renderer
+                    // that is still fetching and playing audio independently.
+                    let backoff = 1 << min(max(self.consecutivePollFailures - 2, 0), 3)
+                    let interval = self.pollInterval * backoff
+                    try await Task.sleep(for: interval)
                 } catch {
                     return
                 }
@@ -227,7 +274,12 @@ final class UPnPPlaybackEngine: PlaybackEngine {
         do {
             let snapshot = try await client.snapshot()
             guard generation == pollGeneration, !Task.isCancelled else { return }
+            let wasReconnecting = consecutivePollFailures >= 3
             consecutivePollFailures = 0
+            if wasReconnecting {
+                Self.logger.notice("Renderer state polling recovered")
+                eventHandler?(.rendererConnectionChanged(isReconnecting: false))
+            }
             let state = snapshot.transport.state.uppercased()
             if let stagedNextItem,
                let stagedNextStreamURL,
@@ -248,6 +300,16 @@ final class UPnPPlaybackEngine: PlaybackEngine {
                     )
                 )
                 await stageNextItemIfAvailable()
+                guard generation == pollGeneration, !Task.isCancelled else { return }
+            }
+            if wasReconnecting, let preparedItem,
+               Self.sameStream(snapshot.position.trackURI, currentStreamURL),
+               snapshot.transport.status?.uppercased() != "ERROR_OCCURRED" {
+                if state == "PLAYING" || state == "TRANSITIONING" || state == "PAUSED_PLAYBACK" {
+                    eventHandler?(.rendererPlaybackStateConfirmed(
+                        itemID: preparedItem.id, isPlaying: state != "PAUSED_PLAYBACK"
+                    ))
+                }
             }
             if state == "PLAYING" || state == "TRANSITIONING" {
                 hasObservedPlaying = true
@@ -292,10 +354,12 @@ final class UPnPPlaybackEngine: PlaybackEngine {
         } catch {
             guard generation == pollGeneration, !Task.isCancelled else { return }
             consecutivePollFailures += 1
-            if consecutivePollFailures >= 3 {
-                pollTask?.cancel()
-                pollTask = nil
-                eventHandler?(.failed(PlaybackFailure(error)))
+            if consecutivePollFailures == 3 {
+                // Connection loss is not evidence that playback stopped.
+                // Keep the queue and prepared item, and recover without Play
+                // or SetAVTransportURI when control responses resume.
+                Self.logger.error("Renderer state polling interrupted; retrying")
+                eventHandler?(.rendererConnectionChanged(isReconnecting: true))
             }
         }
     }
@@ -340,6 +404,9 @@ final class UPnPPlaybackEngine: PlaybackEngine {
             stagedNextItem = item
             stagedNextStreamURL = streamURL
         } catch {
+            // Do not log the error text: it can contain an authenticated URL.
+            let code = (error as NSError).code
+            Self.logger.error("Preparing the next renderer track failed code=\(code, privacy: .public)")
             stagedNextItem = nil
             stagedNextStreamURL = nil
         }

@@ -28,6 +28,7 @@ final class PlaybackController: ObservableObject {
     @Published private(set) var externalOutputDisplayName: String?
     @Published private(set) var outputVolumeState: PlaybackVolumeState?
     @Published private(set) var outputVolumeErrorMessage: String?
+    @Published private(set) var isRendererReconnecting = false
     @Published private(set) var signalLevels: PlaybackSignalLevels?
 
     private let engine: PlaybackEngine
@@ -320,6 +321,7 @@ final class PlaybackController: ObservableObject {
         externalOutputDisplayName = name
         signalLevels = nil
         if name == nil {
+            isRendererReconnecting = false
             outputVolumeState = nil
             outputVolumeErrorMessage = nil
         }
@@ -549,6 +551,12 @@ final class PlaybackController: ObservableObject {
             preparedAudioFormat = audioFormat
             self.position = max(position, 0)
             status = .playing
+        case .rendererConnectionChanged(let isReconnecting):
+            isRendererReconnecting = isReconnecting
+        case let .rendererPlaybackStateConfirmed(itemID, isPlaying):
+            guard currentItem?.id == itemID else { return }
+            preparedItemID = itemID
+            status = isPlaying ? .playing : .paused
         case .volumeChanged(let state):
             outputVolumeState = state
             outputVolumeErrorMessage = nil
@@ -612,6 +620,7 @@ final class PlaybackController: ObservableObject {
     @discardableResult
     private func advancePlaybackGeneration() -> UInt64 {
         signalLevels = nil
+        isRendererReconnecting = false
         playbackGeneration &+= 1
         return playbackGeneration
     }
