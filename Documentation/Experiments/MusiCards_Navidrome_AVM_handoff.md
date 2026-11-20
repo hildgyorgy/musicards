@@ -4,6 +4,28 @@ Dátum: 2026-08-10
 
 Ez a dokumentum a MusiCards tervezése közben elvégzett helyi hálózati kísérleteket és az ezekből levont következtetéseket foglalja össze. Elsődleges célja, hogy egy másik Codex-beszélgetésben vagy fejlesztői környezetben innen lehessen folytatni a munkát.
 
+## Frissítés – 2026-11-20: sikeres DIDL_S-listaátadás
+
+A felhasználó sikeresnek jelentette a külön DIDL_S-kísérletet az AVM Audio CS 2.3-on.
+A renderer HTTP-n letölti az XML-listát; a próba a lista kiszolgálását már a Play
+előtt leállítja, majd kilép. Nem marad futó számadagoló, a zenét közvetlenül a
+Navidrome szolgálja ki. Ez új irány a korábbi CurrentURI/NextURI ablak mellett,
+standard UPnP használatával; a QPlay-kísérletet nem éleszti újra.
+
+Fontos kompatibilitási részlet: a lista HTTP Content-Type fejléce pontosan
+`text/xml` legyen. A Rygel playlist-felismerése a charset-kiegészítést nem kezeli
+ugyanígy. Az XML deklarációja továbbra is UTF-8.
+
+**A parancssoros controller megőrzendő, önállóan hasznos eszköz:**
+
+- `Tools/UPnP/navidrome_avm_didl_playlist_probe.command` – indítás Macen;
+- `Tools/UPnP/didl_playlist_probe.py` – megvalósítás, külön telepítendő függőség nélkül;
+- `Tools/UPnP/test_didl_playlist_probe.py` – helyi regressziós tesztek.
+
+Az appba még nincs beépítve. Az alábbi korábbi eredmények történeti feljegyzések;
+az AVM egyetlen következő számmal kapcsolatos korlátját a teljes lista átadása
+kerülheti meg. Más rendererek támogatását külön kell ellenőrizni.
+
 ## A rendszer
 
 - Raspberry Pi 5, Umbrel alatt

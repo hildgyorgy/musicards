@@ -4,6 +4,56 @@ Living handoff for continuing on another Mac. Git and the user's latest
 instructions take precedence. Never commit passwords, tokens, authenticated
 media URLs, private server addresses or signing material here.
 
+## DIDL_S playlist controller — 2026-11-20 (user-tested, not integrated)
+
+- User committed the working UPnP recovery checkpoint, confirmed one autonomous
+  SetNext transition after quitting, and declined an additional server component.
+  Their ConnectionManager Sink response advertises http-get text/xml DIDL_S.
+- Added Tools/UPnP/navidrome_avm_didl_playlist_probe.command and its Python
+  implementation. This is a manually run experiment, NOT a new app code path.
+  It asks for renderer IP and local Navidrome credentials, searches an album,
+  and defaults to its first three tracks (0 selects the full album).
+- Fresh unicast SSDP finds current service endpoints; --description-url is a
+  fallback and --status is read-only. No machine-specific addresses are embedded.
+  No dependencies, daemons, credential files, audio forwarding or transcoding.
+- After explicit confirmation it stops previous playback, clears NextURI, briefly
+  serves one random-path DIDL_S resource only to the selected renderer, and sends
+  SetAVTransportURI. Requires an actual GET and matching NrTracks, then closes
+  the HTTP listener BEFORE Play. NORMAL mode is set and verified. Afterwards
+  the process exits with no Next, Seek, polling or queue feeder remaining.
+- Quit both MusiCards apps before the trial: their current two-item queue logic
+  could otherwise interfere. Observe two autonomous transitions and end-of-list
+  Stop before reopening any controller. A successful Play alone proves nothing.
+- Ten offline tests passed using a fake renderer and loopback HTTP, including
+  server shutdown before Play, matching headers, ordered/escaped XML, access
+  restrictions, and refusing incomplete downloads/counts or repeat mode.
+  Shell syntax and --help also passed. No physical renderer commands were sent
+  by the agent. User subsequently reported the experiment worked cleanly after
+  the MIME-header fix. Main app sources were not changed by this experiment.
+- Basis: upstream GNOME Rygel AVTransport.handle_playlist fetches the full XML
+  via send_and_read_async; DefaultPlayerController.set_playlist_uri stores
+  collection.get_items(). AVM may contain a modified/older implementation:
+  the user's successful physical AVM experiment now supports this route for
+  that renderer. Do not infer support on every other UPnP device.
+- First user hardware attempt found AVM and Navidrome, selected a 13-track album,
+  then SetAVTransportURI returned HTTP 500 before Play. Fixed a probe-specific
+  compatibility issue: upstream Rygel compares the literal HEAD Content-Type
+  against text/xml; our charset parameter prevented playlist detection. The
+  header is now exactly text/xml (UTF-8 remains in the XML declaration), with
+  an exact-header regression assertion. Added safe numeric UPnP fault summaries
+  and HEAD/GET/denied/download counts. No raw fault text or token URLs are logged.
+  The retry started playback, and the user then explicitly reported that the
+  experiment worked cleanly. No second-run transcript or exact playlist length
+  was supplied; retain that distinction from the first 13-track attempt.
+- PRESERVE the command-line controller, Python implementation and tests as a
+  useful standalone tool and hardware reference, even after app integration.
+  The user explicitly requested that this code not be discarded. These new files
+  must be included in the next commit, not treated as temporary cleanup debris.
+- Future native integration must detect DIDL_S support, hand off the selected
+  release's playable remainder as one playlist, and avoid the existing SetNext
+  feeder interfering with renderer-owned playlists. Keep the current proven
+  app behavior until that integration is explicitly requested and tested.
+
 ## UPnP control recovery — 2026-11-20 (working tree)
 
 - User reported the App Store app losing track of an AVM that kept playing;
