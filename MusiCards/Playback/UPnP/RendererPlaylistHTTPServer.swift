@@ -204,8 +204,8 @@ nonisolated private struct PlaylistLANRoute: Sendable {
               inet_ntop(AF_INET, &peer.sin_addr, &peerBuffer, socklen_t(peerBuffer.count)) != nil else {
             throw RendererPlaylistError.unavailable
         }
-        self.localIP = String(cString: localBuffer)
-        self.rendererIP = String(cString: peerBuffer)
+        self.localIP = String(decoding: localBuffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
+        self.rendererIP = String(decoding: peerBuffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
         // Recheck resolved DNS, not only the originally advertised hostname.
         guard NavidromeRendererServerURL.isLocalHost(rendererIP) else { throw RendererPlaylistError.unavailable }
     }
