@@ -51,6 +51,7 @@ nonisolated struct AVTransportSnapshot: Equatable, Sendable {
 
 nonisolated protocol AVTransportControlling: Sendable {
     func snapshot() async throws -> AVTransportSnapshot
+    func positionInfo() async throws -> AVTransportPosition
     func setTransportURI(_ uri: URL, metadata: String) async throws
     func setNextTransportURI(_ uri: URL?, metadata: String) async throws
     func play() async throws

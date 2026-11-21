@@ -282,6 +282,26 @@ final class UPnPPlaybackEngineTests: XCTestCase {
     }
 
     @MainActor
+    func testPlayAfterAnotherControllerReplacedTrackReloadsMusiCardsTrack() async throws {
+        let client = TransportSpy()
+        let engine = makeEngine(client: client)
+        engine.configure(renderer: makeRenderer())
+        try await engine.prepare(makeItem("tosca"))
+        try await engine.play()
+        await engine.pause()
+
+        // Even a coincidentally identical song ID on another server is foreign.
+        await client.replaceCurrentURI(URL(string: "http://192.168.1.20/rest/stream.view?id=tosca")!)
+        try await engine.play()
+        let commands = await client.commands
+        XCTAssertEqual(commands.map(\.kind), ["setURI", "play", "pause", "setURI", "play"])
+        guard case let .setURI(reloaded, _) = commands[3] else { return XCTFail("Expected SetURI before Play") }
+        XCTAssertEqual(UPnPPlaybackEngine.navidromeSongID(in: reloaded), "tosca")
+        XCTAssertEqual(reloaded.host, "192.168.1.10")
+        await engine.stop()
+    }
+
+    @MainActor
     func testUnsupportedSourceDoesNotContactRenderer() async {
         let client = TransportSpy()
         let engine = makeEngine(client: client)
@@ -589,7 +609,7 @@ final class UPnPPlaybackEngineTests: XCTestCase {
                 trackNumber: 1,
                 duration: 180,
                 relativeTime: position,
-                trackURI: URL(string: "http://192.168.1.10/stream?id=\(songID)")
+                trackURI: URL(string: "http://192.168.1.10/rest/stream.view?id=\(songID)")
             )
         )
     }
@@ -660,6 +680,7 @@ private actor TransportSpy: AVTransportControlling {
     private var rejectsPlay = false
     private var playlistCount = 1
     private var currentURI: URL?
+    private var reportedTrackURI: URL?
     private var nextURI: URL?
     private var playlistServer: PlaylistServerSpy?
 
@@ -673,6 +694,15 @@ private actor TransportSpy: AVTransportControlling {
     }
 
     func setNormalPlayMode() async throws {}
+
+    func positionInfo() async throws -> AVTransportPosition {
+        AVTransportPosition(trackNumber: 1, duration: nil, relativeTime: nil, trackURI: reportedTrackURI)
+    }
+
+    func replaceCurrentURI(_ uri: URL) {
+        currentURI = uri
+        reportedTrackURI = uri
+    }
 
     func failNextSnapshots(_ count: Int) { snapshotFailuresRemaining = count }
     func rejectPlay(_ rejected: Bool = true) { rejectsPlay = rejected }
@@ -693,12 +723,15 @@ private actor TransportSpy: AVTransportControlling {
         }
         if shouldFailSnapshots { throw URLError(.cannotConnectToHost) }
         guard !snapshots.isEmpty else { throw URLError(.badServerResponse) }
-        return snapshots.removeFirst()
+        let snapshot = snapshots.removeFirst()
+        if let uri = snapshot.position.trackURI { reportedTrackURI = uri }
+        return snapshot
     }
 
     func setTransportURI(_ uri: URL, metadata: String) async throws {
         commands.append(.setURI(uri, metadata))
         currentURI = uri
+        reportedTrackURI = uri
     }
 
     func setNextTransportURI(_ uri: URL?, metadata: String) async throws {

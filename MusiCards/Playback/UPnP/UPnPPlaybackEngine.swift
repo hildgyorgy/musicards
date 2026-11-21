@@ -84,6 +84,7 @@ final class UPnPPlaybackEngine: PlaybackEngine {
     private var consecutivePollFailures = 0
     private var volumePollCounter = 0
     private var currentStreamURL: URL?
+    private var needsPlayVerification = false
     private var stagedNextItem: PlaybackQueueItem?
     private var stagedNextStreamURL: URL?
     private var lastPlayingPosition: TimeInterval?
@@ -149,6 +150,7 @@ final class UPnPPlaybackEngine: PlaybackEngine {
         hasObservedPlaying = false
         volumePollCounter = 0
         currentStreamURL = nil
+        needsPlayVerification = false
         stagedNextItem = nil
         stagedNextStreamURL = nil
         ownsRendererPlaylist = false
@@ -216,6 +218,7 @@ final class UPnPPlaybackEngine: PlaybackEngine {
         try ensureCurrent(generation)
         await publishVolumeStateIfAvailable()
         try ensureCurrent(generation)
+        needsPlayVerification = false
         eventHandler?(
             .prepared(
                 duration: item.track.duration,
@@ -225,12 +228,23 @@ final class UPnPPlaybackEngine: PlaybackEngine {
     }
 
     func play() async throws {
-        guard preparedItem != nil, let client else {
+        guard let item = preparedItem, let client else {
             throw UPnPPlaybackError.rendererUnavailable(
                 renderer?.friendlyName ?? "network renderer"
             )
         }
+        if needsPlayVerification {
+            let previousGeneration = pollGeneration
+            let position = try await client.positionInfo()
+            try ensureCurrent(previousGeneration)
+            if !Self.sameStream(position.trackURI, currentStreamURL) {
+                // Play acts on the renderer's loaded URI, which another control
+                // point may have replaced since this item was prepared.
+                try await prepare(item)
+            }
+        }
         let generation = pollGeneration
+        needsPlayVerification = true
         do {
             try await client.play()
         } catch {
@@ -387,6 +401,15 @@ final class UPnPPlaybackEngine: PlaybackEngine {
                 )
                 await stageNextItemIfAvailable()
                 guard generation == pollGeneration, !Task.isCancelled else { return }
+            }
+            if let reportedURI = snapshot.position.trackURI,
+               !Self.sameStream(reportedURI, currentStreamURL) {
+                needsPlayVerification = true
+                pollTask?.cancel()
+                pollTask = nil
+                hasObservedPlaying = false
+                eventHandler?(.paused)
+                return
             }
             if wasReconnecting, let preparedItem,
                Self.sameStream(snapshot.position.trackURI, currentStreamURL),
@@ -562,12 +585,18 @@ final class UPnPPlaybackEngine: PlaybackEngine {
     private static func sameStream(_ lhs: URL?, _ rhs: URL?) -> Bool {
         guard let lhs, let rhs else { return false }
         if lhs == rhs { return true }
-        guard let id = navidromeSongID(in: lhs) else { return false }
+        guard lhs.scheme?.lowercased() == rhs.scheme?.lowercased(),
+              lhs.host?.lowercased() == rhs.host?.lowercased(),
+              (lhs.port ?? (lhs.scheme?.lowercased() == "https" ? 443 : 80)) ==
+              (rhs.port ?? (rhs.scheme?.lowercased() == "https" ? 443 : 80)),
+              lhs.path == rhs.path,
+              let id = navidromeSongID(in: lhs) else { return false }
         return id == navidromeSongID(in: rhs)
     }
 
     static func navidromeSongID(in url: URL?) -> String? {
         guard let url,
+              url.path.hasSuffix("/rest/stream.view"),
               let components = URLComponents(
                 url: url,
                 resolvingAgainstBaseURL: false
@@ -629,6 +658,7 @@ extension UPnPPlaybackEngine: RendererPlaybackSessionControlling {
         pollTask = nil
         preparedItem = item
         currentStreamURL = snapshot.position.trackURI ?? streamURL
+        needsPlayVerification = true
         lastPlayingPosition = snapshot.position.relativeTime
         lastPlayingDuration = snapshot.position.duration
         hasObservedPlaying = snapshot.transport.state.uppercased() == "PLAYING"
