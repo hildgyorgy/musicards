@@ -5,13 +5,23 @@ import XCTest
 final class UPnPPlaybackEngineTests: XCTestCase {
     @MainActor
     func testPlaylistXMLEscapesMetadataAndStreamQueryAndRejectsInvalidQueue() throws {
-        let track = makeItem("one", title: "A & B <live> \"quoted\"")
+        let releaseID = "7E9208A7-6E42-4254-917F-439CE609FBD7"
+        let track = makeItem("one", title: "A & B <live> \"quoted\"", releaseID: releaseID)
         let url = URL(string: "http://127.0.0.1/stream?id=one&t=secret")!
         let data = try DIDLPlaylistDocument.make(items: [track], urls: [url])
         let xml = try XCTUnwrap(String(data: data, encoding: .utf8))
         XCTAssertTrue(xml.contains("A &amp; B &lt;live&gt; &quot;quoted&quot;"))
         XCTAssertTrue(xml.contains("id=one&amp;t=secret"))
         XCTAssertTrue(xml.contains("duration=\"0:03:00\""))
+        let artwork = "<upnp:albumArtURI>https://coverartarchive.org/release/\(releaseID.lowercased())/front-250</upnp:albumArtURI>"
+        XCTAssertTrue(xml.contains(artwork))
+        if case let .remoteAudio(asset) = track.source {
+            XCTAssertTrue(DIDLPlaylistDocument.trackMetadata(for: track, streamURL: url, asset: asset).contains(artwork))
+            let withoutRelease = makeItem("two")
+            XCTAssertFalse(DIDLPlaylistDocument.trackMetadata(for: withoutRelease, streamURL: url, asset: asset).contains("albumArtURI"))
+        } else {
+            XCTFail("Expected a remote audio fixture")
+        }
         XCTAssertThrowsError(try DIDLPlaylistDocument.make(items: [track], urls: []))
         XCTAssertThrowsError(try DIDLPlaylistDocument.make(items: Array(repeating: track, count: 1_001), urls: Array(repeating: url, count: 1_001)))
     }
@@ -540,13 +550,14 @@ final class UPnPPlaybackEngineTests: XCTestCase {
     @MainActor
     private func makeItem(
         _ id: String,
-        title: String = "Test Track"
+        title: String = "Test Track",
+        releaseID: String? = nil
     ) -> PlaybackQueueItem {
         let track = PlaybackTrack(
             id: id,
             releaseTrackID: nil,
             recordingID: nil,
-            releaseID: nil,
+            releaseID: releaseID,
             title: title,
             artist: "Test Artist",
             albumTitle: "Test Album",

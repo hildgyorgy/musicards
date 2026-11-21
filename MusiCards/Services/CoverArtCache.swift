@@ -24,6 +24,10 @@ enum CoverArtSize: Sendable {
         case .full:      return "front-500"
         }
     }
+
+    nonisolated func url(for releaseID: String) -> URL? {
+        URL(string: "https://coverartarchive.org/release/\(releaseID)/\(urlSuffix)")
+    }
 }
 
 actor CoverArtCache {
@@ -79,9 +83,7 @@ actor CoverArtCache {
     }
 
     private func fetchCover(releaseID: String, size: CoverArtSize) async -> PlatformImage? {
-        guard let url = URL(
-            string: "https://coverartarchive.org/release/\(releaseID)/\(size.urlSuffix)"
-        ) else { return nil }
+        guard let url = size.url(for: releaseID) else { return nil }
 
         do {
             let (data, response) = try await URLSession.shared.data(from: url)

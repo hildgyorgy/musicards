@@ -62,8 +62,11 @@ nonisolated enum DIDLPlaylistDocument {
             return String(format: "%d:%02d:%02d", seconds / 3600, (seconds % 3600) / 60, seconds % 60)
         }
         let durationAttribute = duration.map { " duration=\"\($0)\"" } ?? ""
+        let artworkElement = track.releaseID.flatMap(UUID.init(uuidString:))
+            .flatMap { CoverArtSize.thumbnail.url(for: $0.uuidString.lowercased()) }
+            .map { "<upnp:albumArtURI>\(escape($0.absoluteString))</upnp:albumArtURI>" } ?? ""
         return """
-        <item id="\(escape(id))" parentID="0" restricted="1"><dc:title>\(escape(track.title))</dc:title><upnp:artist>\(escape(track.artist))</upnp:artist><upnp:album>\(escape(track.albumTitle))</upnp:album><upnp:class>object.item.audioItem.musicTrack</upnp:class><res protocolInfo="http-get:*:\(escape(type)):*"\(durationAttribute)>\(escape(url.absoluteString))</res></item>
+        <item id="\(escape(id))" parentID="0" restricted="1"><dc:title>\(escape(track.title))</dc:title><upnp:artist>\(escape(track.artist))</upnp:artist><upnp:album>\(escape(track.albumTitle))</upnp:album><upnp:class>object.item.audioItem.musicTrack</upnp:class>\(artworkElement)<res protocolInfo="http-get:*:\(escape(type)):*"\(durationAttribute)>\(escape(url.absoluteString))</res></item>
         """
     }
 
