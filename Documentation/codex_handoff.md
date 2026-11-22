@@ -4,6 +4,27 @@ Living handoff for continuing on another Mac. Git and the user's latest
 instructions take precedence. Never commit passwords, tokens, authenticated
 media URLs, private server addresses or signing material here.
 
+## Release readiness — 2026-11-22
+
+- User explicitly confirmed completion of both previously requested physical
+  checks: native AVM album handoff (apps closed, autonomous transitions, album
+  end and control takeover) and real-device system playback with the spectrum
+  meter outside Xcode. These confirmations supersede older pending-hardware
+  notes below. No numerical CPU/battery profile was supplied.
+- Final verification on committed source **10013ba** (`vu meter`) passed:
+  **282 main-app macOS tests**, generic iOS build, **69 Sync tests**.
+- A fresh signed iOS Release archive for **2.3/build 12** was produced in the
+  normal local Xcode Archives/2026-11-22 directory. Strict recursive signature
+  verification passed; application identifier matches the embedded provisioning
+  profile, and multicast entitlement is present in both app and profile.
+- Fresh signed macOS Release archive also succeeded; strict recursive signature
+  verification passed, and the executable remains arm64. Both archives are
+  available in Xcode Organizer.
+- No source changes, commit, version/build bump or upload were performed by
+  this final check. This handoff update is documentation only. Store-side
+  Organizer validation/export/distribution signing and acceptance of build 12
+  have not been verified; local archive success does not prove Store acceptance.
+
 ## Stereo spectrum prototype — 2026-11-22
 
 - User requested L/R labels BELOW the Duo side meter, then authorized a real
