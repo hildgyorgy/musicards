@@ -4,6 +4,45 @@ Living handoff for continuing on another Mac. Git and the user's latest
 instructions take precedence. Never commit passwords, tokens, authenticated
 media URLs, private server addresses or signing material here.
 
+## Stereo spectrum prototype — 2026-11-22
+
+- User requested L/R labels BELOW the Duo side meter, then authorized a real
+  frequency-band prototype for system-audio playback (local files/Navidrome),
+  explicitly accepting no UPnP spectrum. Shared iPad/Duo rail now draws 48
+  logarithmic bands from low at bottom to high at top, with L/R bars extending
+  outwards. The ordinary collapsed player's horizontal RMS meter is retained.
+- MCPPCMRenderer captures finite stereo samples (mono mirrored) in a bounded
+  8192-frame SPSC observation ring only while metering is enabled. Full ring
+  drops observation samples, never waits or alters audio output. One consumer
+  copies the latest available 2048-frame window. Accelerate real FFT + Hann
+  window runs outside the realtime callback in the existing 10 Hz observation
+  task; band display spans 60 Hz to min(16 kHz, Nyquist), with a -60 dB floor.
+  This is a visual prototype, not a calibrated measurement instrument.
+- Existing view leases, Reduce Motion, scene inactivity and external-renderer
+  suppression still apply. No synthetic spectrum or parallel audio stream.
+- All 282 main-app macOS tests passed, including separate low/high stereo tones,
+  silence and observation-ring overflow/wrap with unchanged output samples.
+  Generic iOS Release build also passed.
+  User visually approved the initial 24-band prototype, then requested 48 bands
+  with half-thickness bars, then refined to maximum 1.0 pt with full-length
+  accent-blue tracks at 12% opacity and measured bars at 90%. The upper rail
+  offset was reduced from 236 to 200 pt (still limited by occlusions), making
+  the field taller; its width is now 90% of the initial spectrum prototype.
+  Duo meter and L/R labels align to the narrowest top system occlusion frame
+  (the actual camera), rather than the full-column bounding rectangle also
+  reported by SwiftUI. Measured closed-Duo layout: 466x678 pt, trailing inset
+  84, rail midpoint 424, precise camera center 418.167. Regions are empty on
+  first layout and populate afterward; a -6 pt fallback covers that initial
+  frame. Field width shrinks if needed instead of clamping the axis back to
+  center. iPad stays centered. Temporary geometry prints were removed.
+  Final Release simulator build was installed and tested with real Navidrome
+  system playback: in the 1398-pixel closed-display screenshot both Wi-Fi and
+  the full spectrum field have horizontal midpoint x=1254. Playback paused
+  after the check. No credentials or renderer settings changed.
+  FFT size/update rate are unchanged;
+  extra low bands share FFT bins where the fixed window cannot resolve them.
+  No AVM commands sent.
+
 ## Native autonomous UPnP albums — 2026-11-20 (working tree)
 
 - User explicitly requested integration of the physically successful DIDL_S

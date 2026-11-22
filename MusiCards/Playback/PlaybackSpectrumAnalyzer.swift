@@ -1,11 +1,11 @@
 import Accelerate
 import Foundation
 
-/// Visual prototype: 24 logarithmic bands, 60 Hz ... min(16 kHz, Nyquist).
+/// Visual prototype: 48 logarithmic bands, 60 Hz ... min(16 kHz, Nyquist).
 /// Called by the existing 10 Hz observation task, NEVER by the render callback.
 nonisolated final class PlaybackSpectrumAnalyzer {
     static let frameCount = 2048
-    static let bandCount = 24
+    static let bandCount = 48
     private let setup = vDSP_create_fftsetup(11, FFTRadix(kFFTRadix2))
     private var window = [Float](repeating: 0, count: frameCount)
     private var real = [Float](repeating: 0, count: frameCount / 2)

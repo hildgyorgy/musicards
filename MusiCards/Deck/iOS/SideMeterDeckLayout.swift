@@ -35,10 +35,28 @@ struct SideMeterDeckLayout<Content: View>: View {
             let rail = CGRect(x: leading + leftInset + deckWidth,
                               y: 0, width: railWidth, height: proxy.size.height)
             let reservedRegions = occlusions(in: proxy).filter { $0.intersects(rail) }
+            let preferredMeterWidth = (isTablet ? 70 : max(36, railWidth - 16)) * 0.9
+            // On Duo, align with the top system column rather than the center
+            // of our wider rail. Keep iPad's independent meter placement.
+            let systemColumn = reservedRegions
+                .filter { $0.midY < proxy.size.height / 2
+                    && $0.width <= railWidth
+                    && rail.minX...rail.maxX ~= $0.midX }
+                // Prefer the camera's precise frame over the whole column's
+                // wider bounding rectangle, which is also reported by SwiftUI.
+                .min { $0.width < $1.width }
+            // Localized regions arrive after the first layout on Duo. Until
+            // then its visible system column is 6 pt left of the rail midpoint.
+            let requestedAxis = isTablet ? rail.midX : (systemColumn?.midX ?? rail.midX - 6)
+            let meterAxis = min(max(requestedAxis, rail.minX), rail.maxX)
+            // Fit the field around the chosen axis; never move the axis back
+            // towards rail center just to preserve the old field width.
+            let meterWidth = min(preferredMeterWidth,
+                                 2 * min(meterAxis - rail.minX, rail.maxX - meterAxis))
             let reservedBottom = reservedRegions
                 .filter { $0.midY < proxy.size.height / 2 }
                 .map(\.maxY).max() ?? 0
-            let meterTop = max(reservedBottom + 20, DeckStyle.peek * 4 + DeckStyle.cardLabelHitHeight + 36)
+            let meterTop = max(reservedBottom + 20, DeckStyle.peek * 4 + DeckStyle.cardLabelHitHeight)
             // iPad's bottom-right resize handle also occupies the rail. It
             // limits the bottom, rather than pushing the meter below the screen.
             let reservedTop = reservedRegions
@@ -61,7 +79,8 @@ struct SideMeterDeckLayout<Content: View>: View {
                 VStack(spacing: 0) {
                     if meterBottom > meterTop {
                         SideSignalMeter(controller: controller, isTablet: isTablet)
-                            .frame(width: isTablet ? 70 : max(36, railWidth - 16), height: meterBottom - meterTop)
+                            .frame(width: meterWidth, height: meterBottom - meterTop)
+                            .offset(x: meterAxis - rail.midX)
                             .padding(.top, meterTop)
                     }
                     Spacer(minLength: 0)
@@ -72,6 +91,7 @@ struct SideMeterDeckLayout<Content: View>: View {
             .frame(width: width, height: proxy.size.height)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .environment(\.usesSideSignalMeter, true)
+
         }
     }
 
@@ -150,19 +170,24 @@ private struct PlaybackSpectrumMeter: View {
         Canvas { context, size in
             let count = PlaybackSpectrumAnalyzer.bandCount
             let step = size.height / CGFloat(count)
-            let thickness = min(3, step * 0.55)
+            let thickness = min(1, step * 0.55)
             let center = size.width / 2
             let maximum = max(0, center - 3)
             for band in 0..<count {
-                let y = size.height - (CGFloat(band) + 0.5) * step
+                let y = size.height - (CGFloat(band) + 0.5) * step - thickness / 2
                 for channel in 0..<2 {
+                    let trackX = channel == 0 ? center - 2 - maximum : center + 2
+                    let track = CGRect(x: trackX, y: y, width: maximum, height: thickness)
+                    context.fill(Path(roundedRect: track, cornerRadius: thickness / 2),
+                                 with: .color(Color.accentColor.opacity(0.12)))
                     let values = channel == 0 ? left : right
                     let level = values.indices.contains(band) ? values[band] : 0
-                    let length = max(1.5, maximum * min(1, max(0, level)))
+                    guard level > 0 else { continue }
+                    let length = maximum * min(1, level)
                     let x = channel == 0 ? center - 2 - length : center + 2
                     let rect = CGRect(x: x, y: y, width: length, height: thickness)
                     context.fill(Path(roundedRect: rect, cornerRadius: thickness / 2),
-                                 with: .color(Color.accentColor.opacity(level > 0 ? 0.9 : 0.12)))
+                                 with: .color(Color.accentColor.opacity(0.9)))
                 }
             }
         }

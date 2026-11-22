@@ -11,11 +11,12 @@ final class PlaybackSpectrumAnalyzerTests: XCTestCase {
             return [Float(0.5 * sin(187.5 * phase)), Float(0.25 * sin(6000 * phase))]
         }
         let bands = analyzer.analyze(stereo: stereo, sampleRate: 48_000)
-        XCTAssertEqual(bands.left.count, 24)
+        XCTAssertEqual(bands.left.count, 48)
+        XCTAssertEqual(bands.right.count, 48)
         let leftPeak = bands.left.indices.max { bands.left[$0] < bands.left[$1] }!
         let rightPeak = bands.right.indices.max { bands.right[$0] < bands.right[$1] }!
-        XCTAssertLessThan(leftPeak, 7)
-        XCTAssertGreaterThan(rightPeak, 17)
+        XCTAssertLessThan(leftPeak, 14)
+        XCTAssertGreaterThan(rightPeak, 35)
         XCTAssertGreaterThan(bands.left[leftPeak], 0.7)
         XCTAssertLessThan(bands.right[leftPeak], 0.1)
         XCTAssertLessThan(bands.left[rightPeak], 0.1)
