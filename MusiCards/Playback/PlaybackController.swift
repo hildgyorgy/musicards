@@ -557,7 +557,13 @@ final class PlaybackController: ObservableObject {
             // playback updates, with a short interpolation in the meter view.
             signalLevels = PlaybackSignalLevels(
                 left: max(levels.left, previous.left * 0.65),
-                right: max(levels.right, previous.right * 0.65)
+                right: max(levels.right, previous.right * 0.65),
+                spectrumLeft: levels.spectrumLeft.enumerated().map { index, value in
+                    max(value, previous.spectrumLeft.indices.contains(index) ? previous.spectrumLeft[index] * 0.72 : 0)
+                },
+                spectrumRight: levels.spectrumRight.enumerated().map { index, value in
+                    max(value, previous.spectrumRight.indices.contains(index) ? previous.spectrumRight[index] * 0.72 : 0)
+                }
             )
         case .positionChanged(let position):
             self.position = max(position, 0)

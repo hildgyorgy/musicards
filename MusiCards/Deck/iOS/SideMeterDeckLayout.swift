@@ -60,8 +60,8 @@ struct SideMeterDeckLayout<Content: View>: View {
                     .frame(width: deckWidth)
                 VStack(spacing: 0) {
                     if meterBottom > meterTop {
-                        SideSignalMeter(controller: controller, showsChannelLabels: isTablet)
-                            .frame(width: isTablet ? 70 : 18, height: meterBottom - meterTop)
+                        SideSignalMeter(controller: controller, isTablet: isTablet)
+                            .frame(width: isTablet ? 70 : max(36, railWidth - 16), height: meterBottom - meterTop)
                             .padding(.top, meterTop)
                     }
                     Spacer(minLength: 0)
@@ -99,7 +99,7 @@ struct SideMeterDeckLayout<Content: View>: View {
 
 private struct SideSignalMeter: View {
     @ObservedObject var controller: PlaybackController
-    var showsChannelLabels = false
+    var isTablet: Bool
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var observerID = UUID()
@@ -112,23 +112,15 @@ private struct SideSignalMeter: View {
             if !reduceMotion, controller.externalOutputDisplayName == nil,
                let levels = controller.signalLevels {
                 VStack(spacing: 10) {
-                    PlaybackSignalMeter(
-                        left: PlaybackSignalLevels.displayFraction(levels.left),
-                        right: PlaybackSignalLevels.displayFraction(levels.right),
-                        axis: .vertical
-                    )
-                    .frame(width: showsChannelLabels ? 28 : 18)
+                    PlaybackSpectrumMeter(left: levels.spectrumLeft, right: levels.spectrumRight)
                     .frame(maxHeight: .infinity)
                     .animation(.linear(duration: 0.1), value: levels)
-                    if showsChannelLabels {
-                        HStack {
-                            Text("L")
-                            Spacer()
-                            Text("R")
-                        }
-                        .font(.caption)
-                        .foregroundStyle(Color.accentColor)
+                    HStack(spacing: 0) {
+                        Text("L").frame(maxWidth: .infinity)
+                        Text("R").frame(maxWidth: .infinity)
                     }
+                    .font(isTablet ? .caption : .caption2)
+                    .foregroundStyle(Color.accentColor)
                 }
             }
         }
@@ -146,6 +138,34 @@ private struct SideSignalMeter: View {
             scenePhase == .active && !reduceMotion && controller.externalOutputDisplayName == nil,
             observerID: observerID
         )
+    }
+}
+
+/// Low frequencies at the bottom; independent L/R bands grow outwards.
+private struct PlaybackSpectrumMeter: View {
+    let left: [Double]
+    let right: [Double]
+
+    var body: some View {
+        Canvas { context, size in
+            let count = PlaybackSpectrumAnalyzer.bandCount
+            let step = size.height / CGFloat(count)
+            let thickness = min(3, step * 0.55)
+            let center = size.width / 2
+            let maximum = max(0, center - 3)
+            for band in 0..<count {
+                let y = size.height - (CGFloat(band) + 0.5) * step
+                for channel in 0..<2 {
+                    let values = channel == 0 ? left : right
+                    let level = values.indices.contains(band) ? values[band] : 0
+                    let length = max(1.5, maximum * min(1, max(0, level)))
+                    let x = channel == 0 ? center - 2 - length : center + 2
+                    let rect = CGRect(x: x, y: y, width: length, height: thickness)
+                    context.fill(Path(roundedRect: rect, cornerRadius: thickness / 2),
+                                 with: .color(Color.accentColor.opacity(level > 0 ? 0.9 : 0.12)))
+                }
+            }
+        }
     }
 }
 #endif

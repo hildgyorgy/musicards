@@ -396,12 +396,16 @@ enum AudioOutputRouteInspector {
 nonisolated struct PlaybackSignalLevels: Equatable, Sendable {
     let left: Double
     let right: Double
+    let spectrumLeft: [Double]
+    let spectrumRight: [Double]
 
     static let silence = PlaybackSignalLevels(left: 0, right: 0)
 
-    init(left: Double, right: Double) {
+    init(left: Double, right: Double, spectrumLeft: [Double] = [], spectrumRight: [Double] = []) {
         self.left = left.isFinite ? min(max(left, 0), 1) : 0
         self.right = right.isFinite ? min(max(right, 0), 1) : 0
+        self.spectrumLeft = spectrumLeft
+        self.spectrumRight = spectrumRight
     }
 
     /// A quiet -50 dBFS floor and a logarithmic display, independent of volume.

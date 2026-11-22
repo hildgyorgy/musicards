@@ -163,6 +163,8 @@ final class AudioUnitPlaybackCore {
     private let operations = AudioPlaybackOperationCoordinator()
     private let outputDriver: any AudioUnitOutputDriving
     private var signalMeteringEnabled = false
+    private let spectrumAnalyzer = PlaybackSpectrumAnalyzer()
+    private var spectrumWindow = [Float](repeating: 0, count: 4096)
 
     init(outputDriver: (any AudioUnitOutputDriving)? = nil) {
         self.outputDriver = outputDriver ?? SystemAudioUnitOutputDriver()
@@ -476,8 +478,15 @@ final class AudioUnitPlaybackCore {
 
                 if self.signalMeteringEnabled {
                     let signal = MCPPCMRendererSignalLevels(decodedPCM.renderer)
+                    let frames = self.spectrumWindow.withUnsafeMutableBufferPointer {
+                        MCPPCMRendererCopySpectrumWindow(decodedPCM.renderer, $0.baseAddress!)
+                    }
+                    let spectrum = frames == 2048
+                        ? self.spectrumAnalyzer.analyze(stereo: self.spectrumWindow, sampleRate: decodedPCM.sampleRate)
+                        : (left: [Double](), right: [Double]())
                     self.eventHandler?(.signalLevelsChanged(PlaybackSignalLevels(
-                        left: Double(signal.left), right: Double(signal.right)
+                        left: Double(signal.left), right: Double(signal.right),
+                        spectrumLeft: spectrum.left, spectrumRight: spectrum.right
                     )))
                 }
 

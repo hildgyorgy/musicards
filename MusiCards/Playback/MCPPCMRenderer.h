@@ -50,6 +50,9 @@ bool MCPPCMRendererDidFinish(const MCPPCMRenderer *renderer);
 MCPPCMSignalLevels MCPPCMRendererSignalLevels(const MCPPCMRenderer *renderer);
 // Disabled by default; only visible, active player views request measurement.
 void MCPPCMRendererSetSignalMeteringEnabled(MCPPCMRenderer *renderer, bool enabled);
+// Single non-realtime consumer. Copies the newest 2048 interleaved L/R frames
+// into a 4096-float buffer; returns 0 until a complete window is available.
+uint32_t MCPPCMRendererCopySpectrumWindow(MCPPCMRenderer *renderer, float *stereoSamples);
 
 OSStatus MCPPCMRenderCallback(
     void *inRefCon,

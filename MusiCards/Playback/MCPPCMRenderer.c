@@ -20,6 +20,10 @@ struct MCPPCMRenderer {
     atomic_flag renderAccess;
     _Atomic uint64_t signalEnergy;
     _Atomic bool signalMeteringEnabled;
+    // Bounded SPSC observation ring. Full => drop observations, never wait.
+    float spectrumSamples[8192 * 2];
+    _Atomic uint64_t spectrumRead;
+    _Atomic uint64_t spectrumWrite;
 };
 
 MCPPCMRenderer *MCPPCMRendererCreate(
@@ -62,6 +66,8 @@ MCPPCMRenderer *MCPPCMRendererCreate(
     atomic_flag_clear(&renderer->renderAccess);
     atomic_init(&renderer->signalEnergy, 0);
     atomic_init(&renderer->signalMeteringEnabled, false);
+    atomic_init(&renderer->spectrumRead, 0);
+    atomic_init(&renderer->spectrumWrite, 0);
     return renderer;
 }
 
@@ -261,15 +267,43 @@ void MCPPCMRendererSetSignalMeteringEnabled(MCPPCMRenderer *renderer, bool enabl
     atomic_store_explicit(&renderer->signalMeteringEnabled, enabled, memory_order_relaxed);
 }
 
+uint32_t MCPPCMRendererCopySpectrumWindow(MCPPCMRenderer *renderer, float *stereoSamples) {
+    if (renderer == NULL || stereoSamples == NULL) { return 0; }
+    uint64_t write = atomic_load_explicit(&renderer->spectrumWrite, memory_order_acquire);
+    uint64_t read = atomic_load_explicit(&renderer->spectrumRead, memory_order_relaxed);
+    if (!atomic_load_explicit(&renderer->isPlaying, memory_order_acquire)
+        || !atomic_load_explicit(&renderer->signalMeteringEnabled, memory_order_relaxed)) {
+        atomic_store_explicit(&renderer->spectrumRead, write, memory_order_release);
+        return 0;
+    }
+    if (write - read < 2048) { return 0; }
+    for (uint32_t i = 0; i < 2048; i++) {
+        uint64_t source = (write - 2048 + i) % 8192;
+        stereoSamples[i * 2] = renderer->spectrumSamples[source * 2];
+        stereoSamples[i * 2 + 1] = renderer->spectrumSamples[source * 2 + 1];
+    }
+    atomic_store_explicit(&renderer->spectrumRead, write, memory_order_release);
+    return 2048;
+}
+
 static void MCPMeasureSignal(MCPPCMRenderer *renderer, const float *samples, UInt32 frames) {
     double left = 0, right = 0;
     uint32_t channels = renderer->channelCount;
+    uint64_t write = atomic_load_explicit(&renderer->spectrumWrite, memory_order_relaxed);
+    uint64_t read = atomic_load_explicit(&renderer->spectrumRead, memory_order_acquire);
+    uint32_t captureFrames = (uint32_t)fmin(frames, 8192 - (write - read));
     for (UInt32 frame = 0; frame < frames; frame++) {
         double l = samples[(size_t)frame * channels];
         double r = channels > 1 ? samples[(size_t)frame * channels + 1] : l;
         if (isfinite(l)) { left += l * l; }
         if (isfinite(r)) { right += r * r; }
+        if (frame < captureFrames) {
+            uint64_t target = (write + frame) % 8192;
+            renderer->spectrumSamples[target * 2] = isfinite(l) ? (float)l : 0;
+            renderer->spectrumSamples[target * 2 + 1] = isfinite(r) ? (float)r : 0;
+        }
     }
+    atomic_store_explicit(&renderer->spectrumWrite, write + captureFrames, memory_order_release);
     uint32_t l = frames > 0 ? (uint32_t)(fmin(left / frames, 1.0) * UINT32_MAX) : 0;
     uint32_t r = frames > 0 ? (uint32_t)(fmin(right / frames, 1.0) * UINT32_MAX) : 0;
     atomic_store_explicit(&renderer->signalEnergy, ((uint64_t)l << 32) | r, memory_order_relaxed);
