@@ -3,6 +3,30 @@ import XCTest
 
 final class ReleaseSelectionRaceTests: XCTestCase {
     @MainActor
+    func testAdoptedArtworkLoadsEvenWhileBrowsingAnotherRelease() async throws {
+        let png = Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC")!
+        let cover = try XCTUnwrap(PlatformImage(data: png))
+        let model = MusiCardsAppModel(
+            playbackEngine: PendingPlaybackEngine(),
+            releaseDetailLoader: { Self.release(id: $0) },
+            releaseCoverLoader: { _ in cover }
+        )
+        let track = PlaybackTrack(
+            id: "song", releaseTrackID: nil, recordingID: nil, releaseID: "playing",
+            title: "Song", artist: "Artist", albumTitle: "Album", duration: 180, artworkData: nil
+        )
+        let queue = ReleasePlaybackQueue(items: [PlaybackQueueItem(
+            track: track, source: .localFile(URL(fileURLWithPath: "/tmp/song.flac"))
+        )], selectedIndex: 0)
+        await model.playbackController.replaceQueue(with: queue.items)
+        model.selectRelease(row(id: "browsing"))
+        await model.preloadPlaybackArtwork(from: queue)
+        XCTAssertNotNil(model.playbackController.currentItem?.track.artworkData)
+        XCTAssertEqual(model.selectedReleaseID, "browsing")
+        XCTAssertEqual(model.playbackController.currentItem?.id, "song")
+    }
+
+    @MainActor
     func testLatestReleaseSelectionWinsWhenOlderSuccessFinishesLast() async {
         let model = makeModel { id in
             if id == "A" {

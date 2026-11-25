@@ -99,14 +99,11 @@ struct PlayerCardContentView: View {
             .scrollIndicators(.hidden)
 
             VStack(spacing: 0) {
-                playerMetadataLabel(sourceTitle(item), compact: true)
-                    .lineLimit(1)
+                // One text block gives both explicit lines the same fitted font.
+                playerMetadataLabel("\(sourceTitle(item))\n\(outputTitle)", compact: true)
+                    .lineLimit(2)
                     .minimumScaleFactor(0.75)
                     .padding(.top, 6)
-
-                playerMetadataLabel(outputTitle, compact: true)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
                     .padding(.bottom, 12 + playerFooterInfoSpacing)
 
                 if controller.canControlOutputVolume {

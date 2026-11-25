@@ -4,6 +4,164 @@ import XCTest
 
 final class UPnPPlaybackEngineTests: XCTestCase {
     @MainActor
+    func testLiveFollowerAdoptsAnotherAlbumAndKeepsFollowingPauseResumeAndStop() async throws {
+        let client = TransportSpy()
+        let engine = makeEngine(client: client, pollInterval: .seconds(60))
+        engine.configure(renderer: makeRenderer(supportsSetNext: true))
+        let controller = PlaybackController(engine: engine)
+        let old = makeItem("old", releaseID: "old-album")
+        let album = [makeItem("new", releaseID: "new-album"), makeItem("new-next", releaseID: "new-album")]
+        engine.releaseQueueProvider = { try await controller.resolvedReleaseQueueForRenderer() }
+        engine.nextItemProvider = { try await controller.resolvedNextItemForRenderer() }
+        await controller.replaceQueue(with: [old])
+        await controller.play()
+        engine.beginObservingRenderer()
+        var lookups = 0
+        controller.rendererQueueResolver = { id in
+            lookups += 1
+            XCTAssertEqual(id, "new")
+            return ReleasePlaybackQueue(items: album, selectedIndex: 0)
+        }
+        let before = await client.commands
+        let foreign = Self.snapshot(state: "PLAYING", songID: "new", position: 42)
+        await client.setSnapshots([foreign, foreign])
+        await engine.pollRenderer()
+        await eventually { controller.currentItem?.id == "new" }
+        XCTAssertEqual(controller.currentItem?.track.releaseID, "new-album")
+        XCTAssertEqual(controller.position, 42)
+        XCTAssertEqual(controller.status, .playing)
+        XCTAssertEqual(lookups, 1)
+        let after = await client.commands
+        XCTAssertEqual(after, before, "Observing must send no SetURI/SetNext/Play/Stop")
+
+        await client.setSnapshots([Self.snapshot(state: "PAUSED_PLAYBACK", songID: "new", position: 50)])
+        await engine.pollRenderer()
+        XCTAssertEqual(controller.status, .paused)
+        await client.setSnapshots([Self.snapshot(state: "PLAYING", songID: "new-next", position: 3)])
+        await engine.pollRenderer()
+        XCTAssertEqual(controller.currentItem?.id, "new-next")
+        XCTAssertEqual(controller.status, .playing)
+        await client.setSnapshots([Self.snapshot(state: "STOPPED", songID: "new", position: 0)])
+        await engine.pollRenderer()
+        XCTAssertEqual(controller.status, .stopped)
+        XCTAssertEqual(controller.currentItem?.id, "new-next", "Renderer EOS reset must not rewind the UI")
+        let ended = await client.commands
+        XCTAssertEqual(ended, before)
+        engine.endObservingRenderer()
+    }
+
+    @MainActor
+    func testSlowForeignAlbumLookupCannotOverrideExplicitQueueReplacement() async throws {
+        let client = TransportSpy()
+        let engine = makeEngine(client: client, pollInterval: .seconds(60))
+        engine.configure(renderer: makeRenderer())
+        let controller = PlaybackController(engine: engine)
+        await controller.replaceQueue(with: [makeItem("old")])
+        await controller.play()
+        engine.beginObservingRenderer()
+        let gate = RendererQueueGate()
+        controller.rendererQueueResolver = { id in try await gate.resolve() }
+        let foreign = Self.snapshot(state: "PLAYING", songID: "foreign", position: 10)
+        await client.setSnapshots([foreign])
+        await engine.pollRenderer()
+        await eventually { gate.isWaiting }
+        // Repeated observations share the same unresolved lookup.
+        await client.setSnapshots([foreign])
+        await engine.pollRenderer()
+        XCTAssertEqual(gate.calls, 1)
+        await controller.replaceQueue(with: [makeItem("chosen")])
+        gate.resume(ReleasePlaybackQueue(items: [makeItem("foreign")], selectedIndex: 0))
+        for _ in 0..<10 { await Task.yield() }
+        XCTAssertEqual(controller.currentItem?.id, "chosen")
+        XCTAssertEqual(controller.status, .idle)
+        engine.endObservingRenderer()
+    }
+
+    @MainActor
+    func testObservationPersistsAfterLocalPauseAndStopUntilDisabled() async throws {
+        let client = TransportSpy()
+        let engine = makeEngine(client: client, pollInterval: .milliseconds(5))
+        engine.configure(renderer: makeRenderer())
+        try await engine.prepare(makeItem("first"))
+        engine.beginObservingRenderer()
+        try await engine.play()
+        await engine.pause()
+        let pausedCount = await client.snapshotCount
+        try await Task.sleep(for: .milliseconds(25))
+        let afterPause = await client.snapshotCount
+        XCTAssertGreaterThan(afterPause, pausedCount)
+        await engine.stop()
+        let stoppedCount = await client.snapshotCount
+        try await Task.sleep(for: .milliseconds(25))
+        let afterStop = await client.snapshotCount
+        XCTAssertGreaterThan(afterStop, stoppedCount)
+        engine.endObservingRenderer()
+        let disabledCount = await client.snapshotCount
+        try await Task.sleep(for: .milliseconds(25))
+        let afterDisable = await client.snapshotCount
+        XCTAssertEqual(afterDisable, disabledCount)
+    }
+
+    @MainActor
+    func testChangedRendererSongDuringCatalogLookupIsNotAdopted() async throws {
+        let client = TransportSpy()
+        let engine = makeEngine(client: client, pollInterval: .seconds(60))
+        engine.configure(renderer: makeRenderer())
+        let controller = PlaybackController(engine: engine)
+        await controller.replaceQueue(with: [makeItem("old")])
+        await controller.play()
+        engine.beginObservingRenderer()
+        let gate = RendererQueueGate()
+        controller.rendererQueueResolver = { _ in try await gate.resolve() }
+        let foreign = Self.snapshot(state: "PLAYING", songID: "foreign", position: 10)
+        await client.setSnapshots([foreign])
+        await engine.pollRenderer()
+        await eventually { gate.isWaiting }
+        await client.setSnapshots([Self.snapshot(state: "PLAYING", songID: "newer", position: 1)])
+        let before = await client.commands
+        gate.resume(ReleasePlaybackQueue(items: [makeItem("foreign")], selectedIndex: 0))
+        for _ in 0..<50 { await Task.yield() }
+        XCTAssertEqual(controller.currentItem?.id, "old")
+        let after = await client.commands
+        XCTAssertEqual(after, before)
+        engine.endObservingRenderer()
+    }
+
+    @MainActor
+    func testSelectedIdleRendererIsObservedButSystemOutputDoesNotReceiveItsEvents() async throws {
+        let client = TransportSpy()
+        let engine = makeEngine(client: client, pollInterval: .seconds(60))
+        var selection = OutputRoutingPlaybackEngine.Selection.renderer(makeRenderer())
+        let routing = OutputRoutingPlaybackEngine(
+            systemEngine: PendingPlaybackEngine(), rendererEngine: engine, selection: { selection }
+        )
+        var events: [PlaybackEngineEvent] = []
+        routing.eventHandler = { events.append($0) }
+        let foreign = Self.snapshot(state: "PLAYING", songID: "foreign", position: 8)
+        await client.setSnapshots([foreign, foreign])
+        _ = try await routing.rendererSnapshot()
+        await engine.pollRenderer()
+        XCTAssertTrue(events.contains(.rendererSessionChanged(foreign)))
+        let before = events.count
+        selection = .system
+        await routing.stop()
+        await client.setSnapshots([foreign])
+        await engine.pollRenderer()
+        XCTAssertEqual(events.count, before)
+        let commands = await client.commands
+        XCTAssertTrue(commands.isEmpty, "Selecting/observing idle output must not control transport")
+    }
+
+    @MainActor
+    private func eventually(_ predicate: () -> Bool) async {
+        for _ in 0..<200 {
+            if predicate() { return }
+            try? await Task.sleep(for: .milliseconds(2))
+        }
+        XCTAssertTrue(predicate())
+    }
+
+    @MainActor
     func testPlaylistXMLEscapesMetadataAndStreamQueryAndRejectsInvalidQueue() throws {
         let releaseID = "7E9208A7-6E42-4254-917F-439CE609FBD7"
         let track = makeItem("one", title: "A & B <live> \"quoted\"", releaseID: releaseID)
@@ -780,5 +938,20 @@ private actor PlaylistServerSpy: RendererPlaylistServing {
         continuation?.resume(throwing: CancellationError())
         continuation = nil
         return downloaded
+    }
+}
+
+@MainActor
+private final class RendererQueueGate {
+    private var continuation: CheckedContinuation<ReleasePlaybackQueue, Error>?
+    private(set) var calls = 0
+    var isWaiting: Bool { continuation != nil }
+    func resolve() async throws -> ReleasePlaybackQueue {
+        calls += 1
+        return try await withCheckedThrowingContinuation { continuation = $0 }
+    }
+    func resume(_ queue: ReleasePlaybackQueue) {
+        continuation?.resume(returning: queue)
+        continuation = nil
     }
 }

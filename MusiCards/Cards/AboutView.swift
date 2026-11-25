@@ -22,8 +22,13 @@ struct AboutView: View {
                 #if os(macOS)
                 if #available(macOS 26.0, *) {
                     helpSection("Window appearance") {
-                        Toggle("Liquid glass", isOn: $glassTransparent)
-                            .toggleStyle(.switch)
+                        HStack {
+                            Text("Liquid glass")
+                            Spacer()
+                            Toggle("Liquid glass", isOn: $glassTransparent)
+                                .labelsHidden()
+                                .toggleStyle(.switch)
+                        }
                     }
                 }
                 #endif
@@ -38,11 +43,11 @@ struct AboutView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
 
-                    Text("Explore MusicBrainz artists, releases, tracks and credits. Connect your own music to play matching tracks.")
+                    helpText("Explore **MusicBrainz** artists, releases, tracks and credits. Connect your own music to play matching tracks.")
                 }
 
                 helpSection("Find music") {
-                    Text("Type a name or title in Search:")
+                    helpText("Type a name or title in **Search**:")
 
                     VStack(alignment: .leading, spacing: 12) {
                         searchExample("artist", "Find artists")
@@ -50,43 +55,43 @@ struct AboutView: View {
                         searchExample("artist, release", "Find an artist’s release")
                     }
 
-                    Text("Paste a MusicBrainz release ID to open a specific edition.")
+                    helpText("Paste a **MusicBrainz release ID** to open a specific edition.")
 
-                    Text("Use the search switch to look in your library only, or include MusicBrainz.")
+                    helpText("Use the search switch to look in **your library only**, or include **MusicBrainz**.")
 
                     #if os(iOS)
-                    Text("On iPhone, you can scan a CD barcode or use Shazam. When Apple Music is playing, its album may also appear in Search.")
+                    helpText("On iPhone, you can scan a **CD barcode** or use **Shazam**. When **Apple Music** is playing, its album may also appear in **Search**.")
                     #endif
                 }
 
                 helpSection("Choose a music source") {
-                    Text("Open SOURCE on the home screen and choose This device or Navidrome. This choice affects playback, not MusicBrainz browsing.")
+                    helpText("Open **SOURCE** on the home screen and choose **This device** or **Navidrome**. This choice affects playback, not MusicBrainz browsing.")
 
-                    Text("For This device, first tag your files with MusicBrainz Picard and prepare the music folder with MusiCards for Mac. MusiCards creates the index (\(Text("library.json").font(.system(.body, design: .monospaced)))) needed to match your files with MusicBrainz; you don’t need to edit it yourself.")
+                    helpText("For **This device**, first tag your files with **MusicBrainz Picard** and prepare the music folder with **MusiCards for Mac**. MusiCards creates the index (`library.json`) needed to match your files with MusicBrainz; you don’t need to edit it yourself.")
 
                     #if os(macOS)
-                    Text("Use Create / update library index on the home screen, then select the prepared folder in SOURCE. Update the index after adding or changing music.")
+                    helpText("Use **Create / update library index** on the home screen, then select the prepared folder in **SOURCE**. Update the index after adding or changing music.")
                     #else
-                    Text("After preparing the folder on Mac, select it from Files in SOURCE. It can also be on supported external storage. Update the index on Mac after adding or changing music.")
+                    helpText("After preparing the folder on Mac, select it from **Files** in **SOURCE**. It can also be on supported external storage. Update the index on Mac after adding or changing music.")
                     #endif
 
                     Link("MusicBrainz Picard", destination: AboutLinks.picard)
 
-                    Text("For Navidrome, no \(Text("library.json").font(.system(.body, design: .monospaced))) is needed: Navidrome provides the catalog and MusicBrainz IDs from your tagged files. Let it scan your music, then enter your server addresses and account details in SOURCE. MusiCards prefers the local address when reachable and otherwise uses the remote address. SOURCE shows the active connection.")
+                    helpText("For **Navidrome**, no `library.json` is needed: Navidrome provides the catalog and MusicBrainz IDs from your tagged files. Let it scan your music, then enter your server addresses and account details in **SOURCE**. MusiCards prefers the **local address** when reachable and otherwise uses the **remote address**. SOURCE shows the active connection.")
                 }
 
                 helpSection("Choose audio output") {
-                    Text("Open OUTPUT on the home screen. System audio follows the output chosen on your device, including speakers, headphones, AirPlay, Bluetooth and connected DACs.")
+                    helpText("Open **OUTPUT** on the home screen. **System audio** follows the output chosen on your device, including speakers, headphones, AirPlay, Bluetooth and connected DACs.")
 
-                    Text("You can also search for and select a UPnP renderer on your network. UPnP playback requires an active local Navidrome connection, and the renderer must be able to reach that server. With a remote connection, choose System audio.")
+                    helpText("You can also search for and select a **UPnP renderer** on your network. UPnP playback requires an active **local Navidrome connection**, and the renderer must be able to reach that server. With a remote connection, choose **System audio**.")
 
-                    Text("A blue play symbol marks a release or track available from the active music source.")
+                    helpText("A **blue play symbol** marks a release or track available from the active music source.")
                 }
 
                 helpSection("If playback is unavailable") {
-                    Text("No play symbol? Check the active source. For files on this device, check the MusicBrainz tags and update \(Text("library.json").font(.system(.body, design: .monospaced))) after changing your music. For Navidrome, check that its library scan has finished.")
+                    helpText("**No play symbol?** Check the active source. For files on this device, check the **MusicBrainz tags** and update `library.json` after changing your music. For **Navidrome**, check that its library scan has finished.")
 
-                    Text("No renderer found? Try Deep search or enter its address in OUTPUT. No sound? Check the selected output here and in the system.")
+                    helpText("**No renderer found?** Try **Deep search** or enter its address in **OUTPUT**. **No sound?** Check the selected output here and in the system.")
                 }
 
                 helpSection("Support & privacy") {
@@ -119,6 +124,20 @@ struct AboutView: View {
         .presentationDragIndicator(.visible)
         .presentationContentInteraction(.scrolls)
         #endif
+    }
+
+    /// Keep inline feature names quieter than the section headings.
+    private func helpText(_ markdown: String) -> Text {
+        var text = (try? AttributedString(
+            markdown: markdown,
+            options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+        )) ?? AttributedString(markdown)
+        for run in text.runs {
+            if run.inlinePresentationIntent?.contains(.stronglyEmphasized) == true {
+                text[run.range].font = .body.weight(.semibold)
+            }
+        }
+        return Text(text)
     }
 
     private func helpSection<Content: View>(

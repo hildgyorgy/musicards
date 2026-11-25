@@ -29,6 +29,7 @@ final class OutputRoutingPlaybackEngine: PlaybackEngine {
     private let selection: () -> Selection
     private let validatePlayback: () async throws -> Void
     private var activeRoute: Route?
+    private var observedRendererID: String?
     private var preparedItem: PlaybackQueueItem?
     private var signalMeteringRequested = false
 
@@ -53,7 +54,9 @@ final class OutputRoutingPlaybackEngine: PlaybackEngine {
             self.eventHandler?(event)
         }
         rendererEngine.eventHandler = { [weak self] event in
-            guard let self, case .renderer = self.activeRoute else { return }
+            guard let self, case .renderer(let selected) = self.selection(),
+                  self.activeRoute != .system,
+                  self.observedRendererID == selected.id else { return }
             self.eventHandler?(event)
         }
     }
@@ -63,6 +66,8 @@ final class OutputRoutingPlaybackEngine: PlaybackEngine {
         preparedItem = item
         switch selection() {
         case .system:
+            observedRendererID = nil
+            rendererEngine.endObservingRenderer()
             if case .renderer = activeRoute {
                 await rendererEngine.stop()
             }
@@ -76,6 +81,8 @@ final class OutputRoutingPlaybackEngine: PlaybackEngine {
                 await systemEngine.stop()
             }
             rendererEngine.configure(renderer: renderer)
+            observedRendererID = renderer.id
+            rendererEngine.beginObservingRenderer()
             activeRoute = .renderer(renderer.id)
             try await rendererEngine.prepare(item)
 
@@ -128,6 +135,14 @@ final class OutputRoutingPlaybackEngine: PlaybackEngine {
         }
         activeRoute = nil
         preparedItem = nil
+        if case .renderer(let renderer) = selection() {
+            rendererEngine.configure(renderer: renderer)
+            observedRendererID = renderer.id
+            rendererEngine.beginObservingRenderer()
+        } else {
+            observedRendererID = nil
+            rendererEngine.endObservingRenderer()
+        }
     }
 
     func seek(to position: TimeInterval) async throws {
@@ -186,6 +201,8 @@ extension OutputRoutingPlaybackEngine: RendererPlaybackSessionControlling {
     func rendererSnapshot() async throws -> AVTransportSnapshot? {
         guard case .renderer(let renderer) = selection() else { return nil }
         rendererEngine.configure(renderer: renderer)
+        observedRendererID = renderer.id
+        rendererEngine.beginObservingRenderer()
         return try await rendererEngine.rendererSnapshot()
     }
 
@@ -201,6 +218,8 @@ extension OutputRoutingPlaybackEngine: RendererPlaybackSessionControlling {
         }
         preparedItem = item
         rendererEngine.configure(renderer: renderer)
+        observedRendererID = renderer.id
+        rendererEngine.beginObservingRenderer()
         activeRoute = .renderer(renderer.id)
         try await rendererEngine.adoptRendererSession(
             item: item,

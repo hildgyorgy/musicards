@@ -4,6 +4,89 @@ Living handoff for continuing on another Mac. Git and the user's latest
 instructions take precedence. Never commit passwords, tokens, authenticated
 media URLs, private server addresses or signing material here.
 
+## Shared Player source/output typography — 2026-11-25
+
+- User requested both footer information lines scale together, with the longer
+  line determining their common visible font size. PlayerCardContentView now
+  uses a single footnote Text block with an explicit newline, two-line limit and
+  the existing 0.75 minimum scale factor. Top/bottom padding is retained.
+- Applies to the expanded Player on both platforms. No playback changes.
+  Generic iOS and macOS builds passed; user visual check pending.
+
+## Duo Player top spacing — 2026-11-25
+
+- User physically confirmed the live cross-controller following works well, then
+  requested the Player content begin directly below its label on iPhone Duo,
+  matching Release and recovering scarce vertical space.
+- Player's DeckCard opts into usesTightHeaderSpacing. iOS DeckCardView applies it
+  only with the phone idiom + side meter layout: removes the regular 20 pt top
+  gap, uses the Release side-rail -16 pt content start, and removes the trailing
+  24 pt header/content spacer (Player is entirely in the header).
+- Ordinary iPhone, iPad and macOS spacing remain unchanged. No transport changes.
+  Generic iOS and macOS builds passed; user visual confirmation pending.
+
+## Live renderer following across controllers — 2026-11-25
+
+- User requested all open controllers' Player cards follow the selected renderer,
+  including another device replacing the album. Browsing remains independent;
+  only explicit transport commands should change what is playing.
+- OutputRoutingPlaybackEngine enables observation for the selected UPnP output,
+  including idle selection. It keeps observing after local Pause/Stop; deselecting
+  or changing to system output disables polling and filters old renderer events.
+  This reuses the existing poll loop/backoff, not another polling timer.
+- A previously unknown active Navidrome TrackURI relinquishes the old queue feeder
+  immediately, then emits rendererSessionChanged. PlaybackController resolves the
+  album via its injected resolver, deduplicates pending song lookups, checks the
+  latest renderer snapshot again, then adopts without transport setters. Startup
+  takeover uses this same path. Observer adoption never sends SetNext, even for
+  single-track/current-next transport, preventing competing controllers' feeders.
+- Lookup cancellation/generations protect explicit Play, queue/source/output
+  changes. Failed lookups back off; changed songs are rechecked before adoption.
+  Adoption failures must leave observation alive. Old deferred cleanup cannot
+  remove a newer pending lookup. Loading queues ignore observation state events.
+- Live known-track polling confirms Pause/Resume state every cycle. Album EOS
+  stays stopped, preserving reset-to-first handling and autonomous DIDL albums.
+- Successful takeover invokes the existing artwork + lazy card preloads, including
+  the independent Player artwork update. A browsed different release is preserved.
+- New tests cover foreign-album adoption without transport commands, subsequent
+  track/Pause/Resume/Stop, persistent observation after Pause/Stop, disabling it,
+  stale lookup vs explicit queue replacement, song changing during lookup, and
+  idle selected output vs system-output event filtering.
+- Verification passed: 288 main-app tests in the full run, generic iOS build,
+  and 69 Sync tests. The subsequently added idle/system-routing test also passed
+  with the whole UPnP test group (289 main-app tests covered in total). Physical
+  two-device testing was subsequently confirmed successful by the user. No AVM
+  commands were sent by the agent. No commit,
+  Store upload, signing change or version bump was performed.
+
+## Help typography polish — 2026-11-25
+
+- User requested a trailing Liquid glass switch on macOS and subtle inline
+  emphasis throughout Help & support. AboutView now separates the accessible
+  toggle from its visible label with a spacer, retaining its preference key.
+- Feature/control names, source/output choices and troubleshooting cues use
+  semibold inline text. Existing sections, body size, links and spacing remain;
+  library.json retains code styling. Shared copy changes apply on iOS too.
+- macOS and generic iOS device builds passed.
+  No playback/signing/version changes were made for this UI polish.
+
+## UPnP takeover artwork — 2026-11-25
+
+- User reported successful cross-device transport/position adoption but no cover
+  on the receiving controller. Navidrome's adopted queue has nil artwork; the
+  subsequent release-card cover load never updated playback's immutable tracks.
+- After adoption, preloadPlaybackArtwork runs alongside the existing card preload,
+  using the shared releaseCoverLoader/CoverArtCache. It is independent of the
+  browsed release and never delays transport adoption or sends renderer commands.
+- PlaybackController.updateArtwork patches only missing images on all queue items
+  matching the still-current release, preserving identities, sources, selection,
+  position and prepared engine state. A late result for another album is ignored.
+- Now Playing's artwork cache now compares image data as well as item ID, allowing
+  a formerly missing image to appear without waiting for the next track.
+- 284 main-app macOS tests passed, including actual injected-image loading while
+  browsing another release and a no-transport-change/whole-album metadata test.
+  Generic iOS device build also passed. No version bump or commit.
+
 ## Release readiness — 2026-11-22
 
 - User explicitly confirmed completion of both previously requested physical

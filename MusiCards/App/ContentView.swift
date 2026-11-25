@@ -76,7 +76,8 @@ struct ContentView: View {
                 slotIndex: MusiCardID.player.slotIndex,
                 cardLabel: "Player",
                 title: "",
-                subtitle: ""
+                subtitle: "",
+                usesTightHeaderSpacing: true
             ),
         ])
         return result

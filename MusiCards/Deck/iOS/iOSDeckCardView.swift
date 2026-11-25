@@ -119,6 +119,11 @@ struct DeckCardView<ID: Hashable, CollapsedHeaderContent: View, HeaderContent: V
         )
     }
 
+    private var usesDuoPlayerSpacing: Bool {
+        card.usesTightHeaderSpacing && usesSideSignalMeter
+            && UIDevice.current.userInterfaceIdiom == .phone
+    }
+
     private var cardContent: some View {
         VStack(alignment: .leading, spacing: 0) {
             topBarView
@@ -137,11 +142,13 @@ struct DeckCardView<ID: Hashable, CollapsedHeaderContent: View, HeaderContent: V
                     // scroll viewport below the card label (56 + 20 - 36 = 40).
                     .padding(.top, usesSideSignalMeter ? -16 : 0)
                 } else {
-                    Spacer().frame(height: DeckStyle.headerTopSpacing)
+                    Spacer().frame(height: usesDuoPlayerSpacing ? 0 : DeckStyle.headerTopSpacing)
 
                     header
+                        // Match the Release card's side-rail content start.
+                        .padding(.top, usesDuoPlayerSpacing ? -16 : 0)
 
-                    Spacer().frame(height: DeckStyle.contentTopSpacing)
+                    Spacer().frame(height: usesDuoPlayerSpacing ? 0 : DeckStyle.contentTopSpacing)
 
                     content
                 }

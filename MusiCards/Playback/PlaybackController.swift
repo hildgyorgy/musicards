@@ -32,6 +32,13 @@ final class PlaybackController: ObservableObject {
     @Published private(set) var rendererPlaybackNotice: String?
     @Published private(set) var signalLevels: PlaybackSignalLevels?
 
+    var rendererQueueResolver: ((String) async throws -> ReleasePlaybackQueue)?
+    var rendererPlaybackAdopted: ((ReleasePlaybackQueue) -> Void)?
+    private var rendererFollowTask: Task<Void, Never>?
+    private var pendingRendererSongID: String?
+    private var rendererFollowSequence: UInt64 = 0
+    private var rendererFollowRetryAfter = Date.distantPast
+
     private let engine: PlaybackEngine
     private let assetResolver: (any PlaybackAssetResolving)?
     private var preparedItemID: PlaybackQueueItem.ID?
@@ -203,6 +210,7 @@ final class PlaybackController: ObservableObject {
 
     func play() async {
         guard status != .loading, let currentItem else { return }
+        cancelRendererFollowLookup()
         if needsNavidromePreparation {
             needsNavidromePreparation = false
             if isNavidromeItem(currentItem) {
@@ -272,6 +280,7 @@ final class PlaybackController: ObservableObject {
     }
 
     func pause() async {
+        cancelRendererFollowLookup()
         guard status.isPlaying else { return }
         await engine.pause()
         status = .paused
@@ -422,7 +431,7 @@ final class PlaybackController: ObservableObject {
               newQueue.items.indices.contains(newQueue.selectedIndex) else {
             return
         }
-        _ = advancePlaybackGeneration()
+        let generation = advancePlaybackGeneration()
         pendingOutputResumePosition = nil
         queue = newQueue.items
         currentIndex = newQueue.selectedIndex
@@ -434,11 +443,14 @@ final class PlaybackController: ObservableObject {
         status = .ready
         do {
             let resolved = try await resolvedItem(item)
+            guard generation == playbackGeneration, !Task.isCancelled else { throw CancellationError() }
             try await renderer.adoptRendererSession(
                 item: resolved,
                 snapshot: snapshot
             )
+            guard generation == playbackGeneration, !Task.isCancelled else { throw CancellationError() }
         } catch {
+            guard generation == playbackGeneration else { throw error }
             queue = []
             currentIndex = nil
             preparedItemID = nil
@@ -448,6 +460,60 @@ final class PlaybackController: ObservableObject {
             status = .idle
             throw error
         }
+    }
+
+    /// Catalog lookup can be slow. Deduplicate observations and recheck transport
+    /// before adopting; explicit Play/source/output changes always win the race.
+    func followRendererPlaybackIfAvailable(_ snapshot: AVTransportSnapshot) {
+        guard status != .loading,
+              ["PLAYING", "TRANSITIONING", "PAUSED_PLAYBACK"].contains(snapshot.transport.state.uppercased()),
+              let resolve = rendererQueueResolver,
+              let songID = UPnPPlaybackEngine.navidromeSongID(in: snapshot.position.trackURI),
+              pendingRendererSongID != songID,
+              Date() >= rendererFollowRetryAfter else { return }
+        cancelRendererFollowLookup()
+        rendererFollowSequence &+= 1
+        let sequence = rendererFollowSequence
+        let generation = playbackGeneration
+        pendingRendererSongID = songID
+        rendererFollowTask = Task { [weak self] in
+            guard let self else { return }
+            defer {
+                if self.rendererFollowSequence == sequence {
+                    self.pendingRendererSongID = nil
+                    self.rendererFollowTask = nil
+                }
+            }
+            do {
+                let queue = try await resolve(songID)
+                guard generation == self.playbackGeneration, !Task.isCancelled else { return }
+                guard let latest = try await self.rendererSnapshot(),
+                      latest.position.trackURI?.host == snapshot.position.trackURI?.host,
+                      latest.position.trackURI?.port == snapshot.position.trackURI?.port,
+                      UPnPPlaybackEngine.navidromeSongID(in: latest.position.trackURI) == songID,
+                      ["PLAYING", "TRANSITIONING", "PAUSED_PLAYBACK"].contains(latest.transport.state.uppercased()),
+                      generation == self.playbackGeneration, !Task.isCancelled else { return }
+                // Adoption advances the generation, which cancels pending lookups.
+                self.rendererFollowTask = nil
+                self.pendingRendererSongID = nil
+                try await self.adoptRendererPlayback(queue: queue, snapshot: latest)
+                self.rendererPlaybackAdopted?(queue)
+            } catch {
+                guard generation == self.playbackGeneration, !Task.isCancelled else { return }
+                self.rendererFollowRetryAfter = Date().addingTimeInterval(3)
+            }
+        }
+    }
+
+    /// Artwork is display metadata: never replace the queue or touch transport.
+    /// A late response for an album we have left must not update another session.
+    func updateArtwork(_ data: Data, forReleaseID releaseID: String) {
+        guard currentItem?.track.releaseID == releaseID else { return }
+        let updated = queue.map { item in
+            item.track.releaseID == releaseID && item.track.artworkData == nil
+                ? item.replacingArtwork(data) : item
+        }
+        if updated != queue { queue = updated }
     }
 
     /// Preserve the queue's MB release boundary, even if future queues contain
@@ -579,6 +645,7 @@ final class PlaybackController: ObservableObject {
             self.position = max(position, 0)
             status = .playing
         case let .rendererTrackChanged(itemID, duration, audioFormat, position, isPlaying):
+            guard status != .loading else { return }
             guard let index = queue.firstIndex(where: { $0.id == itemID }) else { return }
             currentIndex = index
             preparedItemID = itemID
@@ -586,7 +653,10 @@ final class PlaybackController: ObservableObject {
             preparedAudioFormat = audioFormat
             self.position = max(0, position)
             status = isPlaying ? .playing : .paused
+        case .rendererSessionChanged(let snapshot):
+            followRendererPlaybackIfAvailable(snapshot)
         case .rendererPlaylistStopped:
+            guard status != .loading else { return }
             // A renderer-owned list must never trigger the app's fallback Next.
             preparedItemID = nil
             status = .stopped
@@ -595,6 +665,7 @@ final class PlaybackController: ObservableObject {
         case .rendererConnectionChanged(let isReconnecting):
             isRendererReconnecting = isReconnecting
         case let .rendererPlaybackStateConfirmed(itemID, isPlaying):
+            guard status != .loading else { return }
             guard currentItem?.id == itemID else { return }
             preparedItemID = itemID
             status = isPlaying ? .playing : .paused
@@ -658,8 +729,17 @@ final class PlaybackController: ObservableObject {
         }
     }
 
+    private func cancelRendererFollowLookup() {
+        rendererFollowSequence &+= 1
+        rendererFollowTask?.cancel()
+        rendererFollowTask = nil
+        pendingRendererSongID = nil
+    }
+
     @discardableResult
     private func advancePlaybackGeneration() -> UInt64 {
+        cancelRendererFollowLookup()
+        rendererFollowRetryAfter = .distantPast
         signalLevels = nil
         isRendererReconnecting = false
         rendererPlaybackNotice = nil

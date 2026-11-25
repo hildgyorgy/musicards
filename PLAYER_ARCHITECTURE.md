@@ -4,6 +4,19 @@ This document preserves stable product decisions and the playback contracts.
 See Documentation/codex_handoff.md for the latest tested checkpoint. Dated
 August implementation notes below are historical, not a current task list.
 
+## Live UPnP observation — 2026-11-25
+
+The selected renderer is the source of Player state across controllers. Its
+existing polling loop persists through local Pause/Stop; it is disabled on system
+output selection. Unknown active Navidrome tracks immediately revoke the old
+queue's feeder authority. Catalog lookup is deduplicated and revalidated against
+a fresh transport snapshot, then adopted without SetURI, SetNext, Play or Stop.
+Adoption observers never feed NextURI, including for a single-track session;
+only the controller that explicitly prepares playback may feed a legacy queue.
+Explicit commands and queue/output changes invalidate pending lookups. Browsing
+is separate from Player identity. Successful adoption refreshes artwork and lazy
+metadata without navigating away from a separately browsed release.
+
 ## Autonomous renderer albums — 2026-11-20
 
 Explicit ConnectionManager HTTP DIDL_S support allows a single, ordered playlist

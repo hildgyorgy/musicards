@@ -90,6 +90,8 @@ final class UPnPPlaybackEngine: PlaybackEngine {
     private var lastPlayingPosition: TimeInterval?
     private var lastPlayingDuration: TimeInterval?
     private var pollGeneration: UInt64 = 0
+    private var observesExternalChanges = false
+    private var feedsRendererQueue = true
     private var ownsRendererPlaylist = false
     private var playlistEntries: [(item: PlaybackQueueItem, url: URL)] = []
     private var playlistTrackOffset = 0
@@ -120,6 +122,19 @@ final class UPnPPlaybackEngine: PlaybackEngine {
     deinit {
         pollTask?.cancel()
         if let server = playlistServer { Task { _ = await server.finish() } }
+    }
+
+    /// Observation never changes transport; keep it alive through Pause/Stop.
+    func beginObservingRenderer() {
+        observesExternalChanges = true
+        if pollTask == nil { startPolling() }
+    }
+
+    func endObservingRenderer() {
+        observesExternalChanges = false
+        pollGeneration &+= 1
+        pollTask?.cancel()
+        pollTask = nil
     }
 
     func configure(renderer: UPnPRendererDescriptor) {
@@ -173,6 +188,7 @@ final class UPnPPlaybackEngine: PlaybackEngine {
         _ = await previousServer?.finish()
         try ensureCurrent(generation)
         ownsRendererPlaylist = false
+        feedsRendererQueue = true
         playlistEntries = []
         if renderer?.capabilities.supportsDIDLPlaylist == true {
             eventHandler?(.rendererPlaybackNotice(nil))
@@ -286,6 +302,7 @@ final class UPnPPlaybackEngine: PlaybackEngine {
         } catch {
             eventHandler?(.failed(PlaybackFailure(error)))
         }
+        if observesExternalChanges { startPolling() }
     }
 
     func stop() async {
@@ -306,6 +323,9 @@ final class UPnPPlaybackEngine: PlaybackEngine {
         _ = await server?.finish()
         guard generation == pollGeneration, !Task.isCancelled else { return }
         try? await stoppedClient?.stop()
+        guard generation == pollGeneration else { return }
+        feedsRendererQueue = false
+        if observesExternalChanges { startPolling() }
     }
 
     func seek(to position: TimeInterval) async throws {
@@ -352,6 +372,27 @@ final class UPnPPlaybackEngine: PlaybackEngine {
                 eventHandler?(.rendererConnectionChanged(isReconnecting: false))
             }
             let state = snapshot.transport.state.uppercased()
+            if observesExternalChanges,
+               ["PLAYING", "TRANSITIONING", "PAUSED_PLAYBACK"].contains(state),
+               let uri = snapshot.position.trackURI,
+               !Self.sameStream(uri, currentStreamURL),
+               !Self.sameStream(uri, stagedNextStreamURL),
+               playlistEntry(for: snapshot.position) == nil {
+                // Another controller replaced transport. Stop feeding OUR queue
+                // before asking the catalog to identify the new session.
+                feedsRendererQueue = false
+                ownsRendererPlaylist = false
+                playlistEntries = []
+                stagedNextItem = nil
+                stagedNextStreamURL = nil
+                needsPlayVerification = true
+                hasObservedPlaying = false
+                if Self.navidromeSongID(in: uri) != nil {
+                    eventHandler?(.rendererSessionChanged(snapshot))
+                }
+                await publishVolumeStateIfAvailable()
+                return
+            }
             if ownsRendererPlaylist {
                 if ["PLAYING", "TRANSITIONING", "PAUSED_PLAYBACK"].contains(state),
                    let entry = playlistEntry(for: snapshot.position) {
@@ -405,13 +446,15 @@ final class UPnPPlaybackEngine: PlaybackEngine {
             if let reportedURI = snapshot.position.trackURI,
                !Self.sameStream(reportedURI, currentStreamURL) {
                 needsPlayVerification = true
-                pollTask?.cancel()
-                pollTask = nil
+                if !observesExternalChanges {
+                    pollTask?.cancel()
+                    pollTask = nil
+                }
                 hasObservedPlaying = false
                 eventHandler?(.paused)
                 return
             }
-            if wasReconnecting, let preparedItem,
+            if wasReconnecting || observesExternalChanges, let preparedItem,
                Self.sameStream(snapshot.position.trackURI, currentStreamURL),
                snapshot.transport.status?.uppercased() != "ERROR_OCCURRED" {
                 if state == "PLAYING" || state == "TRANSITIONING" || state == "PAUSED_PLAYBACK" {
@@ -440,9 +483,15 @@ final class UPnPPlaybackEngine: PlaybackEngine {
             guard generation == pollGeneration, !Task.isCancelled else { return }
             if hasObservedPlaying,
                state == "STOPPED" || state == "NO_MEDIA_PRESENT" {
-                pollTask?.cancel()
-                pollTask = nil
+                if !observesExternalChanges {
+                    pollTask?.cancel()
+                    pollTask = nil
+                }
                 hasObservedPlaying = false
+                if observesExternalChanges && !feedsRendererQueue {
+                    eventHandler?(.rendererPlaylistStopped)
+                    return
+                }
                 let duration = lastPlayingDuration ?? preparedItem?.track.duration
                 let position = max(lastPlayingPosition ?? 0, snapshot.position.relativeTime ?? 0)
                 if snapshot.transport.status?.uppercased() == "ERROR_OCCURRED" {
@@ -481,7 +530,7 @@ final class UPnPPlaybackEngine: PlaybackEngine {
     }
 
     private func stageNextItemIfAvailable() async {
-        guard !ownsRendererPlaylist else { return }
+        guard !ownsRendererPlaylist, feedsRendererQueue else { return }
         guard renderer?.capabilities.supportsSetNext == true,
               let client else {
             stagedNextItem = nil
@@ -654,6 +703,18 @@ extension UPnPPlaybackEngine: RendererPlaybackSessionControlling {
 
         pollGeneration &+= 1
         let generation = pollGeneration
+        var adoptionCompleted = false
+        defer {
+            if observesExternalChanges && !adoptionCompleted && generation == pollGeneration {
+                // A catalog/asset failure must not permanently detach observation.
+                preparedItem = nil
+                currentStreamURL = nil
+                playlistEntries = []
+                ownsRendererPlaylist = false
+                feedsRendererQueue = false
+                startPolling()
+            }
+        }
         pollTask?.cancel()
         pollTask = nil
         preparedItem = item
@@ -685,7 +746,8 @@ extension UPnPPlaybackEngine: RendererPlaybackSessionControlling {
         // A playlist adopted from another controller owns its own end-of-list.
         // An unknown media response on a playlist-capable renderer must not
         // receive a speculative SetNext that could extend an existing album.
-        ownsRendererPlaylist = (media?.numberOfTracks ?? 0) > 1 ||
+        feedsRendererQueue = !observesExternalChanges
+        ownsRendererPlaylist = observesExternalChanges || (media?.numberOfTracks ?? 0) > 1 ||
             (media == nil && renderer?.capabilities.supportsDIDLPlaylist == true)
         playlistEntries = []
         if ownsRendererPlaylist, let queue = try await releaseQueueProvider?() {
@@ -702,6 +764,7 @@ extension UPnPPlaybackEngine: RendererPlaybackSessionControlling {
         await publishVolumeStateIfAvailable()
         try ensureCurrent(generation)
         startPolling()
+        adoptionCompleted = true
     }
 }
 

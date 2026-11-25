@@ -11,4 +11,5 @@ struct DeckCard<ID: Hashable>: Identifiable {
     let title: String
     let subtitle: String
     var scrollsHeaderInCompactLayout = false
+    var usesTightHeaderSpacing = false
 }

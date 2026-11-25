@@ -4,6 +4,32 @@ import XCTest
 
 final class PlaybackControllerTests: XCTestCase {
     @MainActor
+    func testLateArtworkUpdatesWholeAlbumWithoutTouchingPlayback() async {
+        let engine = PlaybackEngineSpy()
+        let controller = PlaybackController(engine: engine)
+        await controller.replaceQueue(with: [item(1), item(2), item(3, releaseID: "other")])
+        await controller.play()
+        engine.emit(.positionChanged(42))
+        let prepared = engine.preparedIDs
+        let plays = engine.playCount
+        let stops = engine.stopCount
+        let art = Data([1, 2, 3])
+        controller.updateArtwork(art, forReleaseID: "other")
+        XCTAssertTrue(controller.queue.allSatisfy { $0.track.artworkData == nil })
+        controller.updateArtwork(art, forReleaseID: "release")
+        XCTAssertEqual(controller.queue[0].track.artworkData, art)
+        XCTAssertEqual(controller.queue[1].track.artworkData, art)
+        XCTAssertNil(controller.queue[2].track.artworkData)
+        XCTAssertEqual(controller.currentIndex, 0)
+        XCTAssertEqual(controller.position, 42)
+        XCTAssertEqual(controller.status, .playing)
+        XCTAssertEqual(controller.queue.map(\.id), ["item-1", "item-2", "item-3"])
+        XCTAssertEqual(engine.preparedIDs, prepared)
+        XCTAssertEqual(engine.playCount, plays)
+        XCTAssertEqual(engine.stopCount, stops)
+    }
+
+    @MainActor
     func testRendererAlbumQueueStopsAtReleaseBoundaryAndPreservesSelectedOffset() async throws {
         let controller = PlaybackController(engine: PlaybackEngineSpy())
         await controller.replaceQueue(with: [

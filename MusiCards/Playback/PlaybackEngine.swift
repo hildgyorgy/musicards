@@ -431,6 +431,7 @@ enum PlaybackEngineEvent: Equatable {
         position: TimeInterval
     )
     case rendererTrackChanged(itemID: String, duration: TimeInterval?, audioFormat: PlaybackAudioFormat?, position: TimeInterval, isPlaying: Bool)
+    case rendererSessionChanged(AVTransportSnapshot)
     case rendererPlaylistStopped
     case rendererPlaybackNotice(String?)
     case rendererConnectionChanged(isReconnecting: Bool)

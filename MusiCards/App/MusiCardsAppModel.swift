@@ -290,22 +290,30 @@ final class MusiCardsAppModel: ObservableObject {
                 self?.hasCurrentPlaybackItem = hasCurrentItem
             }
 
+        playbackController.rendererQueueResolver = { songID in
+            try await navidromeLibraryProvider.playbackQueue(containingNavidromeSongID: songID)
+        }
+        playbackController.rendererPlaybackAdopted = { [weak self] queue in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                async let artwork: Void = self.preloadPlaybackArtwork(from: queue)
+                await self.preloadPlaybackContext(from: queue)
+                await artwork
+            }
+        }
+
         rendererBrowser.selectionCommitHandler = { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 await self.playbackController.outputSelectionDidChange()
-                await self.adoptRendererPlaybackIfAvailable(
-                    provider: navidromeLibraryProvider
-                )
+                await self.adoptRendererPlaybackIfAvailable()
             }
         }
         rendererBrowser.selectedRendererResolvedHandler = { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 await self.playbackController.refreshOutputVolume()
-                await self.adoptRendererPlaybackIfAvailable(
-                    provider: navidromeLibraryProvider
-                )
+                await self.adoptRendererPlaybackIfAvailable()
             }
         }
 
@@ -346,9 +354,7 @@ final class MusiCardsAppModel: ObservableObject {
         networkMonitor.cancel()
     }
 
-    private func adoptRendererPlaybackIfAvailable(
-        provider: NavidromeLibraryProvider
-    ) async {
+    private func adoptRendererPlaybackIfAvailable() async {
         guard activeLibrarySource == .navidrome else { return }
         guard playbackController.canAdoptRendererPlayback else { return }
         do {
@@ -356,18 +362,12 @@ final class MusiCardsAppModel: ObservableObject {
                   ["PLAYING", "PAUSED_PLAYBACK", "TRANSITIONING"].contains(
                     snapshot.transport.state.uppercased()
                   ),
-                  let songID = UPnPPlaybackEngine.navidromeSongID(
+                  UPnPPlaybackEngine.navidromeSongID(
                     in: snapshot.position.trackURI
-                  ) else { return }
-            let queue = try await provider.playbackQueue(
-                containingNavidromeSongID: songID
-            )
-            guard playbackController.canAdoptRendererPlayback else { return }
-            try await playbackController.adoptRendererPlayback(
-                queue: queue,
-                snapshot: snapshot
-            )
-            await preloadPlaybackContext(from: queue)
+                  ) != nil else { return }
+            guard activeLibrarySource == .navidrome,
+                  playbackController.canAdoptRendererPlayback else { return }
+            playbackController.followRendererPlaybackIfAvailable(snapshot)
         } catch {
             // Discovery and ordinary local playback remain usable when an
             // external renderer session cannot be identified as Navidrome.
@@ -375,6 +375,19 @@ final class MusiCardsAppModel: ObservableObject {
                 "Renderer playback could not be adopted errorType=\(String(reflecting: type(of: error)), privacy: .public) detail=\(error.localizedDescription, privacy: .private)"
             )
         }
+    }
+
+    /// Fetch the adopted album's cover independently of the browsing selection.
+    /// Playback is already adopted; artwork must not delay or restart transport.
+    func preloadPlaybackArtwork(from queue: ReleasePlaybackQueue) async {
+        guard queue.items.indices.contains(queue.selectedIndex) else { return }
+        let track = queue.items[queue.selectedIndex].track
+        guard let releaseID = track.releaseID, !releaseID.isEmpty,
+              playbackController.currentItem?.track.releaseID == releaseID,
+              playbackController.currentItem?.track.artworkData == nil else { return }
+        let cover = await releaseCoverLoader(releaseID)
+        guard !Task.isCancelled, let data = imageData(for: cover) else { return }
+        playbackController.updateArtwork(data, forReleaseID: releaseID)
     }
 
     func preloadPlaybackContext(

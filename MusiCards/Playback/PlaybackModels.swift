@@ -204,6 +204,18 @@ struct PlaybackQueueItem: Identifiable, Equatable, Sendable {
         self.source = source
     }
 
+    func replacingArtwork(_ data: Data) -> PlaybackQueueItem {
+        let updatedTrack = PlaybackTrack(
+            id: track.id, releaseTrackID: track.releaseTrackID,
+            recordingID: track.recordingID, releaseID: track.releaseID,
+            title: track.title, artist: track.artist, albumTitle: track.albumTitle,
+            duration: track.duration, artworkData: data,
+            mediumFormat: track.mediumFormat, discNumber: track.discNumber,
+            trackNumber: track.trackNumber, audioFormat: track.audioFormat
+        )
+        return PlaybackQueueItem(id: id, track: updatedTrack, source: source)
+    }
+
     func replacingSource(_ source: PlaybackSource) -> PlaybackQueueItem {
         PlaybackQueueItem(id: id, track: track, source: source)
     }

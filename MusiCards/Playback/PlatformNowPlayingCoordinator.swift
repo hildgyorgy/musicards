@@ -30,6 +30,7 @@ final class PlatformNowPlayingCoordinator {
     private var commandTargets: [(command: MPRemoteCommand, target: Any)] = []
     private var lastPublishedSnapshot: PublishedSnapshot?
     private var cachedArtworkItemID: String?
+    private var cachedArtworkData: Data?
     private var cachedArtwork: MPMediaItemArtwork?
 
     init(controller: PlaybackController) {
@@ -141,6 +142,7 @@ final class PlatformNowPlayingCoordinator {
         guard lastPublishedSnapshot != nil else { return }
         lastPublishedSnapshot = nil
         cachedArtworkItemID = nil
+        cachedArtworkData = nil
         cachedArtwork = nil
         let infoCenter = MPNowPlayingInfoCenter.default()
         infoCenter.nowPlayingInfo = nil
@@ -216,11 +218,12 @@ final class PlatformNowPlayingCoordinator {
     private func artwork(
         for item: PlaybackQueueItem
     ) -> MPMediaItemArtwork? {
-        if cachedArtworkItemID == item.id {
+        if cachedArtworkItemID == item.id, cachedArtworkData == item.track.artworkData {
             return cachedArtwork
         }
 
         cachedArtworkItemID = item.id
+        cachedArtworkData = item.track.artworkData
 
         guard let data = item.track.artworkData,
               let artwork = Self.makeArtwork(from: data) else {
